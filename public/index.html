@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>A&amp;B Tools Business Manager — Ledger &amp; Admin Panel</title>
+  <meta name="theme-color" content="#0d0f12">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- SheetJS for client-side Excel backup -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ==================== PIN GATE / LOCK SCREEN ==================== -->
+  <div id="pinGateModal" class="pin-gate-overlay active">
+    <div class="pin-gate-card">
+      <div class="pin-brand-badge">
+        <div class="pin-logo-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <h1 class="brand-title">A&amp;B Tools</h1>
+        <p class="brand-subtitle">Business Manager &amp; Ledger</p>
+      </div>
+
+      <!-- PIN Setup State (First Time Launch) -->
+      <div id="pinSetupContainer" class="pin-state-section" style="display: none;">
+        <div class="pin-prompt-box">
+          <span class="security-tag">🔐 First-Time Setup</span>
+          <h2 class="pin-heading">Create Your Secret PIN</h2>
+          <p class="pin-desc">There is no default PIN. Please choose a 4-digit PIN that only you know.</p>
+        </div>
+
+        <div class="pin-input-group">
+          <label>New 4-Digit PIN</label>
+          <input type="password" id="newPinInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="off">
+        </div>
+        <div class="pin-input-group">
+          <label>Confirm PIN</label>
+          <input type="password" id="confirmPinInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="off">
+        </div>
+        <div id="pinSetupError" class="pin-error-msg"></div>
+        <button id="btnSavePin" class="btn btn-gold btn-block">
+          <span>Save PIN &amp; Unlock</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <!-- PIN Unlock State (Existing Users) -->
+      <div id="pinUnlockContainer" class="pin-state-section">
+        <div class="pin-prompt-box">
+          <span class="security-tag">🔒 Private Business Ledger</span>
+          <h2 class="pin-heading">Enter Your Security PIN</h2>
+          <p class="pin-desc">Enter your 4-digit PIN to access your financial records.</p>
+        </div>
+
+        <div class="pin-dots-display" id="pinDotsDisplay">
+          <span class="pin-dot"></span>
+          <span class="pin-dot"></span>
+          <span class="pin-dot"></span>
+          <span class="pin-dot"></span>
+        </div>
+
+        <input type="password" id="unlockPinInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" class="hidden-pin-input" autofocus autocomplete="off">
+
+        <!-- Mobile Touch Numpad -->
+        <div class="numpad-grid">
+          <button class="numpad-btn" data-key="1">1</button>
+          <button class="numpad-btn" data-key="2">2</button>
+          <button class="numpad-btn" data-key="3">3</button>
+          <button class="numpad-btn" data-key="4">4</button>
+          <button class="numpad-btn" data-key="5">5</button>
+          <button class="numpad-btn" data-key="6">6</button>
+          <button class="numpad-btn" data-key="7">7</button>
+          <button class="numpad-btn" data-key="8">8</button>
+          <button class="numpad-btn" data-key="9">9</button>
+          <button class="numpad-btn key-action" id="btnClearPin">C</button>
+          <button class="numpad-btn" data-key="0">0</button>
+          <button class="numpad-btn key-action" id="btnBackspacePin">⌫</button>
+        </div>
+
+        <div id="pinUnlockError" class="pin-error-msg"></div>
+
+        <button id="btnUnlockSubmit" class="btn btn-gold btn-block mt-3">
+          <span>Unlock Dashboard</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MAIN APPLICATION CONTAINER ==================== -->
+  <div id="appContainer" class="app-root">
+
+    <!-- Top Sticky Header -->
+    <header class="app-header">
+      <div class="header-content">
+        <div class="header-brand">
+          <div class="logo-mark">A&amp;B</div>
+          <div>
+            <h1 class="header-title">A&amp;B Tools Manager</h1>
+            <span class="header-tagline">Sales Ledger &amp; Profit Tracker</span>
+          </div>
+        </div>
+
+        <!-- Header Actions -->
+        <div class="header-actions">
+          <button id="btnQuickSearch" class="icon-btn" title="Search Phone / Customer / Account" aria-label="Search">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <span class="btn-text-desktop">Search (🔍)</span>
+          </button>
+          
+          <button id="btnDownloadExcel" class="icon-btn btn-excel" title="Download Excel (.xlsx)" aria-label="Download Excel">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span class="btn-text-desktop">Excel Sheet</span>
+          </button>
+
+          <button id="btnLockApp" class="icon-btn btn-lock" title="Lock App" aria-label="Lock App">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons Bar -->
+      <div class="action-quick-bar">
+        <button id="btnOpenNewSaleModal" class="btn btn-gold btn-sm">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>+ New Sale</span>
+        </button>
+        <button id="btnOpenNewExpenseModal" class="btn btn-subtle btn-sm">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>+ New Expense</span>
+        </button>
+        <button id="btnOpenRemindersView" class="btn btn-reminder-pill btn-sm">
+          <span>⏰ Reminders</span>
+          <span id="remindersCountBadge" class="badge-count">0</span>
+        </button>
+        <div class="live-date-pill" id="liveDatePill" title="Today's Live Date">
+          <span class="live-pulse"></span>
+          <span id="liveDateDisplay">Today</span>
+        </div>
+      </div>
+
+      <!-- Period Filter Tabs -->
+      <div class="period-tabs-wrapper">
+        <div class="period-tabs">
+          <button class="period-tab active" data-period="all">All Time</button>
+          <button class="period-tab" data-period="today">Today</button>
+          <button class="period-tab" data-period="week">This Week</button>
+          <button class="period-tab" data-period="month">This Month</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Scrollable Content Area -->
+    <main class="app-body">
+
+      <!-- ==================== DASHBOARD KPI STATS ==================== -->
+      <section class="stats-grid">
+        <!-- Revenue Card -->
+        <div class="stat-card stat-revenue">
+          <div class="stat-header">
+            <span class="stat-label">Total Revenue</span>
+            <div class="stat-icon-wrap icon-green">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            </div>
+          </div>
+          <div class="stat-value"><span class="currency">Rs.</span> <span id="kpiRevenue">0</span></div>
+          <div class="stat-meta"><span id="kpiSalesCount">0</span> sales completed</div>
+        </div>
+
+        <!-- Expense Card -->
+        <div class="stat-card stat-expense">
+          <div class="stat-header">
+            <span class="stat-label">Total Expense</span>
+            <div class="stat-icon-wrap icon-red">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+            </div>
+          </div>
+          <div class="stat-value"><span class="currency">Rs.</span> <span id="kpiExpense">0</span></div>
+          <div class="stat-meta"><span id="kpiExpenseCount">0</span> expenses recorded</div>
+        </div>
+
+        <!-- Profit Card -->
+        <div class="stat-card stat-profit" id="kpiProfitCard">
+          <div class="stat-header">
+            <span class="stat-label">Net Profit</span>
+            <div class="stat-icon-wrap icon-gold">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            </div>
+          </div>
+          <div class="stat-value"><span class="currency">Rs.</span> <span id="kpiProfit">0</span></div>
+          <div class="stat-meta">Revenue − Expense</div>
+        </div>
+
+        <!-- Pending Wasooli Card -->
+        <div class="stat-card stat-pending clickable" id="kpiPendingCard" title="Click to view pending payments">
+          <div class="stat-header">
+            <span class="stat-label">Pending Payments</span>
+            <div class="stat-icon-wrap icon-amber">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+          </div>
+          <div class="stat-value text-amber"><span class="currency">Rs.</span> <span id="kpiPendingAmount">0</span></div>
+          <div class="stat-meta"><span id="kpiPendingCount">0</span> pending orders · <span class="highlight-link">View Details &rarr;</span></div>
+        </div>
+      </section>
+
+      <!-- Navigation Tabs (Sales, Expenses, Pending, Reminders, Admin) -->
+      <nav class="content-nav-bar">
+        <button class="nav-tab active" data-view="salesView">
+          📋 Sales (<span id="navSalesCount">0</span>)
+        </button>
+        <button class="nav-tab" data-view="expensesView">
+          💸 Expenses (<span id="navExpenseCount">0</span>)
+        </button>
+        <button class="nav-tab" data-view="pendingView">
+          ⏳ Pending (<span id="navPendingCount">0</span>)
+        </button>
+        <button class="nav-tab" data-view="remindersView">
+          ⏰ WhatsApp Reminders
+        </button>
+        <button class="nav-tab" data-view="adminView">
+          ⚙️ Admin Panel
+        </button>
+      </nav>
+
+      <!-- ==================== VIEW 1: SALES LIST ==================== -->
+      <section id="salesView" class="view-panel active">
+        <div class="view-header">
+          <div>
+            <h2 class="view-title">Sales History</h2>
+            <p class="view-subtitle">All sales transactions, customer phones, and assigned accounts</p>
+          </div>
+          <div class="view-filters">
+            <select id="salesFilterProduct" class="custom-select select-sm">
+              <option value="ALL">All Products</option>
+            </select>
+            <select id="salesFilterStatus" class="custom-select select-sm">
+              <option value="ALL">All Status</option>
+              <option value="Paid">Paid</option>
+              <option value="Pending">Pending</option>
+              <option value="Unpaid">Unpaid</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="salesListContainer" class="cards-list">
+          <!-- Dynamic sales cards injected here -->
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 2: EXPENSES LIST ==================== -->
+      <section id="expensesView" class="view-panel">
+        <div class="view-header">
+          <div>
+            <h2 class="view-title">Business Expenses</h2>
+            <p class="view-subtitle">Meta Ads, Vendor Purchasing, and operating costs</p>
+          </div>
+          <button id="btnHeaderNewExpense" class="btn btn-subtle btn-sm">+ New Expense</button>
+        </div>
+
+        <div id="expensesListContainer" class="cards-list">
+          <!-- Dynamic expense cards injected here -->
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 3: PENDING PAYMENTS ==================== -->
+      <section id="pendingView" class="view-panel">
+        <div class="view-header">
+          <div>
+            <h2 class="view-title">Pending &amp; Unpaid Payments</h2>
+            <p class="view-subtitle">Customers with outstanding balances</p>
+          </div>
+          <div class="pending-total-pill">
+            <span>Total Outstanding:</span>
+            <strong>Rs. <span id="pendingTabTotal">0</span></strong>
+          </div>
+        </div>
+
+        <div id="pendingListContainer" class="cards-list">
+          <!-- Dynamic pending cards with 1-tap WhatsApp button -->
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 4: DAILY REMINDERS ==================== -->
+      <section id="remindersView" class="view-panel">
+        <div class="view-header">
+          <div>
+            <h2 class="view-title">Daily Automated Reminders</h2>
+            <p class="view-subtitle">Pending payment reminders and 1-day expiry notices with 1-tap WhatsApp</p>
+          </div>
+          <button id="btnRefreshReminders" class="btn btn-outline btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+            Refresh
+          </button>
+        </div>
+
+        <!-- Reminders Subsections -->
+        <div class="reminder-box mb-4">
+          <div class="reminder-box-header">
+            <h3 class="reminder-heading text-amber">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              1. Pending Payment Reminders
+            </h3>
+            <span class="badge-amber" id="pendingRemindersCount">0</span>
+          </div>
+          <p class="section-hint">Sales marked Pending or Unpaid dated yesterday or earlier (today's sales start reminding tomorrow).</p>
+          <div id="pendingRemindersList" class="reminders-list">
+            <!-- Dynamic pending WhatsApp cards -->
+          </div>
+        </div>
+
+        <div class="reminder-box">
+          <div class="reminder-box-header">
+            <h3 class="reminder-heading text-rose">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              2. Plan Expiry Reminders (1 Day Before)
+            </h3>
+            <span class="badge-rose" id="expiryRemindersCount">0</span>
+          </div>
+          <p class="section-hint">Accounts expiring tomorrow (1 day ahead) or today. Send 1-tap WhatsApp renewal message.</p>
+          <div id="expiryRemindersList" class="reminders-list">
+            <!-- Dynamic expiry WhatsApp cards -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 5: ADMIN PANEL ==================== -->
+      <section id="adminView" class="view-panel">
+        <div class="view-header">
+          <div>
+            <h2 class="view-title">Admin Management Panel</h2>
+            <p class="view-subtitle">Products catalog, Plans, Prices, Excel Backend &amp; Security</p>
+          </div>
+        </div>
+
+        <!-- Admin Cards Grid -->
+        <div class="admin-grid">
+
+          <!-- 1. Product Catalog & Prices Management -->
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <div class="admin-card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                <span>Products &amp; Pricing Management</span>
+              </div>
+              <button id="btnOpenNewProductModal" class="btn btn-gold btn-xs">+ Add New Tool</button>
+            </div>
+            <p class="admin-card-desc">Configure Surfshark, Nord, Gemini Pro, CapCut, and custom tools with plan durations and prices.</p>
+
+            <div id="adminProductsCatalog" class="admin-catalog-list">
+              <!-- Render product catalog with edit/delete buttons -->
+            </div>
+          </div>
+
+          <!-- 2. Excel & Data Backup -->
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <div class="admin-card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                <span>Excel Backend &amp; Data Backup</span>
+              </div>
+            </div>
+            <p class="admin-card-desc">All data is permanently written into a 3-sheet Excel workbook (Sales, Expenses, Products).</p>
+
+            <div class="admin-actions-column">
+              <button id="btnAdminDownloadExcel" class="btn btn-excel btn-block">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span>Download Complete Excel (.xlsx)</span>
+              </button>
+
+              <button id="btnDownloadJsonBackup" class="btn btn-subtle btn-block">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                <span>Download JSON Backup</span>
+              </button>
+
+              <div class="restore-box">
+                <label for="restoreFileInput" class="btn btn-outline btn-block cursor-pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path></svg>
+                  <span>Restore Data from Backup File</span>
+                </label>
+                <input type="file" id="restoreFileInput" accept=".json" style="display:none;">
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Security & PIN Settings -->
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <div class="admin-card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                <span>Security &amp; PIN Settings</span>
+              </div>
+            </div>
+            <p class="admin-card-desc">Change your private security PIN to protect customer data and financial numbers.</p>
+
+            <form id="changePinForm" class="admin-pin-form">
+              <div class="form-group">
+                <label>Current PIN</label>
+                <input type="password" id="currentPinInput" inputmode="numeric" maxlength="6" class="form-control" placeholder="••••" required>
+              </div>
+              <div class="form-group">
+                <label>New PIN (Minimum 4 digits)</label>
+                <input type="password" id="changeNewPinInput" inputmode="numeric" maxlength="6" class="form-control" placeholder="••••" required>
+              </div>
+              <div id="changePinMessage" class="pin-feedback-msg"></div>
+              <button type="submit" class="btn btn-gold btn-block">Update Security PIN</button>
+            </form>
+          </div>
+
+          <!-- 4. Danger Zone: Reset Data -->
+          <div class="admin-card" style="border-color: rgba(239, 68, 68, 0.35);">
+            <div class="admin-card-header">
+              <div class="admin-card-title text-rose">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                <span>Reset / Start Fresh</span>
+              </div>
+            </div>
+            <p class="admin-card-desc">Clear demo sales and expenses to start entering your actual daily business records. Product catalog and PIN will be preserved.</p>
+            <button id="btnResetSalesExpenses" class="btn btn-subtle btn-block" style="border-color: var(--danger-border); color: #f87171;">
+              <span>🗑️ Clear All Sales &amp; Expenses</span>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar for Mobile -->
+    <nav class="mobile-bottom-nav">
+      <button class="mobile-nav-btn active" data-view="salesView">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        <span>Sales</span>
+      </button>
+      <button class="mobile-nav-btn" data-view="expensesView">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+        <span>Expenses</span>
+      </button>
+      <button class="mobile-nav-btn" id="mobileBtnNewSale">
+        <div class="mobile-fab-center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </div>
+        <span>+ Sale</span>
+      </button>
+      <button class="mobile-nav-btn" data-view="remindersView">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span>Reminders</span>
+      </button>
+      <button class="mobile-nav-btn" data-view="adminView">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span>Admin</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ==================== MODAL: SALE ENTRY / EDIT ==================== -->
+  <div id="saleModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="saleModalTitle" class="modal-title">New Sale Entry</h3>
+        <button class="modal-close-btn" data-close-modal="saleModal">&times;</button>
+      </div>
+
+      <form id="saleForm" class="modal-form">
+        <input type="hidden" id="saleEditId" value="">
+
+        <!-- Date & Customer Phone -->
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <div class="label-with-actions">
+              <label for="saleDateInput">Date <span class="text-gold">*</span></label>
+              <div class="date-quick-chips">
+                <button type="button" class="btn-chip" id="btnSaleDateToday">Today</button>
+                <button type="button" class="btn-chip" id="btnSaleDateYesterday">Yesterday</button>
+              </div>
+            </div>
+            <input type="date" id="saleDateInput" class="form-control" required>
+          </div>
+          <div class="form-group flex-1">
+            <label for="salePhoneInput">Customer Phone Number <span class="badge-req">Required</span></label>
+            <input type="tel" id="salePhoneInput" class="form-control" placeholder="03182642966" required>
+            <small class="form-hint">Primary identifier (Used for instant lookup)</small>
+          </div>
+        </div>
+
+        <!-- Customer Name (Optional) -->
+        <div class="form-group">
+          <label for="saleNameInput">Customer Name <span class="text-muted">(Optional)</span></label>
+          <input type="text" id="saleNameInput" class="form-control" placeholder="e.g. Ali Ahmed">
+        </div>
+
+        <!-- Product & Account Type -->
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="saleProductSelect">Product <span class="text-gold">*</span></label>
+            <select id="saleProductSelect" class="form-control" required>
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label for="saleTypeSelect">Account Type <span class="text-gold">*</span></label>
+            <select id="saleTypeSelect" class="form-control" required>
+              <option value="Shared">Shared</option>
+              <option value="Private">Private</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Assigned Account (Email/Login) -->
+        <div class="form-group">
+          <label for="saleAccountLogin">Assigned Account — Email/Login <span class="text-gold">*</span></label>
+          <input type="text" id="saleAccountLogin" class="form-control font-mono" placeholder="e.g. Abd114@kuromee.com" required>
+          <small class="form-hint">Useful when customer reports logout to quickly look up assigned credentials</small>
+        </div>
+
+        <!-- Plan & Price (Amount) -->
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="salePlanSelect">Plan Duration <span class="text-gold">*</span></label>
+            <select id="salePlanSelect" class="form-control" required>
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label for="saleAmountInput">Amount (Rs.) <span class="text-gold">*</span></label>
+            <input type="number" id="saleAmountInput" class="form-control font-mono font-bold" min="0" placeholder="e.g. 600" required>
+          </div>
+        </div>
+
+        <!-- Expiry Preview Box (Auto Inclusive Calculation) -->
+        <div class="expiry-calc-box">
+          <div class="expiry-calc-icon">📅</div>
+          <div class="expiry-calc-info">
+            <span class="expiry-label">Calculated Expiry Date (Inclusive):</span>
+            <strong id="saleExpiryPreview" class="expiry-value text-gold">2026-10-30</strong>
+            <span class="expiry-formula-hint">Formula: Purchase Date + (Plan Months &times; 30 &minus; 1 day)</span>
+          </div>
+        </div>
+
+        <!-- Payment Status -->
+        <div class="form-group">
+          <label>Payment Status <span class="text-gold">*</span></label>
+          <div class="status-radio-group">
+            <label class="status-radio radio-paid">
+              <input type="radio" name="saleStatus" value="Paid">
+              <span>Paid</span>
+            </label>
+            <label class="status-radio radio-pending">
+              <input type="radio" name="saleStatus" value="Pending" checked>
+              <span>Pending</span>
+            </label>
+            <label class="status-radio radio-unpaid">
+              <input type="radio" name="saleStatus" value="Unpaid">
+              <span>Unpaid</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Notes (Optional) -->
+        <div class="form-group">
+          <label for="saleNotesInput">Notes <span class="text-muted">(Optional)</span></label>
+          <input type="text" id="saleNotesInput" class="form-control" placeholder="Any special instructions or reference">
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" data-close-modal="saleModal">Cancel</button>
+          <button type="submit" id="btnSaveSale" class="btn btn-gold flex-1">Save Sale</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: EXPENSE ENTRY / EDIT ==================== -->
+  <div id="expenseModal" class="modal-overlay">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3 id="expenseModalTitle" class="modal-title">New Expense Entry</h3>
+        <button class="modal-close-btn" data-close-modal="expenseModal">&times;</button>
+      </div>
+
+      <form id="expenseForm" class="modal-form">
+        <input type="hidden" id="expenseEditId" value="">
+
+        <div class="form-group">
+          <div class="label-with-actions">
+            <label for="expenseDateInput">Date <span class="text-gold">*</span></label>
+            <div class="date-quick-chips">
+              <button type="button" class="btn-chip" id="btnExpenseDateToday">Today</button>
+              <button type="button" class="btn-chip" id="btnExpenseDateYesterday">Yesterday</button>
+            </div>
+          </div>
+          <input type="date" id="expenseDateInput" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label for="expenseCategorySelect">Category <span class="text-gold">*</span></label>
+          <select id="expenseCategorySelect" class="form-control" required>
+            <option value="Meta Ads">Meta Ads (Facebook/Instagram Ads)</option>
+            <option value="Vendor Purchasing">Vendor Purchasing (Wholesale Tool Purchases)</option>
+            <option value="Mobile/Easypaisa Charges">Mobile / Easypaisa Charges</option>
+            <option value="Other">Other Expenses</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="expenseDescInput">Description <span class="text-muted">(Optional)</span></label>
+          <input type="text" id="expenseDescInput" class="form-control" placeholder="Leave empty to use category name">
+        </div>
+
+        <div class="form-group">
+          <label for="expenseAmountInput">Amount (Rs.) <span class="text-gold">*</span></label>
+          <input type="number" id="expenseAmountInput" class="form-control font-mono font-bold" min="0" placeholder="e.g. 1500" required>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" data-close-modal="expenseModal">Cancel</button>
+          <button type="submit" id="btnSaveExpense" class="btn btn-gold flex-1">Save Expense</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: GLOBAL SEARCH (🔍) ==================== -->
+  <div id="searchModal" class="modal-overlay">
+    <div class="modal-card modal-search">
+      <div class="search-top-bar">
+        <div class="search-input-wrap">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="search" id="globalSearchInput" placeholder="Search Phone (e.g. 2966), Name, Account Email, Product..." autofocus autocomplete="off">
+          <button id="btnClearSearch" class="btn-clear-search">&times;</button>
+        </div>
+        <button class="modal-close-btn" data-close-modal="searchModal">&times;</button>
+      </div>
+
+      <div class="search-hint-bar">
+        <span>💡 Tip: Type any digits of customer phone (e.g. <strong>2966</strong>) to instantly view their assigned account!</span>
+      </div>
+
+      <div id="searchResultsList" class="search-results-container">
+        <!-- Search result cards dynamically rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: ADD / EDIT PRODUCT & PLANS (ADMIN) ==================== -->
+  <div id="productModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="productModalTitle" class="modal-title">Add New Tool / Product</h3>
+        <button class="modal-close-btn" data-close-modal="productModal">&times;</button>
+      </div>
+
+      <form id="productForm" class="modal-form">
+        <input type="hidden" id="productEditId" value="">
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="prodNameInput">Product Name <span class="text-gold">*</span></label>
+            <input type="text" id="prodNameInput" class="form-control" placeholder="e.g. Surfshark, Nord, Gemini Pro" required>
+          </div>
+          <div class="form-group flex-1">
+            <label for="prodTypeSelect">Account Type</label>
+            <select id="prodTypeSelect" class="form-control">
+              <option value="Shared">Shared</option>
+              <option value="Private">Private</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="plans-manager-section">
+          <div class="plans-header">
+            <h4>Plans &amp; Pricing (Rs.)</h4>
+            <button type="button" id="btnAddPlanRow" class="btn btn-outline btn-xs">+ Add Plan Row</button>
+          </div>
+          <div id="plansListRowsContainer" class="plans-rows-container">
+            <!-- Dynamic plan rows: Duration Months, Label, Price Rs. -->
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" data-close-modal="productModal">Cancel</button>
+          <button type="submit" id="btnSaveProduct" class="btn btn-gold flex-1">Save Product</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toastNotification" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+{
+  "pin": "2580",
+  "products": [
+    {
+      "id": "prod_surfshark_shared",
+      "name": "Surfshark",
+      "type": "Shared",
+      "plans": [
+        {
+          "months": 1,
+          "label": "1 Month (30 Days)",
+          "price": 250
+        },
+        {
+          "months": 2,
+          "label": "2 Months (60 Days)",
+          "price": 400
+        },
+        {
+          "months": 3,
+          "label": "3 Months (90 Days)",
+          "price": 600
+        },
+        {
+          "months": 6,
+          "label": "6 Months (180 Days)",
+          "price": 1000
+        },
+        {
+          "months": 12,
+          "label": "12 Months (360 Days)",
+          "price": 1600
+        }
+      ]
+    },
+    {
+      "id": "prod_surfshark_private",
+      "name": "Surfshark",
+      "type": "Private",
+      "plans": [
+        {
+          "months": 2,
+          "label": "2 Months (60 Days)",
+          "price": 2200
+        },
+        {
+          "months": 12,
+          "label": "1 Year (360 Days)",
+          "price": 9499
+        }
+      ]
+    },
+    {
+      "id": "prod_nord_shared",
+      "name": "Nord",
+      "type": "Shared",
+      "plans": [
+        {
+          "months": 3,
+          "label": "3 Months (90 Days)",
+          "price": 500
+        },
+        {
+          "months": 6,
+          "label": "6 Months (180 Days)",
+          "price": 900
+        },
+        {
+          "months": 9,
+          "label": "9 Months (270 Days)",
+          "price": 1300
+        },
+        {
+          "months": 12,
+          "label": "12 Months (360 Days)",
+          "price": 1600
+        }
+      ]
+    },
+    {
+      "id": "prod_nord_private",
+      "name": "Nord",
+      "type": "Private",
+      "plans": [
+        {
+          "months": 3,
+          "label": "3 Months (90 Days)",
+          "price": 1800
+        },
+        {
+          "months": 12,
+          "label": "12 Months (360 Days)",
+          "price": 6500
+        }
+      ]
+    },
+    {
+      "id": "prod_gemini_pro",
+      "name": "Gemini Pro",
+      "type": "Shared",
+      "plans": [
+        {
+          "months": 18,
+          "label": "18 Months (540 Days)",
+          "price": 750
+        }
+      ]
+    },
+    {
+      "id": "prod_capcut",
+      "name": "CapCut",
+      "type": "Shared",
+      "plans": [
+        {
+          "months": 1,
+          "label": "1 Month (30 Days)",
+          "price": 450
+        }
+      ]
+    },
+    {
+      "id": "prod_chatgpt",
+      "name": "ChatGPT",
+      "type": "Shared",
+      "plans": [
+        {
+          "months": 1,
+          "label": "1 Month (30 Days)",
+          "price": 800
+        }
+      ]
+    },
+    {
+      "id": "prod_muse_ai",
+      "name": "Muse AI",
+      "type": "Shared",
+      "plans": [
+        {
+          "months": 1,
+          "label": "1 Month (30 Days)",
+          "price": 500
+        }
+      ]
+    }
+  ],
+  "sales": [
+    {
+      "id": "sale_1790808573942_ktuq",
+      "date": "2026-10-01",
+      "customerName": "Ali Ahmed",
+      "customerPhone": "03182642966",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "Abd114@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Pending",
+      "expiryDate": "2026-10-30",
+      "notes": "",
+      "createdAt": "2026-09-30T22:49:33.942Z"
+    }
+  ],
+  "expenses": [
+    {
+      "id": "exp_1790810881227_1bq9",
+      "date": "2026-10-01",
+      "category": "Meta Ads",
+      "description": "Meta Ads Campaign",
+      "amount": 500,
+      "createdAt": "2026-09-30T23:28:01.227Z"
+    }
+  ],
+  "settings": {
+    "businessName": "A&B Tools Business Manager",
+    "currency": "Rs.",
+    "lastExcelExport": null
+  }
+}
