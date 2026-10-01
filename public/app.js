@@ -31,27 +31,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   startDailyDateWatcher();
 });
 
-// Auto-adjust focused fields when mobile virtual keyboard opens
+// Auto-adjust focused fields when mobile virtual keyboard opens without sluggish scroll locks
 function setupViewportKeyboardHandling() {
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', () => {
       const activeElement = document.activeElement;
       if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT' || activeElement.tagName === 'TEXTAREA')) {
-        setTimeout(() => {
-          activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 150);
+        activeElement.scrollIntoView({ block: 'nearest' });
       }
     });
   }
-
-  // Handle mobile field focus so input is never blocked by virtual keyboard
-  document.addEventListener('focusin', (e) => {
-    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) {
-      setTimeout(() => {
-        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 250);
-    }
-  });
 }
 
 // Check PIN setup status (Instant 0ms UI with background server sync)
@@ -308,36 +297,92 @@ function saveLocalState() {
   STATE.data.settings = STATE.data.settings || {};
   const ts = Date.now();
   STATE.data.settings.lastModified = ts;
-  localStorage.setItem('ab_tools_cache', JSON.stringify(STATE.data));
-  localStorage.setItem('ab_tools_last_modified', String(ts));
+  try {
+    localStorage.setItem('ab_tools_cache', JSON.stringify(STATE.data));
+    localStorage.setItem('ab_tools_last_modified', String(ts));
+  } catch (e) {
+    console.warn('localStorage save warning:', e);
+  }
 }
 
-// ==================== LOAD & SYNC DATA (Instant Stale-While-Revalidate) ====================
-async function loadAppData() {
-  const cached = localStorage.getItem('ab_tools_cache');
-  const localLastModified = Number(localStorage.getItem('ab_tools_last_modified')) || 0;
+// Smart non-destructive record merge helper
+function mergeClientRecords(localList = [], serverList = [], deletedIds = []) {
+  const deletedSet = new Set(deletedIds || []);
+  const map = new Map();
 
+  // First seed with server records that are not deleted
+  for (const item of (serverList || [])) {
+    if (item && item.id && !deletedSet.has(item.id)) {
+      map.set(item.id, item);
+    }
+  }
+
+  // Then merge local records: keep local or newer record
+  for (const item of (localList || [])) {
+    if (item && item.id && !deletedSet.has(item.id)) {
+      if (!map.has(item.id)) {
+        map.set(item.id, item);
+      } else {
+        const serverItem = map.get(item.id);
+        const localTime = new Date(item.updatedAt || item.createdAt || 0).getTime();
+        const serverTime = new Date(serverItem.updatedAt || serverItem.createdAt || 0).getTime();
+        if (localTime >= serverTime) {
+          map.set(item.id, item);
+        }
+      }
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+// ==================== LOAD & SYNC DATA (Instant Stale-While-Revalidate + Non-Destructive Merge) ====================
+async function loadAppData() {
+  // 1. Instant Cache Render (0ms latency)
+  const cached = localStorage.getItem('ab_tools_cache');
   if (cached) {
     try {
-      STATE.data = JSON.parse(cached);
-      populateProductDropdowns();
-      renderApp();
+      const parsed = JSON.parse(cached);
+      if (parsed && typeof parsed === 'object') {
+        STATE.data = parsed;
+        populateProductDropdowns();
+        renderApp();
+      }
     } catch (e) {
       console.warn('Error reading cache:', e);
     }
   }
 
-  // 2. Fetch fresh data from server in background & update smoothly
+  // 2. Fetch fresh data from server in background & merge safely
   try {
     const res = await fetch('/api/data');
     if (res.ok) {
       const serverData = await res.json();
-      const serverLastModified = Number(serverData.settings?.lastModified) || 0;
+      const deletedSales = serverData.settings?.deletedSaleIds || [];
+      const deletedExpenses = serverData.settings?.deletedExpenseIds || [];
 
-      // If local state has changes that server doesn't have yet, push local state to server!
-      if (localLastModified > serverLastModified) {
+      // Safe non-destructive merge: NEVER delete local entries because server container was fresh
+      const mergedSales = mergeClientRecords(STATE.data.sales || [], serverData.sales || [], deletedSales);
+      const mergedExpenses = mergeClientRecords(STATE.data.expenses || [], serverData.expenses || [], deletedExpenses);
+      const mergedProducts = (serverData.products && serverData.products.length) ? serverData.products : (STATE.data.products || []);
+
+      // Detect if server is missing local records (e.g. serverless cold start / fresh container)
+      const serverMissingSales = (serverData.sales || []).length < mergedSales.length;
+      const serverMissingExpenses = (serverData.expenses || []).length < mergedExpenses.length;
+
+      STATE.data.sales = mergedSales;
+      STATE.data.expenses = mergedExpenses;
+      STATE.data.products = mergedProducts.length ? mergedProducts : (STATE.data.products || []);
+      STATE.data.settings = { ...STATE.data.settings, ...(serverData.settings || {}) };
+
+      saveLocalState();
+      populateProductDropdowns();
+      renderApp();
+
+      // If server was missing local entries, restore them automatically to server
+      if (serverMissingSales || serverMissingExpenses) {
         const localPin = localStorage.getItem('ab_tools_pin');
-        await fetch('/api/backup/restore', {
+        fetch('/api/backup/restore', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -346,13 +391,7 @@ async function loadAppData() {
               pin: localPin
             }
           })
-        });
-      } else if (serverLastModified > localLastModified) {
-        STATE.data = serverData;
-        localStorage.setItem('ab_tools_cache', JSON.stringify(serverData));
-        localStorage.setItem('ab_tools_last_modified', String(serverLastModified));
-        populateProductDropdowns();
-        renderApp();
+        }).catch(err => console.warn('Auto restore sync warning:', err));
       }
     }
   } catch (err) {
@@ -562,11 +601,29 @@ function isDateInPeriod(dateStr, period) {
 
 function renderApp() {
   renderKPIs();
-  renderSales();
-  renderExpenses();
-  renderPendingPayments();
-  renderReminders();
-  renderAdminCatalog();
+
+  // Instant render for the currently visible view (0ms latency)
+  if (STATE.currentView === 'salesView') {
+    renderSales();
+  } else if (STATE.currentView === 'expensesView') {
+    renderExpenses();
+  } else if (STATE.currentView === 'pendingView') {
+    renderPendingPayments();
+  } else if (STATE.currentView === 'remindersView') {
+    renderReminders();
+  } else if (STATE.currentView === 'adminView') {
+    renderAdminCatalog();
+  }
+
+  // Defer rendering inactive background tabs to avoid blocking user interactions
+  const defer = window.requestIdleCallback || ((cb) => setTimeout(cb, 30));
+  defer(() => {
+    if (STATE.currentView !== 'salesView') renderSales();
+    if (STATE.currentView !== 'expensesView') renderExpenses();
+    if (STATE.currentView !== 'pendingView') renderPendingPayments();
+    if (STATE.currentView !== 'remindersView') renderReminders();
+    if (STATE.currentView !== 'adminView') renderAdminCatalog();
+  });
 }
 
 function renderKPIs() {
@@ -1184,7 +1241,14 @@ function switchView(viewId) {
     t.classList.toggle('active', t.getAttribute('data-view') === viewId);
   });
 
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Ensure target view content is rendered immediately
+  if (viewId === 'salesView') renderSales();
+  else if (viewId === 'expensesView') renderExpenses();
+  else if (viewId === 'pendingView') renderPendingPayments();
+  else if (viewId === 'remindersView') renderReminders();
+  else if (viewId === 'adminView') renderAdminCatalog();
+
+  window.scrollTo(0, 0);
 }
 
 function openModal(id) {
@@ -1201,7 +1265,6 @@ function setDefaultDates() {
   const expenseDate = document.getElementById('expenseDateInput');
   if (saleDate) {
     saleDate.value = today;
-    updateLiveExpiryPreview();
   }
   if (expenseDate) {
     expenseDate.value = today;
@@ -1213,8 +1276,11 @@ function openSaleModal() {
   document.getElementById('saleModalTitle').textContent = 'New Sale Entry';
   document.getElementById('saleForm').reset();
   setDefaultDates();
-  onProductOrTypeChange();
+  onProductChange();
   openModal('saleModal');
+  setTimeout(() => {
+    document.getElementById('salePhoneInput')?.focus({ preventScroll: true });
+  }, 30);
 }
 
 function openEditSale(id) {
@@ -1276,7 +1342,8 @@ async function handleSaleSubmit(e) {
     planLabel,
     amount,
     paymentStatus,
-    notes
+    notes,
+    updatedAt: new Date().toISOString()
   };
 
   // Immediate Local Update (Never lost on refresh)
@@ -1318,6 +1385,7 @@ async function markSalePaid(id) {
   const sale = (STATE.data.sales || []).find(s => s.id === id);
   if (sale) {
     sale.paymentStatus = 'Paid';
+    sale.updatedAt = new Date().toISOString();
     saveLocalState();
     showToast('Marked as Paid! ✓');
     renderApp();
@@ -1337,6 +1405,11 @@ async function markSalePaid(id) {
 async function deleteSale(id) {
   if (!confirm('Are you sure you want to delete this sale record?')) return;
   STATE.data.sales = (STATE.data.sales || []).filter(s => s.id !== id);
+  STATE.data.settings = STATE.data.settings || {};
+  STATE.data.settings.deletedSaleIds = STATE.data.settings.deletedSaleIds || [];
+  if (!STATE.data.settings.deletedSaleIds.includes(id)) {
+    STATE.data.settings.deletedSaleIds.push(id);
+  }
   saveLocalState();
   showToast('Sale record deleted');
   renderApp();
@@ -1378,7 +1451,13 @@ async function handleExpenseSubmit(e) {
   const description = document.getElementById('expenseDescInput').value.trim();
   const amount = Number(document.getElementById('expenseAmountInput').value) || 0;
 
-  const payload = { date, category, description, amount };
+  const payload = {
+    date,
+    category,
+    description,
+    amount,
+    updatedAt: new Date().toISOString()
+  };
 
   // Immediate Local Update (Never lost on refresh)
   STATE.data.expenses = STATE.data.expenses || [];
@@ -1415,6 +1494,11 @@ async function handleExpenseSubmit(e) {
 async function deleteExpense(id) {
   if (!confirm('Are you sure you want to delete this expense record?')) return;
   STATE.data.expenses = (STATE.data.expenses || []).filter(e => e.id !== id);
+  STATE.data.settings = STATE.data.settings || {};
+  STATE.data.settings.deletedExpenseIds = STATE.data.settings.deletedExpenseIds || [];
+  if (!STATE.data.settings.deletedExpenseIds.includes(id)) {
+    STATE.data.settings.deletedExpenseIds.push(id);
+  }
   saveLocalState();
   showToast('Expense record deleted');
   renderApp();

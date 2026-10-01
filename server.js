@@ -32,6 +32,56 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Cloud KV / Redis Persistent Storage Adapter (Upstash Redis / Vercel KV)
+const KV_REST_API_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const KV_REST_API_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+
+async function syncFromCloudKV() {
+  if (!KV_REST_API_URL || !KV_REST_API_TOKEN) return false;
+  try {
+    const res = await fetch(`${KV_REST_API_URL}/get/ab_tools_db`, {
+      headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.result) {
+        const parsed = typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
+        if (parsed && typeof parsed === 'object') {
+          memoryDb = parsed;
+          return true;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Cloud KV read warning:', err.message);
+  }
+  return false;
+}
+
+async function syncToCloudKV(data) {
+  if (!KV_REST_API_URL || !KV_REST_API_TOKEN) return;
+  try {
+    await fetch(`${KV_REST_API_URL}/set/ab_tools_db`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${KV_REST_API_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(JSON.stringify(data))
+    });
+  } catch (err) {
+    console.warn('Cloud KV write warning:', err.message);
+  }
+}
+
+// Auto-sync Cloud KV for incoming API calls if configured
+app.use(async (req, res, next) => {
+  if (KV_REST_API_URL && KV_REST_API_TOKEN && req.path.startsWith('/api')) {
+    await syncFromCloudKV();
+  }
+  next();
+});
+
 // Default initial catalog as specified in specification
 const DEFAULT_PRODUCTS = [
   {
@@ -118,6 +168,9 @@ function getInitialDb() {
     settings: {
       businessName: 'A&B Tools Business Manager',
       currency: 'Rs.',
+      lastModified: 1,
+      deletedSaleIds: [],
+      deletedExpenseIds: [],
       lastExcelExport: null
     }
   };
@@ -143,6 +196,9 @@ function readDb() {
       if (!parsed.products || parsed.products.length === 0) {
         parsed.products = DEFAULT_PRODUCTS;
       }
+      parsed.settings = parsed.settings || {};
+      parsed.settings.deletedSaleIds = parsed.settings.deletedSaleIds || [];
+      parsed.settings.deletedExpenseIds = parsed.settings.deletedExpenseIds || [];
       memoryDb = parsed;
       return memoryDb;
     }
@@ -157,6 +213,8 @@ function readDb() {
 function writeDb(data) {
   data.settings = data.settings || {};
   data.settings.lastModified = Date.now();
+  data.settings.deletedSaleIds = data.settings.deletedSaleIds || [];
+  data.settings.deletedExpenseIds = data.settings.deletedExpenseIds || [];
   memoryDb = data;
   try {
     if (!fs.existsSync(WRITABLE_DATA_DIR)) {
@@ -165,6 +223,11 @@ function writeDb(data) {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
   } catch (err) {
     console.warn('Filesystem write warning (continuing with in-memory):', err.message);
+  }
+
+  // Push to Cloud KV / Redis if configured
+  if (KV_REST_API_URL && KV_REST_API_TOKEN) {
+    syncToCloudKV(data).catch(err => console.warn('Cloud KV sync write warning:', err.message));
   }
 
   if (!isServerless) {
@@ -443,6 +506,13 @@ app.delete('/api/sales/:id', (req, res) => {
     return res.status(404).json({ error: 'Sale record not found' });
   }
 
+  db.settings = db.settings || {};
+  db.settings.deletedSaleIds = db.settings.deletedSaleIds || [];
+  if (!db.settings.deletedSaleIds.includes(id)) {
+    db.settings.deletedSaleIds.push(id);
+    if (db.settings.deletedSaleIds.length > 500) db.settings.deletedSaleIds.shift();
+  }
+
   writeDb(db);
   res.json({ success: true, message: 'Sale deleted successfully' });
 });
@@ -505,6 +575,13 @@ app.delete('/api/expenses/:id', (req, res) => {
 
   if (db.expenses.length === initialLength) {
     return res.status(404).json({ error: 'Expense record not found' });
+  }
+
+  db.settings = db.settings || {};
+  db.settings.deletedExpenseIds = db.settings.deletedExpenseIds || [];
+  if (!db.settings.deletedExpenseIds.includes(id)) {
+    db.settings.deletedExpenseIds.push(id);
+    if (db.settings.deletedExpenseIds.length > 500) db.settings.deletedExpenseIds.shift();
   }
 
   writeDb(db);
@@ -591,19 +668,59 @@ app.get('/api/backup/download', (req, res) => {
   res.send(JSON.stringify(db, null, 2));
 });
 
-// JSON Full Restore
+// Helper to merge lists deduplicated by id without data loss
+function mergeRecordLists(existing = [], incoming = [], deletedSet = new Set()) {
+  const map = new Map();
+  (existing || []).forEach(item => {
+    if (item && item.id && !deletedSet.has(item.id)) map.set(item.id, item);
+  });
+  (incoming || []).forEach(item => {
+    if (item && item.id && !deletedSet.has(item.id)) {
+      if (!map.has(item.id)) {
+        map.set(item.id, item);
+      } else {
+        const existingItem = map.get(item.id);
+        const incomingTime = new Date(item.updatedAt || item.createdAt || 0).getTime();
+        const existingTime = new Date(existingItem.updatedAt || existingItem.createdAt || 0).getTime();
+        if (incomingTime >= existingTime) {
+          map.set(item.id, item);
+        }
+      }
+    }
+  });
+  return Array.from(map.values());
+}
+
+// JSON Full Restore (Smart Non-Destructive Merge)
 app.post('/api/backup/restore', (req, res) => {
   const { backupData } = req.body;
   if (!backupData || (!backupData.sales && !backupData.products)) {
     return res.status(400).json({ error: 'Invalid backup file format' });
   }
   const db = readDb();
-  db.sales = backupData.sales || db.sales;
-  db.expenses = backupData.expenses || db.expenses;
-  db.products = backupData.products || db.products;
+  const deletedSales = new Set([
+    ...(db.settings?.deletedSaleIds || []),
+    ...(backupData.settings?.deletedSaleIds || [])
+  ]);
+  const deletedExpenses = new Set([
+    ...(db.settings?.deletedExpenseIds || []),
+    ...(backupData.settings?.deletedExpenseIds || [])
+  ]);
+
+  db.sales = mergeRecordLists(db.sales, backupData.sales, deletedSales);
+  db.expenses = mergeRecordLists(db.expenses, backupData.expenses, deletedExpenses);
+  if (backupData.products && backupData.products.length) {
+    db.products = backupData.products;
+  }
   if (backupData.pin) db.pin = backupData.pin;
+  db.settings = {
+    ...db.settings,
+    ...(backupData.settings || {}),
+    deletedSaleIds: Array.from(deletedSales),
+    deletedExpenseIds: Array.from(deletedExpenses)
+  };
   writeDb(db);
-  res.json({ success: true, message: 'Backup restored successfully!' });
+  res.json({ success: true, message: 'Backup restored successfully!', salesCount: db.sales.length });
 });
 
 // Reset System

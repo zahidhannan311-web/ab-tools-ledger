@@ -272,16 +272,15 @@ body {
 .pin-gate-overlay {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at 50% 25%, #181d26 0%, #08090c 80%);
+  background: radial-gradient(circle at 50% 25%, #181d26 0%, #08090c 90%);
   z-index: 9999;
   display: none;
   align-items: center;
   justify-content: center;
   padding: 20px;
-  backdrop-filter: blur(8px);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.2s ease;
 }
 .pin-gate-overlay.active {
   display: flex !important;
@@ -1129,9 +1128,7 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(4, 5, 7, 0.85);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(6, 8, 12, 0.90);
   z-index: 1000;
   display: none;
   align-items: center;
@@ -1139,7 +1136,7 @@ body {
   padding: 16px;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.15s ease-out;
 }
 .modal-overlay.active {
   display: flex !important;
@@ -1152,18 +1149,22 @@ body {
   max-width: 520px;
   max-height: 90vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   background: var(--bg-surface);
   border: 1px solid var(--gold-border);
   border-radius: var(--border-radius-lg);
   padding: 24px;
-  box-shadow: var(--shadow-md), var(--shadow-gold);
-  animation: modalIn 0.25s ease;
+  box-shadow: var(--shadow-md);
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  animation: modalIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .modal-sm { max-width: 420px; }
 .modal-search { max-width: 650px; min-height: 380px; }
 
 @keyframes modalIn {
-  from { opacity: 0; transform: scale(0.96) translateY(10px); }
+  from { opacity: 0; transform: scale(0.98) translateY(6px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
