@@ -664,8 +664,8 @@ function renderKPIs() {
   const totalExpense = filteredExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   const netProfit = totalRevenue - totalExpense;
 
-  const pendingSales = sales.filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid');
-  const pendingTotal = pendingSales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+  const filteredPendingSales = filteredSales.filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid');
+  const filteredPendingTotal = filteredPendingSales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
 
   document.getElementById('kpiRevenue').textContent = totalRevenue.toLocaleString('en-US');
   document.getElementById('kpiExpense').textContent = totalExpense.toLocaleString('en-US');
@@ -684,13 +684,13 @@ function renderKPIs() {
 
   document.getElementById('kpiSalesCount').textContent = filteredSales.length;
   document.getElementById('kpiExpenseCount').textContent = filteredExpenses.length;
-  document.getElementById('kpiPendingAmount').textContent = pendingTotal.toLocaleString('en-US');
-  document.getElementById('kpiPendingCount').textContent = pendingSales.length;
+  document.getElementById('kpiPendingAmount').textContent = filteredPendingTotal.toLocaleString('en-US');
+  document.getElementById('kpiPendingCount').textContent = filteredPendingSales.length;
 
-  document.getElementById('navSalesCount').textContent = sales.length;
-  document.getElementById('navExpenseCount').textContent = expenses.length;
-  document.getElementById('navPendingCount').textContent = pendingSales.length;
-  document.getElementById('pendingTabTotal').textContent = pendingTotal.toLocaleString('en-US');
+  document.getElementById('navSalesCount').textContent = filteredSales.length;
+  document.getElementById('navExpenseCount').textContent = filteredExpenses.length;
+  document.getElementById('navPendingCount').textContent = filteredPendingSales.length;
+  document.getElementById('pendingTabTotal').textContent = filteredPendingTotal.toLocaleString('en-US');
 }
 
 // ==================== RENDER SALES LIST ====================
@@ -833,13 +833,16 @@ function renderPendingPayments() {
   const container = document.getElementById('pendingListContainer');
   if (!container) return;
 
-  const pendingSales = (STATE.data.sales || []).filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid');
+  const period = STATE.currentPeriod;
+  const pendingSales = (STATE.data.sales || [])
+    .filter(s => isDateInPeriod(s.date, period))
+    .filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid');
 
   if (pendingSales.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">🎉</div>
-        <div class="empty-state-title">No pending payments!</div>
+        <div class="empty-state-title">No pending payments for this period!</div>
         <p class="text-muted mt-2">All customer payments are cleared.</p>
       </div>
     `;

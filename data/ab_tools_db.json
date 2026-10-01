@@ -145,6 +145,22 @@
   ],
   "sales": [
     {
+      "id": "sale_1790891345201_z6tu",
+      "date": "2026-10-02",
+      "customerName": "",
+      "customerPhone": "dssds",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "Sgsg",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Paid",
+      "expiryDate": "2026-10-31",
+      "notes": "",
+      "createdAt": "2026-10-01T21:49:05.201Z"
+    },
+    {
       "id": "sale_1790839031379",
       "date": "2026-10-01",
       "customerPhone": "+92 340 7317084",
@@ -190,7 +206,7 @@
   "settings": {
     "businessName": "A&B Tools Business Manager",
     "currency": "Rs.",
-    "lastModified": 1790890098545,
+    "lastModified": 1790891345202,
     "deletedSaleIds": [
       "sale_1790808573942_ktuq"
     ],
