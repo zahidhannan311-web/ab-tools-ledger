@@ -2,17 +2,30 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const XLSX = require('xlsx');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const DATA_DIR = path.join(__dirname, 'data');
-const DB_FILE = path.join(DATA_DIR, 'ab_tools_db.json');
-const EXCEL_FILE = path.join(DATA_DIR, 'AB_Tools_Business_Ledger.xlsx');
+// Detect serverless environment (Vercel, AWS Lambda, etc.)
+const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NOW_REGION);
 
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+// Root bundled data directory (read-only on serverless)
+const BUNDLED_DATA_DIR = path.join(__dirname, 'data');
+const BUNDLED_DB_FILE = path.join(BUNDLED_DATA_DIR, 'ab_tools_db.json');
+
+// Writable data directory: use os.tmpdir() on serverless to prevent EROFS errors
+const WRITABLE_DATA_DIR = isServerless ? path.join(os.tmpdir(), 'ab_tools_data') : BUNDLED_DATA_DIR;
+const DB_FILE = path.join(WRITABLE_DATA_DIR, 'ab_tools_db.json');
+const EXCEL_FILE = path.join(WRITABLE_DATA_DIR, 'AB_Tools_Business_Ledger.xlsx');
+
+try {
+  if (!fs.existsSync(WRITABLE_DATA_DIR)) {
+    fs.mkdirSync(WRITABLE_DATA_DIR, { recursive: true });
+  }
+} catch (err) {
+  console.warn('Could not initialize writable data directory:', err.message);
 }
 
 app.use(cors());
@@ -110,32 +123,54 @@ function getInitialDb() {
   };
 }
 
+let memoryDb = null;
+
 function readDb() {
+  if (memoryDb) {
+    return memoryDb;
+  }
   try {
-    if (!fs.existsSync(DB_FILE)) {
-      const initial = getInitialDb();
-      writeDb(initial);
-      return initial;
+    let raw = null;
+    if (fs.existsSync(DB_FILE)) {
+      raw = fs.readFileSync(DB_FILE, 'utf8');
+    } else if (fs.existsSync(BUNDLED_DB_FILE)) {
+      raw = fs.readFileSync(BUNDLED_DB_FILE, 'utf8');
     }
-    const raw = fs.readFileSync(DB_FILE, 'utf8');
-    const data = raw.charCodeAt(0) === 0xFEFF ? raw.slice(1) : raw;
-    const parsed = JSON.parse(data);
-    if (!parsed.products || parsed.products.length === 0) {
-      parsed.products = DEFAULT_PRODUCTS;
+
+    if (raw) {
+      const data = raw.charCodeAt(0) === 0xFEFF ? raw.slice(1) : raw;
+      const parsed = JSON.parse(data);
+      if (!parsed.products || parsed.products.length === 0) {
+        parsed.products = DEFAULT_PRODUCTS;
+      }
+      memoryDb = parsed;
+      return memoryDb;
     }
-    return parsed;
   } catch (err) {
     console.error('Error reading db:', err);
-    return getInitialDb();
   }
+
+  memoryDb = getInitialDb();
+  return memoryDb;
 }
 
 function writeDb(data) {
+  memoryDb = data;
   try {
+    if (!fs.existsSync(WRITABLE_DATA_DIR)) {
+      fs.mkdirSync(WRITABLE_DATA_DIR, { recursive: true });
+    }
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
-    syncExcelWorkbook(data);
   } catch (err) {
-    console.error('Error writing db:', err);
+    console.warn('Filesystem write warning (continuing with in-memory):', err.message);
+  }
+
+  if (!isServerless) {
+    try {
+      syncExcelWorkbook(data);
+    } catch (err) {
+      console.warn('Excel disk write warning:', err.message);
+    }
   }
 }
 
@@ -161,62 +196,68 @@ function getLocalDateString() {
   return `${y}-${m}-${day}`;
 }
 
-// Sync all data into Excel workbook with 3 sheets: Sales, Expenses, Products
-function syncExcelWorkbook(data) {
-  try {
-    const wb = XLSX.utils.book_new();
+// Build Excel workbook in memory with 3 sheets: Sales, Expenses, Products
+function buildExcelWorkbook(data) {
+  const wb = XLSX.utils.book_new();
 
-    // 1. Sales Sheet
-    const salesRows = (data.sales || []).map(s => ({
-      'Sale ID': s.id || '',
-      'Date': s.date || '',
-      'Customer Phone': s.customerPhone || '',
-      'Customer Name': s.customerName || '',
-      'Product': s.product || '',
-      'Account Type': s.accountType || '',
-      'Assigned Account (Email/Login)': s.accountLogin || '',
-      'Plan Duration': s.planLabel || `${s.planMonths} Month(s)`,
-      'Plan Months': s.planMonths || '',
-      'Amount (Rs.)': s.amount || 0,
-      'Payment Status': s.paymentStatus || 'Pending',
-      'Expiry Date': s.expiryDate || '',
-      'Notes': s.notes || '',
-      'Created At': s.createdAt || ''
-    }));
-    const wsSales = XLSX.utils.json_to_sheet(salesRows.length ? salesRows : [{ Note: 'No sales records found' }]);
-    XLSX.utils.book_append_sheet(wb, wsSales, 'Sales');
+  // 1. Sales Sheet
+  const salesRows = (data.sales || []).map(s => ({
+    'Sale ID': s.id || '',
+    'Date': s.date || '',
+    'Customer Phone': s.customerPhone || '',
+    'Customer Name': s.customerName || '',
+    'Product': s.product || '',
+    'Account Type': s.accountType || '',
+    'Assigned Account (Email/Login)': s.accountLogin || '',
+    'Plan Duration': s.planLabel || `${s.planMonths} Month(s)`,
+    'Plan Months': s.planMonths || '',
+    'Amount (Rs.)': s.amount || 0,
+    'Payment Status': s.paymentStatus || 'Pending',
+    'Expiry Date': s.expiryDate || '',
+    'Notes': s.notes || '',
+    'Created At': s.createdAt || ''
+  }));
+  const wsSales = XLSX.utils.json_to_sheet(salesRows.length ? salesRows : [{ Note: 'No sales records found' }]);
+  XLSX.utils.book_append_sheet(wb, wsSales, 'Sales');
 
-    // 2. Expenses Sheet
-    const expensesRows = (data.expenses || []).map(e => ({
-      'Expense ID': e.id || '',
-      'Date': e.date || '',
-      'Category': e.category || '',
-      'Description': e.description || e.category || '',
-      'Amount (Rs.)': e.amount || 0,
-      'Created At': e.createdAt || ''
-    }));
-    const wsExpenses = XLSX.utils.json_to_sheet(expensesRows.length ? expensesRows : [{ Note: 'No expense records found' }]);
-    XLSX.utils.book_append_sheet(wb, wsExpenses, 'Expenses');
+  // 2. Expenses Sheet
+  const expensesRows = (data.expenses || []).map(e => ({
+    'Expense ID': e.id || '',
+    'Date': e.date || '',
+    'Category': e.category || '',
+    'Description': e.description || e.category || '',
+    'Amount (Rs.)': e.amount || 0,
+    'Created At': e.createdAt || ''
+  }));
+  const wsExpenses = XLSX.utils.json_to_sheet(expensesRows.length ? expensesRows : [{ Note: 'No expense records found' }]);
+  XLSX.utils.book_append_sheet(wb, wsExpenses, 'Expenses');
 
-    // 3. Products Sheet
-    const productsRows = [];
-    (data.products || []).forEach(p => {
-      (p.plans || []).forEach(pl => {
-        productsRows.push({
-          'Product Name': p.name || '',
-          'Account Type': p.type || '',
-          'Plan Duration (Months)': pl.months || '',
-          'Plan Description': pl.label || '',
-          'Price (Rs.)': pl.price || 0
-        });
+  // 3. Products Sheet
+  const productsRows = [];
+  (data.products || []).forEach(p => {
+    (p.plans || []).forEach(pl => {
+      productsRows.push({
+        'Product Name': p.name || '',
+        'Account Type': p.type || '',
+        'Plan Duration (Months)': pl.months || '',
+        'Plan Description': pl.label || '',
+        'Price (Rs.)': pl.price || 0
       });
     });
-    const wsProducts = XLSX.utils.json_to_sheet(productsRows.length ? productsRows : [{ Note: 'No products found' }]);
-    XLSX.utils.book_append_sheet(wb, wsProducts, 'Products');
+  });
+  const wsProducts = XLSX.utils.json_to_sheet(productsRows.length ? productsRows : [{ Note: 'No products found' }]);
+  XLSX.utils.book_append_sheet(wb, wsProducts, 'Products');
 
+  return wb;
+}
+
+// Sync all data into Excel workbook file on disk (for localhost)
+function syncExcelWorkbook(data) {
+  try {
+    const wb = buildExcelWorkbook(data);
     XLSX.writeFile(wb, EXCEL_FILE);
   } catch (err) {
-    console.error('Error generating Excel file:', err);
+    console.error('Error writing Excel file:', err);
   }
 }
 
@@ -509,20 +550,34 @@ app.delete('/api/products/:id', (req, res) => {
 
 // ======================== EXCEL EXPORT & BACKUP ========================
 
-// Direct Download Excel (.xlsx)
+// Direct Download Excel (.xlsx) - In-memory buffer streaming (100% crash-proof on Vercel)
 app.get('/api/export/excel', (req, res) => {
-  const db = readDb();
-  syncExcelWorkbook(db);
-
-  if (fs.existsSync(EXCEL_FILE)) {
+  try {
+    const db = readDb();
+    const wb = buildExcelWorkbook(db);
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
     const today = new Date().toISOString().split('T')[0];
+
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="AB_Tools_Ledger_${today}.xlsx"`);
-    const fileStream = fs.createReadStream(EXCEL_FILE);
-    fileStream.pipe(res);
-  } else {
-    res.status(500).json({ error: 'Failed to generate Excel file' });
+    res.setHeader('Content-Length', buffer.length);
+    return res.end(buffer);
+  } catch (err) {
+    console.error('Failed to generate Excel download:', err);
+    return res.status(500).json({ error: 'Failed to generate Excel file: ' + err.message });
   }
+});
+
+// Catch-all route to serve public/index.html for any direct page navigation
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  return res.status(404).send('Page not found');
 });
 
 // JSON Full Backup Download

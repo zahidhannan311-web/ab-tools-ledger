@@ -54,11 +54,33 @@ function setupViewportKeyboardHandling() {
   });
 }
 
-// Check PIN setup status from server
+// Check PIN setup status from server (with smart auto-sync for serverless restarts)
 async function checkPinStatus() {
   try {
-    const res = await fetch('/api/status');
-    const data = await res.json();
+    let res = await fetch('/api/status');
+    let data = await res.json();
+
+    // If serverless container cold-restarted and pin is not set, auto-sync from browser localStorage
+    const localPin = localStorage.getItem('ab_tools_pin');
+    const localCacheStr = localStorage.getItem('ab_tools_cache');
+    if (!data.pinSet && localPin && localCacheStr) {
+      try {
+        const localCache = JSON.parse(localCacheStr);
+        localCache.pin = localPin;
+        const restoreRes = await fetch('/api/backup/restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ backupData: localCache })
+        });
+        if (restoreRes.ok) {
+          const recheck = await fetch('/api/status');
+          data = await recheck.json();
+        }
+      } catch (syncErr) {
+        console.warn('Auto restore sync warning:', syncErr);
+      }
+    }
+
     STATE.pinSet = data.pinSet;
 
     const savedSession = sessionStorage.getItem('ab_tools_unlocked');
