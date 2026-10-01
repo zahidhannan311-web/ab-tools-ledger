@@ -49,12 +49,12 @@ async function syncFromCloudKV() {
         if (parsed && typeof parsed === 'object') {
           parsed.settings = parsed.settings || {};
           parsed.settings.deletedSaleIds = parsed.settings.deletedSaleIds || [];
-          if (!parsed.settings.deletedSaleIds.includes('sale_1790808573942_ktuq')) {
-            parsed.settings.deletedSaleIds.push('sale_1790808573942_ktuq');
-          }
+          ['sale_1790808573942_ktuq', 'sale_1790891345201_z6tu'].forEach(id => {
+            if (!parsed.settings.deletedSaleIds.includes(id)) parsed.settings.deletedSaleIds.push(id);
+          });
           const delSales = new Set(parsed.settings.deletedSaleIds);
           if (parsed.sales) {
-            parsed.sales = parsed.sales.filter(s => s && s.id && !delSales.has(s.id) && s.id !== 'sale_1790808573942_ktuq');
+            parsed.sales = parsed.sales.filter(s => s && s.id && !delSales.has(s.id) && s.id !== 'sale_1790808573942_ktuq' && s.id !== 'sale_1790891345201_z6tu');
           }
           memoryDb = parsed;
           return true;
@@ -178,7 +178,7 @@ function getInitialDb() {
       businessName: 'A&B Tools Business Manager',
       currency: 'Rs.',
       lastModified: 1,
-      deletedSaleIds: ['sale_1790808573942_ktuq'],
+      deletedSaleIds: ['sale_1790808573942_ktuq', 'sale_1790891345201_z6tu'],
       deletedExpenseIds: [],
       lastExcelExport: null
     }
@@ -207,12 +207,12 @@ function readDb() {
       }
       parsed.settings = parsed.settings || {};
       parsed.settings.deletedSaleIds = parsed.settings.deletedSaleIds || [];
-      if (!parsed.settings.deletedSaleIds.includes('sale_1790808573942_ktuq')) {
-        parsed.settings.deletedSaleIds.push('sale_1790808573942_ktuq');
-      }
+      ['sale_1790808573942_ktuq', 'sale_1790891345201_z6tu'].forEach(id => {
+        if (!parsed.settings.deletedSaleIds.includes(id)) parsed.settings.deletedSaleIds.push(id);
+      });
       const delSales = new Set(parsed.settings.deletedSaleIds);
       if (parsed.sales) {
-        parsed.sales = parsed.sales.filter(s => s && s.id && !delSales.has(s.id) && s.id !== 'sale_1790808573942_ktuq');
+        parsed.sales = parsed.sales.filter(s => s && s.id && !delSales.has(s.id) && s.id !== 'sale_1790808573942_ktuq' && s.id !== 'sale_1790891345201_z6tu');
       }
       parsed.settings.deletedExpenseIds = parsed.settings.deletedExpenseIds || [];
       const delExpenses = new Set(parsed.settings.deletedExpenseIds);
@@ -732,7 +732,10 @@ app.post('/api/backup/restore', (req, res) => {
   if (backupData.products && backupData.products.length) {
     db.products = backupData.products;
   }
-  if (backupData.pin) db.pin = backupData.pin;
+  // Only set PIN on restore if the system has no PIN configured yet
+  if (backupData.pin && !db.pin) {
+    db.pin = backupData.pin;
+  }
   db.settings = {
     ...db.settings,
     ...(backupData.settings || {}),

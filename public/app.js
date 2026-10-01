@@ -64,26 +64,6 @@ async function checkPinStatus() {
   try {
     let res = await fetch('/api/status');
     let data = await res.json();
-
-    const localCacheStr = localStorage.getItem('ab_tools_cache');
-    if (!data.pinSet && localPin && localCacheStr) {
-      try {
-        const localCache = JSON.parse(localCacheStr);
-        localCache.pin = localPin;
-        const restoreRes = await fetch('/api/backup/restore', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ backupData: localCache })
-        });
-        if (restoreRes.ok) {
-          const recheck = await fetch('/api/status');
-          data = await recheck.json();
-        }
-      } catch (syncErr) {
-        console.warn('Auto restore sync warning:', syncErr);
-      }
-    }
-
     STATE.pinSet = data.pinSet;
     if (!STATE.unlocked) {
       showPinGate();
@@ -191,26 +171,7 @@ async function handleUnlockSubmit() {
     return;
   }
 
-  const localPin = localStorage.getItem('ab_tools_pin');
-
-  // Fast-path: Instant 0ms Unlock if entered PIN matches cached PIN
-  if (localPin && STATE.enteredPin === localPin) {
-    STATE.unlocked = true;
-    sessionStorage.setItem('ab_tools_unlocked', 'true');
-    document.getElementById('pinGateModal').classList.remove('active');
-    showToast('Welcome back! Dashboard unlocked 🔓');
-    loadAppData();
-
-    // Verify in background
-    fetch('/api/auth/verify-pin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin: STATE.enteredPin })
-    }).catch(() => {});
-    return;
-  }
-
-  // Fallback: Verify with server
+  // Always verify PIN directly with server so PIN changes on other devices sync immediately
   try {
     const res = await fetch('/api/auth/verify-pin', {
       method: 'POST',
@@ -233,7 +194,17 @@ async function handleUnlockSubmit() {
       shakePinCard();
     }
   } catch (err) {
-    errEl.textContent = 'Incorrect PIN!';
+    // Offline fallback: if network is down and entered PIN matches cached PIN, allow offline access
+    const localPin = localStorage.getItem('ab_tools_pin');
+    if (localPin && STATE.enteredPin === localPin) {
+      STATE.unlocked = true;
+      sessionStorage.setItem('ab_tools_unlocked', 'true');
+      document.getElementById('pinGateModal').classList.remove('active');
+      showToast('Welcome back! (Offline Mode) 🔓');
+      loadAppData();
+      return;
+    }
+    errEl.textContent = 'Network error or incorrect PIN!';
     STATE.enteredPin = '';
     updatePinDots();
     shakePinCard();
@@ -338,6 +309,8 @@ function mergeClientRecords(localList = [], serverList = [], deletedIds = []) {
 
 // ==================== LOAD & SYNC DATA (Instant Stale-While-Revalidate + Non-Destructive Merge) ====================
 async function loadAppData() {
+  const ignoredSaleIds = new Set(['sale_1790808573942_ktuq', 'sale_1790891345201_z6tu']);
+
   // 1. Instant Cache Render (0ms latency)
   const cached = localStorage.getItem('ab_tools_cache');
   if (cached) {
@@ -346,12 +319,12 @@ async function loadAppData() {
       if (parsed && typeof parsed === 'object') {
         parsed.settings = parsed.settings || {};
         parsed.settings.deletedSaleIds = parsed.settings.deletedSaleIds || [];
-        if (!parsed.settings.deletedSaleIds.includes('sale_1790808573942_ktuq')) {
-          parsed.settings.deletedSaleIds.push('sale_1790808573942_ktuq');
-        }
+        ignoredSaleIds.forEach(id => {
+          if (!parsed.settings.deletedSaleIds.includes(id)) parsed.settings.deletedSaleIds.push(id);
+        });
         const delSet = new Set(parsed.settings.deletedSaleIds);
         if (parsed.sales) {
-          parsed.sales = parsed.sales.filter(s => s && s.id && !delSet.has(s.id) && s.id !== 'sale_1790808573942_ktuq');
+          parsed.sales = parsed.sales.filter(s => s && s.id && !delSet.has(s.id) && !ignoredSaleIds.has(s.id));
         }
         STATE.data = parsed;
         populateProductDropdowns();
@@ -362,58 +335,70 @@ async function loadAppData() {
     }
   }
 
-  // 2. Fetch fresh data from server in background & merge safely
+  // 2. Fetch fresh data from server in background (Server is Cloud Source of Truth)
   try {
     const res = await fetch('/api/data');
     if (res.ok) {
       const serverData = await res.json();
-      const localDeletedSales = STATE.data.settings?.deletedSaleIds || [];
+
       const serverDeletedSales = serverData.settings?.deletedSaleIds || [];
-      const deletedSales = Array.from(new Set([...localDeletedSales, ...serverDeletedSales, 'sale_1790808573942_ktuq']));
+      const combinedDeletedSales = Array.from(new Set([
+        ...(STATE.data.settings?.deletedSaleIds || []),
+        ...serverDeletedSales,
+        ...ignoredSaleIds
+      ]));
 
-      const localDeletedExpenses = STATE.data.settings?.deletedExpenseIds || [];
-      const serverDeletedExpenses = serverData.settings?.deletedExpenseIds || [];
-      const deletedExpenses = Array.from(new Set([...localDeletedExpenses, ...serverDeletedExpenses]));
+      const combinedDeletedExpenses = Array.from(new Set([
+        ...(STATE.data.settings?.deletedExpenseIds || []),
+        ...(serverData.settings?.deletedExpenseIds || [])
+      ]));
 
-      // Safe non-destructive merge: NEVER delete local entries because server container was fresh
-      const filteredServerSales = (serverData.sales || []).filter(s => s && s.id !== 'sale_1790808573942_ktuq');
-      const filteredLocalSales = (STATE.data.sales || []).filter(s => s && s.id !== 'sale_1790808573942_ktuq');
-      const mergedSales = mergeClientRecords(filteredLocalSales, filteredServerSales, deletedSales);
-      const mergedExpenses = mergeClientRecords(STATE.data.expenses || [], serverData.expenses || [], deletedExpenses);
-      const mergedProducts = (serverData.products && serverData.products.length) ? serverData.products : (STATE.data.products || []);
+      const delSaleSet = new Set(combinedDeletedSales);
+      const delExpenseSet = new Set(combinedDeletedExpenses);
 
-      // Detect if server is missing local records (e.g. serverless cold start / fresh container)
-      const serverMissingSales = (serverData.sales || []).length < mergedSales.length;
-      const serverMissingExpenses = (serverData.expenses || []).length < mergedExpenses.length;
+      // Server is cloud source of truth
+      const freshSales = (serverData.sales || []).filter(s => s && s.id && !delSaleSet.has(s.id));
+      const freshExpenses = (serverData.expenses || []).filter(e => e && e.id && !delExpenseSet.has(e.id));
+      const freshProducts = (serverData.products && serverData.products.length) ? serverData.products : (STATE.data.products || []);
 
-      STATE.data.sales = mergedSales;
-      STATE.data.expenses = mergedExpenses;
-      STATE.data.products = mergedProducts.length ? mergedProducts : (STATE.data.products || []);
+      // If serverless container cold-started completely empty while client has local data, recover
+      if (freshSales.length === 0 && freshExpenses.length === 0 && (STATE.data.sales || []).length > 0) {
+        const localValidSales = (STATE.data.sales || []).filter(s => s && s.id && !delSaleSet.has(s.id));
+        const localValidExpenses = (STATE.data.expenses || []).filter(e => e && e.id && !delExpenseSet.has(e.id));
+        if (localValidSales.length > 0 || localValidExpenses.length > 0) {
+          fetch('/api/backup/restore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              backupData: {
+                sales: localValidSales,
+                expenses: localValidExpenses,
+                products: freshProducts,
+                settings: {
+                  ...STATE.data.settings,
+                  deletedSaleIds: combinedDeletedSales,
+                  deletedExpenseIds: combinedDeletedExpenses
+                }
+              }
+            })
+          }).catch(err => console.warn('Cold-start recovery warning:', err));
+        }
+      } else {
+        STATE.data.sales = freshSales;
+        STATE.data.expenses = freshExpenses;
+      }
+
+      STATE.data.products = freshProducts;
       STATE.data.settings = {
         ...STATE.data.settings,
         ...(serverData.settings || {}),
-        deletedSaleIds: deletedSales,
-        deletedExpenseIds: deletedExpenses
+        deletedSaleIds: combinedDeletedSales,
+        deletedExpenseIds: combinedDeletedExpenses
       };
 
       saveLocalState();
       populateProductDropdowns();
       renderApp();
-
-      // If server was missing local entries, restore them automatically to server
-      if (serverMissingSales || serverMissingExpenses) {
-        const localPin = localStorage.getItem('ab_tools_pin');
-        fetch('/api/backup/restore', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            backupData: {
-              ...STATE.data,
-              pin: localPin
-            }
-          })
-        }).catch(err => console.warn('Auto restore sync warning:', err));
-      }
     }
   } catch (err) {
     console.warn('Background data sync:', err);
