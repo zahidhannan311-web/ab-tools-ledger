@@ -155,6 +155,8 @@ function readDb() {
 }
 
 function writeDb(data) {
+  data.settings = data.settings || {};
+  data.settings.lastModified = Date.now();
   memoryDb = data;
   try {
     if (!fs.existsSync(WRITABLE_DATA_DIR)) {

@@ -304,10 +304,19 @@ function shakePinCard() {
   card.style.animation = 'shake 0.4s ease';
 }
 
+function saveLocalState() {
+  STATE.data.settings = STATE.data.settings || {};
+  const ts = Date.now();
+  STATE.data.settings.lastModified = ts;
+  localStorage.setItem('ab_tools_cache', JSON.stringify(STATE.data));
+  localStorage.setItem('ab_tools_last_modified', String(ts));
+}
+
 // ==================== LOAD & SYNC DATA (Instant Stale-While-Revalidate) ====================
 async function loadAppData() {
-  // 1. Immediately render from local cache if available (0ms load time!)
   const cached = localStorage.getItem('ab_tools_cache');
+  const localLastModified = Number(localStorage.getItem('ab_tools_last_modified')) || 0;
+
   if (cached) {
     try {
       STATE.data = JSON.parse(cached);
@@ -322,11 +331,29 @@ async function loadAppData() {
   try {
     const res = await fetch('/api/data');
     if (res.ok) {
-      const data = await res.json();
-      STATE.data = data;
-      localStorage.setItem('ab_tools_cache', JSON.stringify(data));
-      populateProductDropdowns();
-      renderApp();
+      const serverData = await res.json();
+      const serverLastModified = Number(serverData.settings?.lastModified) || 0;
+
+      // If local state has changes that server doesn't have yet, push local state to server!
+      if (localLastModified > serverLastModified) {
+        const localPin = localStorage.getItem('ab_tools_pin');
+        await fetch('/api/backup/restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            backupData: {
+              ...STATE.data,
+              pin: localPin
+            }
+          })
+        });
+      } else if (serverLastModified > localLastModified) {
+        STATE.data = serverData;
+        localStorage.setItem('ab_tools_cache', JSON.stringify(serverData));
+        localStorage.setItem('ab_tools_last_modified', String(serverLastModified));
+        populateProductDropdowns();
+        renderApp();
+      }
     }
   } catch (err) {
     console.warn('Background data sync:', err);
@@ -1252,80 +1279,72 @@ async function handleSaleSubmit(e) {
     notes
   };
 
+  // Immediate Local Update (Never lost on refresh)
+  STATE.data.sales = STATE.data.sales || [];
+  if (editId) {
+    const idx = STATE.data.sales.findIndex(s => s.id === editId);
+    if (idx !== -1) {
+      STATE.data.sales[idx] = { ...STATE.data.sales[idx], ...payload, expiryDate: calculateExpiry(date, planMonths) };
+    }
+  } else {
+    STATE.data.sales.unshift({
+      id: 'sale_' + Date.now(),
+      ...payload,
+      expiryDate: calculateExpiry(date, planMonths),
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  saveLocalState();
+  closeModal('saleModal');
+  showToast(editId ? 'Sale updated successfully!' : 'New sale added successfully! 🎉');
+  renderApp();
+
+  // Background server sync
   try {
     const url = editId ? `/api/sales/${editId}` : '/api/sales';
     const method = editId ? 'PUT' : 'POST';
-
-    const res = await fetch(url, {
+    await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-
-    if (res.ok) {
-      closeModal('saleModal');
-      showToast(editId ? 'Sale updated successfully!' : 'New sale added successfully! 🎉');
-      await loadAppData();
-    } else {
-      const err = await res.json();
-      alert(err.error || 'Failed to save sale');
-    }
   } catch (err) {
-    console.warn('Saving to local cache:', err);
-    if (editId) {
-      const idx = STATE.data.sales.findIndex(s => s.id === editId);
-      if (idx !== -1) {
-        STATE.data.sales[idx] = { ...STATE.data.sales[idx], ...payload, expiryDate: calculateExpiry(date, planMonths) };
-      }
-    } else {
-      STATE.data.sales.unshift({
-        id: 'sale_' + Date.now(),
-        ...payload,
-        expiryDate: calculateExpiry(date, planMonths),
-        createdAt: new Date().toISOString()
-      });
-    }
-    localStorage.setItem('ab_tools_cache', JSON.stringify(STATE.data));
-    closeModal('saleModal');
-    showToast('Saved in Offline Mode!');
-    renderApp();
+    console.warn('Network sync error:', err);
   }
 }
 
 async function markSalePaid(id) {
+  const sale = (STATE.data.sales || []).find(s => s.id === id);
+  if (sale) {
+    sale.paymentStatus = 'Paid';
+    saveLocalState();
+    showToast('Marked as Paid! ✓');
+    renderApp();
+  }
+
   try {
-    const res = await fetch(`/api/sales/${id}/status`, {
+    await fetch(`/api/sales/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paymentStatus: 'Paid' })
     });
-    if (res.ok) {
-      showToast('Marked as Paid! ✓');
-      await loadAppData();
-    }
   } catch (err) {
-    const sale = STATE.data.sales.find(s => s.id === id);
-    if (sale) sale.paymentStatus = 'Paid';
-    localStorage.setItem('ab_tools_cache', JSON.stringify(STATE.data));
-    showToast('Marked as Paid (Offline)');
-    renderApp();
+    console.warn('Network sync error:', err);
   }
 }
 
 async function deleteSale(id) {
   if (!confirm('Are you sure you want to delete this sale record?')) return;
+  STATE.data.sales = (STATE.data.sales || []).filter(s => s.id !== id);
+  saveLocalState();
+  showToast('Sale record deleted');
+  renderApp();
 
   try {
-    const res = await fetch(`/api/sales/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      showToast('Sale record deleted');
-      await loadAppData();
-    }
+    await fetch(`/api/sales/${id}`, { method: 'DELETE' });
   } catch (err) {
-    STATE.data.sales = STATE.data.sales.filter(s => s.id !== id);
-    localStorage.setItem('ab_tools_cache', JSON.stringify(STATE.data));
-    showToast('Sale deleted');
-    renderApp();
+    console.warn('Network sync error:', err);
   }
 }
 
@@ -1361,52 +1380,49 @@ async function handleExpenseSubmit(e) {
 
   const payload = { date, category, description, amount };
 
+  // Immediate Local Update (Never lost on refresh)
+  STATE.data.expenses = STATE.data.expenses || [];
+  if (editId) {
+    const idx = STATE.data.expenses.findIndex(e => e.id === editId);
+    if (idx !== -1) STATE.data.expenses[idx] = { ...STATE.data.expenses[idx], ...payload };
+  } else {
+    STATE.data.expenses.unshift({
+      id: 'exp_' + Date.now(),
+      ...payload,
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  saveLocalState();
+  closeModal('expenseModal');
+  showToast(editId ? 'Expense updated!' : 'Expense recorded successfully!');
+  renderApp();
+
+  // Background server sync
   try {
     const url = editId ? `/api/expenses/${editId}` : '/api/expenses';
     const method = editId ? 'PUT' : 'POST';
-
-    const res = await fetch(url, {
+    await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-
-    if (res.ok) {
-      closeModal('expenseModal');
-      showToast(editId ? 'Expense updated!' : 'Expense recorded successfully!');
-      await loadAppData();
-    }
   } catch (err) {
-    if (editId) {
-      const idx = STATE.data.expenses.findIndex(e => e.id === editId);
-      if (idx !== -1) STATE.data.expenses[idx] = { ...STATE.data.expenses[idx], ...payload };
-    } else {
-      STATE.data.expenses.unshift({
-        id: 'exp_' + Date.now(),
-        ...payload,
-        createdAt: new Date().toISOString()
-      });
-    }
-    localStorage.setItem('ab_tools_cache', JSON.stringify(STATE.data));
-    closeModal('expenseModal');
-    showToast('Expense recorded (Offline)');
-    renderApp();
+    console.warn('Network sync error:', err);
   }
 }
 
 async function deleteExpense(id) {
   if (!confirm('Are you sure you want to delete this expense record?')) return;
+  STATE.data.expenses = (STATE.data.expenses || []).filter(e => e.id !== id);
+  saveLocalState();
+  showToast('Expense record deleted');
+  renderApp();
+
   try {
-    const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      showToast('Expense record deleted');
-      await loadAppData();
-    }
+    await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
   } catch (err) {
-    STATE.data.expenses = STATE.data.expenses.filter(e => e.id !== id);
-    localStorage.setItem('ab_tools_cache', JSON.stringify(STATE.data));
-    showToast('Expense deleted');
-    renderApp();
+    console.warn('Network sync error:', err);
   }
 }
 
@@ -1459,6 +1475,7 @@ function addPlanRow(months = 1, label = '', price = 0) {
 
 async function handleProductSubmit(e) {
   e.preventDefault();
+  const editId = document.getElementById('productEditId').value;
   const name = document.getElementById('prodNameInput').value.trim();
   const type = document.getElementById('prodTypeSelect').value;
 
@@ -1472,32 +1489,76 @@ async function handleProductSubmit(e) {
     plans.push({ months, label, price });
   });
 
+  const id = editId || ('prod_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + (type || 'shared').toLowerCase());
+  const productObj = {
+    id,
+    name,
+    type: type || 'Shared',
+    plans
+  };
+
+  // Immediate Local Update (Never lost on refresh)
+  STATE.data.products = STATE.data.products || [];
+  const existingIdx = STATE.data.products.findIndex(p => p.id === id);
+  if (existingIdx >= 0) {
+    STATE.data.products[existingIdx] = productObj;
+  } else {
+    STATE.data.products.push(productObj);
+  }
+
+  saveLocalState();
+  populateProductDropdowns();
+  renderApp();
+  closeModal('productModal');
+  showToast('Product & Pricing saved successfully! 🎉');
+
+  // Background server sync
   try {
-    const res = await fetch('/api/products', {
+    await fetch('/api/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, type, plans })
     });
-    if (res.ok) {
-      closeModal('productModal');
-      showToast('Product & Pricing saved successfully!');
-      await loadAppData();
-    }
+
+    const localPin = localStorage.getItem('ab_tools_pin');
+    await fetch('/api/backup/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        backupData: {
+          ...STATE.data,
+          pin: localPin
+        }
+      })
+    });
   } catch (err) {
-    console.error('Save product error:', err);
+    console.warn('Network sync error:', err);
   }
 }
 
 async function deleteProduct(id) {
   if (!confirm('Are you sure you want to delete this tool and all its plans?')) return;
+  STATE.data.products = (STATE.data.products || []).filter(p => p.id !== id);
+  saveLocalState();
+  populateProductDropdowns();
+  renderApp();
+  showToast('Product deleted');
+
   try {
-    const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      showToast('Product deleted');
-      await loadAppData();
-    }
+    await fetch(`/api/products/${id}`, { method: 'DELETE' });
+    const localPin = localStorage.getItem('ab_tools_pin');
+    await fetch('/api/backup/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        backupData: {
+          ...STATE.data,
+          pin: localPin
+        }
+      })
+    });
   } catch (err) {
-    console.error(err);
+    console.warn('Delete product sync error:', err);
   }
 }
 
