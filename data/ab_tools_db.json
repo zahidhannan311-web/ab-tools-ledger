@@ -145,20 +145,36 @@
   ],
   "sales": [
     {
-      "id": "sale_1790808573942_ktuq",
+      "id": "sale_1790839031379",
       "date": "2026-10-01",
-      "customerName": "Ali Ahmed",
-      "customerPhone": "03182642966",
+      "customerPhone": "+92 340 7317084",
+      "customerName": "",
+      "product": "Nord",
+      "accountType": "Shared",
+      "accountLogin": "Nord9@kuromee.com",
+      "planMonths": 3,
+      "planLabel": "3 Months (90 Days)",
+      "amount": 500,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "expiryDate": "2026-12-29",
+      "createdAt": "2026-10-01T07:17:11.379Z"
+    },
+    {
+      "id": "sale_1790838846301",
+      "date": "2026-10-01",
+      "customerPhone": "3085352533",
+      "customerName": "",
       "product": "Surfshark",
       "accountType": "Shared",
-      "accountLogin": "Abd114@kuromee.com",
-      "planMonths": 1,
-      "planLabel": "1 Month (30 Days)",
-      "amount": 250,
+      "accountLogin": "abd149@kuromee.com",
+      "planMonths": 2,
+      "planLabel": "2 Months (60 Days)",
+      "amount": 800,
       "paymentStatus": "Pending",
-      "expiryDate": "2026-10-30",
-      "notes": "",
-      "createdAt": "2026-09-30T22:49:33.942Z"
+      "notes": "2 Devices",
+      "expiryDate": "2026-11-29",
+      "createdAt": "2026-10-01T07:14:06.302Z"
     }
   ],
   "expenses": [
@@ -174,8 +190,10 @@
   "settings": {
     "businessName": "A&B Tools Business Manager",
     "currency": "Rs.",
-    "lastModified": 1,
-    "deletedSaleIds": [],
+    "lastModified": 1790890098545,
+    "deletedSaleIds": [
+      "sale_1790808573942_ktuq"
+    ],
     "deletedExpenseIds": [],
     "lastExcelExport": null
   }

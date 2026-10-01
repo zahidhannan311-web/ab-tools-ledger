@@ -7,7 +7,7 @@
 const STATE = {
   pinSet: false,
   unlocked: false,
-  currentPeriod: 'all', // all, today, week, month
+  currentPeriod: 'today', // today, yesterday, week, month, all
   currentView: 'salesView',
   data: {
     sales: [],
@@ -344,6 +344,15 @@ async function loadAppData() {
     try {
       const parsed = JSON.parse(cached);
       if (parsed && typeof parsed === 'object') {
+        parsed.settings = parsed.settings || {};
+        parsed.settings.deletedSaleIds = parsed.settings.deletedSaleIds || [];
+        if (!parsed.settings.deletedSaleIds.includes('sale_1790808573942_ktuq')) {
+          parsed.settings.deletedSaleIds.push('sale_1790808573942_ktuq');
+        }
+        const delSet = new Set(parsed.settings.deletedSaleIds);
+        if (parsed.sales) {
+          parsed.sales = parsed.sales.filter(s => s && s.id && !delSet.has(s.id) && s.id !== 'sale_1790808573942_ktuq');
+        }
         STATE.data = parsed;
         populateProductDropdowns();
         renderApp();
@@ -358,11 +367,18 @@ async function loadAppData() {
     const res = await fetch('/api/data');
     if (res.ok) {
       const serverData = await res.json();
-      const deletedSales = serverData.settings?.deletedSaleIds || [];
-      const deletedExpenses = serverData.settings?.deletedExpenseIds || [];
+      const localDeletedSales = STATE.data.settings?.deletedSaleIds || [];
+      const serverDeletedSales = serverData.settings?.deletedSaleIds || [];
+      const deletedSales = Array.from(new Set([...localDeletedSales, ...serverDeletedSales, 'sale_1790808573942_ktuq']));
+
+      const localDeletedExpenses = STATE.data.settings?.deletedExpenseIds || [];
+      const serverDeletedExpenses = serverData.settings?.deletedExpenseIds || [];
+      const deletedExpenses = Array.from(new Set([...localDeletedExpenses, ...serverDeletedExpenses]));
 
       // Safe non-destructive merge: NEVER delete local entries because server container was fresh
-      const mergedSales = mergeClientRecords(STATE.data.sales || [], serverData.sales || [], deletedSales);
+      const filteredServerSales = (serverData.sales || []).filter(s => s && s.id !== 'sale_1790808573942_ktuq');
+      const filteredLocalSales = (STATE.data.sales || []).filter(s => s && s.id !== 'sale_1790808573942_ktuq');
+      const mergedSales = mergeClientRecords(filteredLocalSales, filteredServerSales, deletedSales);
       const mergedExpenses = mergeClientRecords(STATE.data.expenses || [], serverData.expenses || [], deletedExpenses);
       const mergedProducts = (serverData.products && serverData.products.length) ? serverData.products : (STATE.data.products || []);
 
@@ -373,7 +389,12 @@ async function loadAppData() {
       STATE.data.sales = mergedSales;
       STATE.data.expenses = mergedExpenses;
       STATE.data.products = mergedProducts.length ? mergedProducts : (STATE.data.products || []);
-      STATE.data.settings = { ...STATE.data.settings, ...(serverData.settings || {}) };
+      STATE.data.settings = {
+        ...STATE.data.settings,
+        ...(serverData.settings || {}),
+        deletedSaleIds: deletedSales,
+        deletedExpenseIds: deletedExpenses
+      };
 
       saveLocalState();
       populateProductDropdowns();
@@ -581,6 +602,11 @@ function isDateInPeriod(dateStr, period) {
   const todayStr = getLocalTodayDateString();
   if (period === 'today') {
     return dateStr === todayStr;
+  }
+
+  if (period === 'yesterday') {
+    const yesterdayStr = getLocalYesterdayDateString();
+    return dateStr === yesterdayStr;
   }
 
   const itemDate = new Date(dateStr + 'T00:00:00');

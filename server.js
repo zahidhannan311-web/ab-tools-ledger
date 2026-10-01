@@ -47,6 +47,15 @@ async function syncFromCloudKV() {
       if (data && data.result) {
         const parsed = typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
         if (parsed && typeof parsed === 'object') {
+          parsed.settings = parsed.settings || {};
+          parsed.settings.deletedSaleIds = parsed.settings.deletedSaleIds || [];
+          if (!parsed.settings.deletedSaleIds.includes('sale_1790808573942_ktuq')) {
+            parsed.settings.deletedSaleIds.push('sale_1790808573942_ktuq');
+          }
+          const delSales = new Set(parsed.settings.deletedSaleIds);
+          if (parsed.sales) {
+            parsed.sales = parsed.sales.filter(s => s && s.id && !delSales.has(s.id) && s.id !== 'sale_1790808573942_ktuq');
+          }
           memoryDb = parsed;
           return true;
         }
@@ -169,7 +178,7 @@ function getInitialDb() {
       businessName: 'A&B Tools Business Manager',
       currency: 'Rs.',
       lastModified: 1,
-      deletedSaleIds: [],
+      deletedSaleIds: ['sale_1790808573942_ktuq'],
       deletedExpenseIds: [],
       lastExcelExport: null
     }
@@ -198,7 +207,18 @@ function readDb() {
       }
       parsed.settings = parsed.settings || {};
       parsed.settings.deletedSaleIds = parsed.settings.deletedSaleIds || [];
+      if (!parsed.settings.deletedSaleIds.includes('sale_1790808573942_ktuq')) {
+        parsed.settings.deletedSaleIds.push('sale_1790808573942_ktuq');
+      }
+      const delSales = new Set(parsed.settings.deletedSaleIds);
+      if (parsed.sales) {
+        parsed.sales = parsed.sales.filter(s => s && s.id && !delSales.has(s.id) && s.id !== 'sale_1790808573942_ktuq');
+      }
       parsed.settings.deletedExpenseIds = parsed.settings.deletedExpenseIds || [];
+      const delExpenses = new Set(parsed.settings.deletedExpenseIds);
+      if (parsed.expenses) {
+        parsed.expenses = parsed.expenses.filter(e => e && e.id && !delExpenses.has(e.id));
+      }
       memoryDb = parsed;
       return memoryDb;
     }
