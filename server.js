@@ -563,11 +563,15 @@ app.post('/api/reset-data', (req, res) => {
 });
 
 // Start Server
-app.listen(PORT, () => {
-  console.log(`===============================================`);
-  console.log(`🚀 A&B Tools Business Manager Running at:`);
-  console.log(`   http://localhost:${PORT}`);
-  console.log(`===============================================`);
-  const initialData = readDb();
-  syncExcelWorkbook(initialData);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`===============================================`);
+    console.log(`🚀 A&B Tools Business Manager Running at:`);
+    console.log(`   http://localhost:${PORT}`);
+    console.log(`===============================================`);
+    const initialData = readDb();
+    syncExcelWorkbook(initialData);
+  });
+}
+
+module.exports = app;
