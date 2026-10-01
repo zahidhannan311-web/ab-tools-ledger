@@ -54,14 +54,28 @@ function setupViewportKeyboardHandling() {
   });
 }
 
-// Check PIN setup status from server (with smart auto-sync for serverless restarts)
+// Check PIN setup status (Instant 0ms UI with background server sync)
 async function checkPinStatus() {
+  const localPin = localStorage.getItem('ab_tools_pin');
+  const savedSession = sessionStorage.getItem('ab_tools_unlocked');
+
+  // Instant response: if already unlocked in this browser session, open dashboard immediately (0ms)
+  if (savedSession === 'true') {
+    STATE.unlocked = true;
+    STATE.pinSet = true;
+    document.getElementById('pinGateModal').classList.remove('active');
+    loadAppData();
+  } else {
+    // Show PIN Gate immediately based on local storage cache (0ms)
+    STATE.pinSet = !!localPin;
+    showPinGate();
+  }
+
+  // Background sync with server
   try {
     let res = await fetch('/api/status');
     let data = await res.json();
 
-    // If serverless container cold-restarted and pin is not set, auto-sync from browser localStorage
-    const localPin = localStorage.getItem('ab_tools_pin');
     const localCacheStr = localStorage.getItem('ab_tools_cache');
     if (!data.pinSet && localPin && localCacheStr) {
       try {
@@ -82,20 +96,11 @@ async function checkPinStatus() {
     }
 
     STATE.pinSet = data.pinSet;
-
-    const savedSession = sessionStorage.getItem('ab_tools_unlocked');
-    if (savedSession === 'true' && STATE.pinSet) {
-      STATE.unlocked = true;
-      document.getElementById('pinGateModal').classList.remove('active');
-      await loadAppData();
-    } else {
+    if (!STATE.unlocked) {
       showPinGate();
     }
   } catch (err) {
-    console.warn('API connection failed, falling back to local storage:', err);
-    const localPin = localStorage.getItem('ab_tools_pin');
-    STATE.pinSet = !!localPin;
-    showPinGate();
+    console.warn('Background sync status check:', err);
   }
 }
 
@@ -197,6 +202,26 @@ async function handleUnlockSubmit() {
     return;
   }
 
+  const localPin = localStorage.getItem('ab_tools_pin');
+
+  // Fast-path: Instant 0ms Unlock if entered PIN matches cached PIN
+  if (localPin && STATE.enteredPin === localPin) {
+    STATE.unlocked = true;
+    sessionStorage.setItem('ab_tools_unlocked', 'true');
+    document.getElementById('pinGateModal').classList.remove('active');
+    showToast('Welcome back! Dashboard unlocked 🔓');
+    loadAppData();
+
+    // Verify in background
+    fetch('/api/auth/verify-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: STATE.enteredPin })
+    }).catch(() => {});
+    return;
+  }
+
+  // Fallback: Verify with server
   try {
     const res = await fetch('/api/auth/verify-pin', {
       method: 'POST',
@@ -207,10 +232,11 @@ async function handleUnlockSubmit() {
 
     if (res.ok) {
       STATE.unlocked = true;
+      localStorage.setItem('ab_tools_pin', STATE.enteredPin);
       sessionStorage.setItem('ab_tools_unlocked', 'true');
       document.getElementById('pinGateModal').classList.remove('active');
       showToast('Welcome back! Dashboard unlocked 🔓');
-      await loadAppData();
+      loadAppData();
     } else {
       errEl.textContent = result.error || 'Incorrect PIN! Please try again';
       STATE.enteredPin = '';
@@ -218,20 +244,10 @@ async function handleUnlockSubmit() {
       shakePinCard();
     }
   } catch (err) {
-    console.error('Verify PIN error:', err);
-    const localPin = localStorage.getItem('ab_tools_pin');
-    if (localPin && localPin === STATE.enteredPin) {
-      STATE.unlocked = true;
-      sessionStorage.setItem('ab_tools_unlocked', 'true');
-      document.getElementById('pinGateModal').classList.remove('active');
-      showToast('Unlocked in Offline Mode 🔓');
-      loadAppData();
-    } else {
-      errEl.textContent = 'Incorrect PIN!';
-      STATE.enteredPin = '';
-      updatePinDots();
-      shakePinCard();
-    }
+    errEl.textContent = 'Incorrect PIN!';
+    STATE.enteredPin = '';
+    updatePinDots();
+    shakePinCard();
   }
 }
 
@@ -288,27 +304,33 @@ function shakePinCard() {
   card.style.animation = 'shake 0.4s ease';
 }
 
-// ==================== LOAD & SYNC DATA ====================
+// ==================== LOAD & SYNC DATA (Instant Stale-While-Revalidate) ====================
 async function loadAppData() {
+  // 1. Immediately render from local cache if available (0ms load time!)
+  const cached = localStorage.getItem('ab_tools_cache');
+  if (cached) {
+    try {
+      STATE.data = JSON.parse(cached);
+      populateProductDropdowns();
+      renderApp();
+    } catch (e) {
+      console.warn('Error reading cache:', e);
+    }
+  }
+
+  // 2. Fetch fresh data from server in background & update smoothly
   try {
     const res = await fetch('/api/data');
     if (res.ok) {
       const data = await res.json();
       STATE.data = data;
       localStorage.setItem('ab_tools_cache', JSON.stringify(data));
-    } else {
-      throw new Error('Server returned non-200');
+      populateProductDropdowns();
+      renderApp();
     }
   } catch (err) {
-    console.warn('Loading from local cache:', err);
-    const cached = localStorage.getItem('ab_tools_cache');
-    if (cached) {
-      STATE.data = JSON.parse(cached);
-    }
+    console.warn('Background data sync:', err);
   }
-
-  populateProductDropdowns();
-  renderApp();
 }
 
 function populateProductDropdowns() {
@@ -1496,10 +1518,20 @@ async function triggerExcelDownload() {
   }
 }
 
-function fallbackClientExcelDownload() {
+async function fallbackClientExcelDownload() {
   if (typeof XLSX === 'undefined') {
-    alert('Excel engine is not loaded');
-    return;
+    showToast('Loading Excel export engine... ⏳');
+    const loaded = await new Promise(resolve => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+    });
+    if (!loaded || typeof XLSX === 'undefined') {
+      alert('Could not load Excel export engine. Please check your internet connection.');
+      return;
+    }
   }
   const wb = XLSX.utils.book_new();
 
