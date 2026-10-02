@@ -304,7 +304,14 @@ function mergeClientRecords(localList = [], serverList = [], deletedIds = []) {
     }
   }
 
-  return Array.from(map.values());
+  // Sort descending by date, then createdAt
+  const list = Array.from(map.values());
+  list.sort((a, b) => {
+    const dDiff = (b.date || '').localeCompare(a.date || '');
+    if (dDiff !== 0) return dDiff;
+    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+  });
+  return list;
 }
 
 // ==================== LOAD & SYNC DATA (Instant Stale-While-Revalidate + Non-Destructive Merge) ====================
@@ -356,38 +363,24 @@ async function loadAppData() {
       const delSaleSet = new Set(combinedDeletedSales);
       const delExpenseSet = new Set(combinedDeletedExpenses);
 
-      // Server is cloud source of truth
+      // Clean server and local data against deleted tombstones
       const freshSales = (serverData.sales || []).filter(s => s && s.id && !delSaleSet.has(s.id));
       const freshExpenses = (serverData.expenses || []).filter(e => e && e.id && !delExpenseSet.has(e.id));
       const freshProducts = (serverData.products && serverData.products.length) ? serverData.products : (STATE.data.products || []);
 
-      // If serverless container cold-started completely empty while client has local data, recover
-      if (freshSales.length === 0 && freshExpenses.length === 0 && (STATE.data.sales || []).length > 0) {
-        const localValidSales = (STATE.data.sales || []).filter(s => s && s.id && !delSaleSet.has(s.id));
-        const localValidExpenses = (STATE.data.expenses || []).filter(e => e && e.id && !delExpenseSet.has(e.id));
-        if (localValidSales.length > 0 || localValidExpenses.length > 0) {
-          fetch('/api/backup/restore', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              backupData: {
-                sales: localValidSales,
-                expenses: localValidExpenses,
-                products: freshProducts,
-                settings: {
-                  ...STATE.data.settings,
-                  deletedSaleIds: combinedDeletedSales,
-                  deletedExpenseIds: combinedDeletedExpenses
-                }
-              }
-            })
-          }).catch(err => console.warn('Cold-start recovery warning:', err));
-        }
-      } else {
-        STATE.data.sales = freshSales;
-        STATE.data.expenses = freshExpenses;
-      }
+      const localValidSales = (STATE.data.sales || []).filter(s => s && s.id && !delSaleSet.has(s.id));
+      const localValidExpenses = (STATE.data.expenses || []).filter(e => e && e.id && !delExpenseSet.has(e.id));
 
+      // SMART NON-DESTRUCTIVE MERGE: Never lose local entries on refresh or cross-device load
+      const mergedSales = mergeClientRecords(localValidSales, freshSales, combinedDeletedSales);
+      const mergedExpenses = mergeClientRecords(localValidExpenses, freshExpenses, combinedDeletedExpenses);
+
+      // Detect if server is missing records that exist locally (e.g. serverless cold container or cross-device sync)
+      const serverMissingSales = (serverData.sales || []).length < mergedSales.length;
+      const serverMissingExpenses = (serverData.expenses || []).length < mergedExpenses.length;
+
+      STATE.data.sales = mergedSales;
+      STATE.data.expenses = mergedExpenses;
       STATE.data.products = freshProducts;
       STATE.data.settings = {
         ...STATE.data.settings,
@@ -399,6 +392,22 @@ async function loadAppData() {
       saveLocalState();
       populateProductDropdowns();
       renderApp();
+
+      // If server was missing records (e.g. serverless container cold-start), push to server
+      if (serverMissingSales || serverMissingExpenses) {
+        fetch('/api/backup/restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            backupData: {
+              sales: mergedSales,
+              expenses: mergedExpenses,
+              products: freshProducts,
+              settings: STATE.data.settings
+            }
+          })
+        }).catch(err => console.warn('Auto restore sync warning:', err));
+      }
     }
   } catch (err) {
     console.warn('Background data sync:', err);

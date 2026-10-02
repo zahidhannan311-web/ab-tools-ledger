@@ -708,7 +708,13 @@ function mergeRecordLists(existing = [], incoming = [], deletedSet = new Set()) 
       }
     }
   });
-  return Array.from(map.values());
+  const list = Array.from(map.values());
+  list.sort((a, b) => {
+    const dDiff = (b.date || '').localeCompare(a.date || '');
+    if (dDiff !== 0) return dDiff;
+    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+  });
+  return list;
 }
 
 // JSON Full Restore (Smart Non-Destructive Merge)
