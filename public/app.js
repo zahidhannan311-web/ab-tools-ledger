@@ -242,7 +242,8 @@ async function handlePinSetup() {
       STATE.unlocked = true;
       sessionStorage.setItem('ab_tools_unlocked', 'true');
       document.getElementById('pinGateModal').classList.remove('active');
-      showToast('Your secret PIN has been configured successfully! 🎉');
+      showToast('Your secret PIN has been configured & auto-saved! 🎉');
+      triggerAutoSaveSync();
       await loadAppData();
     } else {
       errEl.textContent = result.error || 'Failed to save PIN';
@@ -254,6 +255,7 @@ async function handlePinSetup() {
     sessionStorage.setItem('ab_tools_unlocked', 'true');
     document.getElementById('pinGateModal').classList.remove('active');
     showToast('PIN configured successfully (Offline Mode) 🎉');
+    triggerAutoSaveSync();
     loadAppData();
   }
 }
@@ -319,7 +321,9 @@ async function performServerSync() {
       body: JSON.stringify({
         sales: STATE.data.sales || [],
         expenses: STATE.data.expenses || [],
-        settings: STATE.data.settings || {}
+        products: STATE.data.products || [],
+        settings: STATE.data.settings || {},
+        pin: localStorage.getItem('ab_tools_pin')
       })
     });
 
@@ -342,6 +346,8 @@ async function performServerSync() {
 
         const salesChanged = mergedSales.length !== (STATE.data.sales || []).length;
         const expChanged = mergedExpenses.length !== (STATE.data.expenses || []).length;
+        const prodsChanged = JSON.stringify(serverResult.products || []) !== JSON.stringify(STATE.data.products || []);
+        const settingsChanged = JSON.stringify(serverResult.settings || {}) !== JSON.stringify(STATE.data.settings || {});
 
         STATE.data.sales = mergedSales;
         STATE.data.expenses = mergedExpenses;
@@ -355,9 +361,19 @@ async function performServerSync() {
           deletedExpenseIds: combinedDeletedExpenses
         };
 
+        if (serverResult.pin && String(serverResult.pin).length >= 4) {
+          const currentLocalPin = localStorage.getItem('ab_tools_pin');
+          if (currentLocalPin !== serverResult.pin) {
+            localStorage.setItem('ab_tools_pin', serverResult.pin);
+          }
+        }
+
         saveLocalState();
-        if (salesChanged || expChanged) {
+        syncSettingsFormUI();
+
+        if (salesChanged || expChanged || prodsChanged || settingsChanged) {
           populateProductDropdowns();
+          renderAdminCatalog();
           renderApp();
         }
         updateSyncBadge('synced');
@@ -370,6 +386,36 @@ async function performServerSync() {
     updateSyncBadge('offline');
   } finally {
     isSyncInProgress = false;
+  }
+}
+
+function syncSettingsFormUI() {
+  const settings = STATE.data.settings || {};
+  const nameInput = document.getElementById('settingBusinessNameInput');
+  const currInput = document.getElementById('settingCurrencyInput');
+  const tplInput = document.getElementById('settingWhatsappTemplateInput');
+
+  if (nameInput && document.activeElement !== nameInput) {
+    nameInput.value = settings.businessName || 'A&B Tools Business Manager';
+  }
+  if (currInput && document.activeElement !== currInput) {
+    currInput.value = settings.currency || 'Rs.';
+  }
+  if (tplInput && document.activeElement !== tplInput) {
+    tplInput.value = settings.whatsappTemplate || '';
+  }
+
+  const currencyStr = settings.currency || 'Rs.';
+  document.querySelectorAll('.currency').forEach(el => {
+    el.textContent = currencyStr;
+  });
+
+  const brandTitle = document.querySelector('.header-title');
+  if (brandTitle && settings.businessName) {
+    brandTitle.textContent = settings.businessName;
+  }
+  if (settings.businessName) {
+    document.title = settings.businessName;
   }
 }
 
@@ -455,7 +501,9 @@ async function loadAppData() {
           parsed.sales = parsed.sales.filter(s => s && s.id && !delSet.has(s.id) && !ignoredSaleIds.has(s.id));
         }
         STATE.data = parsed;
+        syncSettingsFormUI();
         populateProductDropdowns();
+        renderAdminCatalog();
         renderApp();
       }
     } catch (e) {
@@ -1248,6 +1296,37 @@ function setupEventListeners() {
   document.getElementById('btnAddPlanRow')?.addEventListener('click', () => addPlanRow());
   document.getElementById('productForm')?.addEventListener('submit', handleProductSubmit);
 
+  // Business Settings Live Auto-Save Listeners
+  const nameInput = document.getElementById('settingBusinessNameInput');
+  const currInput = document.getElementById('settingCurrencyInput');
+  const tplInput = document.getElementById('settingWhatsappTemplateInput');
+  const feedbackMsg = document.getElementById('settingsFeedbackMsg');
+
+  let settingsDebounceTimer = null;
+  function onSettingChange() {
+    STATE.data.settings = STATE.data.settings || {};
+    if (nameInput) STATE.data.settings.businessName = nameInput.value.trim() || 'A&B Tools Business Manager';
+    if (currInput) STATE.data.settings.currency = currInput.value.trim() || 'Rs.';
+    if (tplInput) STATE.data.settings.whatsappTemplate = tplInput.value.trim();
+
+    syncSettingsFormUI();
+    renderApp();
+
+    if (settingsDebounceTimer) clearTimeout(settingsDebounceTimer);
+    settingsDebounceTimer = setTimeout(() => {
+      triggerAutoSaveSync();
+      if (feedbackMsg) {
+        feedbackMsg.className = 'pin-feedback-msg text-green';
+        feedbackMsg.textContent = 'Settings auto-saved & synced across devices! ⚡';
+        setTimeout(() => { if (feedbackMsg) feedbackMsg.textContent = ''; }, 3000);
+      }
+    }, 250);
+  }
+
+  nameInput?.addEventListener('input', onSettingChange);
+  currInput?.addEventListener('input', onSettingChange);
+  tplInput?.addEventListener('input', onSettingChange);
+
   // Admin Reset Sales & Expenses
   document.getElementById('btnResetSalesExpenses')?.addEventListener('click', async () => {
     const pin = prompt('Enter your 4-digit Security PIN to confirm resetting all sales and expenses:');
@@ -1635,31 +1714,22 @@ async function handleProductSubmit(e) {
 
   saveLocalState();
   populateProductDropdowns();
+  renderAdminCatalog();
   renderApp();
   closeModal('productModal');
-  showToast('Product & Pricing saved successfully! 🎉');
+  showToast('Product & Pricing saved & auto-synced! 🎉');
 
-  // Background server sync
+  // Instant Cloud Auto-Save (NO REFRESH NEEDED)
+  triggerAutoSaveSync();
+
   try {
     await fetch('/api/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, type, plans })
     });
-
-    const localPin = localStorage.getItem('ab_tools_pin');
-    await fetch('/api/backup/restore', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        backupData: {
-          ...STATE.data,
-          pin: localPin
-        }
-      })
-    });
   } catch (err) {
-    console.warn('Network sync error:', err);
+    console.warn('Product sync warning:', err);
   }
 }
 
@@ -1668,24 +1738,17 @@ async function deleteProduct(id) {
   STATE.data.products = (STATE.data.products || []).filter(p => p.id !== id);
   saveLocalState();
   populateProductDropdowns();
+  renderAdminCatalog();
   renderApp();
-  showToast('Product deleted');
+  showToast('Product deleted & auto-synced');
+
+  // Instant Cloud Auto-Save (NO REFRESH NEEDED)
+  triggerAutoSaveSync();
 
   try {
     await fetch(`/api/products/${id}`, { method: 'DELETE' });
-    const localPin = localStorage.getItem('ab_tools_pin');
-    await fetch('/api/backup/restore', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        backupData: {
-          ...STATE.data,
-          pin: localPin
-        }
-      })
-    });
   } catch (err) {
-    console.warn('Delete product sync error:', err);
+    console.warn('Delete product sync warning:', err);
   }
 }
 
@@ -1830,7 +1893,8 @@ async function handleChangePin(e) {
       msgEl.textContent = 'Security PIN updated successfully! ✓';
       localStorage.setItem('ab_tools_pin', newPin);
       document.getElementById('changePinForm').reset();
-      showToast('PIN updated successfully!');
+      showToast('PIN updated & auto-synced across devices! 🔒');
+      triggerAutoSaveSync();
     } else {
       msgEl.className = 'pin-feedback-msg text-rose';
       msgEl.textContent = result.error || 'Failed to update PIN';

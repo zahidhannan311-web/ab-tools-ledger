@@ -740,7 +740,13 @@ function mergeRecordLists(existing = [], incoming = [], deletedSet = new Set()) 
 // Universal Real-Time Sync endpoint (Cross-Device Instant Save without refresh)
 app.post('/api/sync', (req, res) => {
   try {
-    const { sales: incomingSales, expenses: incomingExpenses, settings: incomingSettings } = req.body;
+    const {
+      sales: incomingSales,
+      expenses: incomingExpenses,
+      products: incomingProducts,
+      settings: incomingSettings,
+      pin: incomingPin
+    } = req.body;
     const db = readDb();
 
     const deletedSales = new Set([
@@ -759,6 +765,22 @@ app.post('/api/sync', (req, res) => {
       db.expenses = mergeRecordLists(db.expenses, incomingExpenses, deletedExpenses);
     }
 
+    if (Array.isArray(incomingProducts) && incomingProducts.length > 0) {
+      // Non-destructive product merge
+      const prodMap = new Map();
+      (db.products || DEFAULT_PRODUCTS).forEach(p => {
+        if (p && p.id) prodMap.set(p.id, p);
+      });
+      incomingProducts.forEach(p => {
+        if (p && p.id) prodMap.set(p.id, p);
+      });
+      db.products = Array.from(prodMap.values());
+    }
+
+    if (incomingPin && String(incomingPin).trim().length >= 4) {
+      db.pin = String(incomingPin).trim();
+    }
+
     db.settings = {
       ...db.settings,
       ...(incomingSettings || {}),
@@ -774,11 +796,31 @@ app.post('/api/sync', (req, res) => {
       sales: db.sales || [],
       expenses: db.expenses || [],
       products: db.products || DEFAULT_PRODUCTS,
-      settings: db.settings
+      settings: db.settings,
+      pin: db.pin
     });
   } catch (err) {
     console.error('Realtime sync error:', err);
     res.status(500).json({ error: 'Realtime sync failed: ' + err.message });
+  }
+});
+
+// Update Business Settings Directly
+app.post('/api/settings', (req, res) => {
+  try {
+    const { businessName, currency, whatsappTemplate, defaultPeriod } = req.body;
+    const db = readDb();
+    db.settings = db.settings || {};
+    if (businessName !== undefined) db.settings.businessName = String(businessName).trim();
+    if (currency !== undefined) db.settings.currency = String(currency).trim();
+    if (whatsappTemplate !== undefined) db.settings.whatsappTemplate = String(whatsappTemplate).trim();
+    if (defaultPeriod !== undefined) db.settings.defaultPeriod = String(defaultPeriod).trim();
+    db.settings.lastModified = Date.now();
+    writeDb(db);
+    res.json({ success: true, settings: db.settings });
+  } catch (err) {
+    console.error('Settings save error:', err);
+    res.status(500).json({ error: 'Failed to save settings: ' + err.message });
   }
 });
 

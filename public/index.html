@@ -405,7 +405,38 @@
             </div>
           </div>
 
-          <!-- 3. Security & PIN Settings -->
+          <!-- 3. General Business Settings & Preferences (Auto-Synced) -->
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <div class="admin-card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <span>General Business Settings</span>
+              </div>
+              <span class="badge-gold">Auto-Saved ⚡</span>
+            </div>
+            <p class="admin-card-desc">Every change here is saved instantly across all your devices without refresh.</p>
+
+            <form id="businessSettingsForm" class="admin-settings-form">
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label>Business / Brand Name</label>
+                  <input type="text" id="settingBusinessNameInput" class="form-control" placeholder="A&B Tools Manager" value="A&B Tools Business Manager">
+                </div>
+                <div class="form-group" style="width: 120px;">
+                  <label>Currency Symbol</label>
+                  <input type="text" id="settingCurrencyInput" class="form-control" placeholder="Rs." value="Rs.">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>WhatsApp Renewal Message Template</label>
+                <textarea id="settingWhatsappTemplateInput" rows="2" class="form-control" placeholder="Assalam-o-Alaikum {customer}, your {product} subscription is expiring on {expiry}. Please let us know to renew."></textarea>
+                <small class="text-muted" style="font-size: 11px;">Available tags: {customer}, {product}, {expiry}, {amount}</small>
+              </div>
+              <div id="settingsFeedbackMsg" class="pin-feedback-msg" style="margin-top: 4px;"></div>
+            </form>
+          </div>
+
+          <!-- 4. Security & PIN Settings -->
           <div class="admin-card">
             <div class="admin-card-header">
               <div class="admin-card-title">
