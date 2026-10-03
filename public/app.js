@@ -21,6 +21,14 @@ const STATE = {
   enteredPin: ''
 };
 
+// Default WhatsApp Message Templates (Individually customizable)
+const DEFAULT_TEMPLATES = {
+  expiry: 'Hello {customer}! Notice from {business}: Your {product} ({account}) expires on {expiry}. Kindly renew to keep uninterrupted access. Thank you!',
+  pending: 'Hello {customer}! Friendly reminder from {business}: The payment of {currency} {amount} for your {product} ({plan}) is currently pending. Kindly clear the dues at your earliest convenience. Thank you!',
+  welcome: 'Assalam-o-Alaikum {customer}! Thank you for choosing {business}. Here are your {product} ({plan}) details:\nLogin: {account}\nExpiry: {expiry}\nAmount: {currency} {amount}\nHave a great experience!',
+  paid: 'Dear {customer}, we have received your payment of {currency} {amount} for {product} ({plan}). Thank you for trusting {business}!'
+};
+
 // ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', async () => {
   setupViewportKeyboardHandling();
@@ -393,7 +401,10 @@ function syncSettingsFormUI() {
   const settings = STATE.data.settings || {};
   const nameInput = document.getElementById('settingBusinessNameInput');
   const currInput = document.getElementById('settingCurrencyInput');
-  const tplInput = document.getElementById('settingWhatsappTemplateInput');
+  const tplExpiry = document.getElementById('settingTplExpiry');
+  const tplPending = document.getElementById('settingTplPending');
+  const tplWelcome = document.getElementById('settingTplWelcome');
+  const tplPaid = document.getElementById('settingTplPaid');
 
   if (nameInput && document.activeElement !== nameInput) {
     nameInput.value = settings.businessName || 'A&B Tools Business Manager';
@@ -401,8 +412,17 @@ function syncSettingsFormUI() {
   if (currInput && document.activeElement !== currInput) {
     currInput.value = settings.currency || 'Rs.';
   }
-  if (tplInput && document.activeElement !== tplInput) {
-    tplInput.value = settings.whatsappTemplate || '';
+  if (tplExpiry && document.activeElement !== tplExpiry) {
+    tplExpiry.value = (settings.templateExpiry !== undefined && settings.templateExpiry !== '') ? settings.templateExpiry : DEFAULT_TEMPLATES.expiry;
+  }
+  if (tplPending && document.activeElement !== tplPending) {
+    tplPending.value = (settings.templatePending !== undefined && settings.templatePending !== '') ? settings.templatePending : DEFAULT_TEMPLATES.pending;
+  }
+  if (tplWelcome && document.activeElement !== tplWelcome) {
+    tplWelcome.value = (settings.templateWelcome !== undefined && settings.templateWelcome !== '') ? settings.templateWelcome : DEFAULT_TEMPLATES.welcome;
+  }
+  if (tplPaid && document.activeElement !== tplPaid) {
+    tplPaid.value = (settings.templatePaid !== undefined && settings.templatePaid !== '') ? settings.templatePaid : DEFAULT_TEMPLATES.paid;
   }
 
   const currencyStr = settings.currency || 'Rs.';
@@ -994,7 +1014,7 @@ function renderReminders() {
           </div>
           <div class="item-btn-group">
             <button class="btn btn-xs btn-gold" onclick="markSalePaid('${s.id}')">Mark Paid</button>
-            <button class="btn-whatsapp" onclick="openWhatsAppDirect('${s.customerPhone}', '${encodeURIComponent(msg)}')">
+            <button class="btn-whatsapp" onclick="openWhatsAppPickerModal('${s.id}', 'pending')">
               <span>💬 Send WhatsApp</span>
             </button>
           </div>
@@ -1036,7 +1056,7 @@ function renderReminders() {
             <div class="reminder-msg-preview">"${escapeHtml(msg)}"</div>
           </div>
           <div class="item-btn-group">
-            <button class="btn-whatsapp" onclick="openWhatsAppDirect('${s.customerPhone}', '${encodeURIComponent(msg)}')">
+            <button class="btn-whatsapp" onclick="openWhatsAppPickerModal('${s.id}', 'expiry')">
               <span>💬 Send Renewal WhatsApp</span>
             </button>
           </div>
@@ -1046,39 +1066,164 @@ function renderReminders() {
   }
 }
 
-// Professional English WhatsApp Messages
+// ==================== DYNAMIC WHATSAPP TEMPLATES & MODAL ====================
+function formatCustomTemplate(template, sale) {
+  if (!template) return '';
+  const settings = STATE.data.settings || {};
+  const business = settings.businessName || 'A&B Tools Business Manager';
+  const currency = settings.currency || 'Rs.';
+  const customer = (sale.customerName && sale.customerName.trim()) ? sale.customerName.trim() : 'Customer';
+  const product = sale.product || '';
+  const account = sale.accountLogin || '';
+  const plan = sale.planLabel || (sale.planMonths ? `${sale.planMonths} Month` : '');
+  const expiry = sale.expiryDate ? formatDateDisplay(sale.expiryDate) : '';
+  const amount = (sale.amount || 0).toLocaleString('en-US');
+  const date = sale.date ? formatDateDisplay(sale.date) : '';
+
+  return template
+    .replace(/\{customer\}/gi, customer)
+    .replace(/\{business\}/gi, business)
+    .replace(/\{currency\}/gi, currency)
+    .replace(/\{amount\}/gi, amount)
+    .replace(/\{product\}/gi, product)
+    .replace(/\{account\}/gi, account)
+    .replace(/\{plan\}/gi, plan)
+    .replace(/\{expiry\}/gi, expiry)
+    .replace(/\{date\}/gi, date);
+}
+
 function composePendingWhatsAppMessage(sale) {
-  const name = sale.customerName ? sale.customerName.trim() : 'Customer';
-  return `Hello ${name}! This is a reminder from A&B Tools regarding your ${sale.product} (${sale.planLabel || sale.planMonths + ' Month'}) subscription. The payment of Rs. ${sale.amount} is currently pending. Kindly clear the dues at your earliest convenience. Thank you!`;
+  const settings = STATE.data.settings || {};
+  const tpl = (settings.templatePending && settings.templatePending.trim())
+    ? settings.templatePending
+    : DEFAULT_TEMPLATES.pending;
+  return formatCustomTemplate(tpl, sale);
 }
 
 function composeExpiryWhatsAppMessage(sale, isTomorrow, isToday, isPast) {
-  const name = sale.customerName ? sale.customerName.trim() : 'Customer';
-  const loginInfo = sale.accountLogin ? ` (${sale.accountLogin})` : '';
-
-  if (isTomorrow) {
-    return `Hello ${name}! Notice from A&B Tools: Your ${sale.product}${loginInfo} subscription will expire tomorrow on ${formatDateDisplay(sale.expiryDate)}. If you would like to renew it, please let us know. Thank you!`;
-  } else if (isToday) {
-    return `Hello ${name}! Notice from A&B Tools: Your ${sale.product}${loginInfo} subscription expires TODAY on ${formatDateDisplay(sale.expiryDate)}. Please contact us now to continue uninterrupted access. Thank you!`;
-  } else {
-    return `Hello ${name}! Notice from A&B Tools: Your ${sale.product}${loginInfo} subscription has expired. Please contact us if you wish to renew. Thank you!`;
+  const settings = STATE.data.settings || {};
+  const tpl = (settings.templateExpiry && settings.templateExpiry.trim())
+    ? settings.templateExpiry
+    : DEFAULT_TEMPLATES.expiry;
+  let text = formatCustomTemplate(tpl, sale);
+  if (isToday && !text.includes('TODAY')) {
+    text = `🚨 [URGENT: EXPIRES TODAY]\n` + text;
+  } else if (isPast && !text.includes('expired')) {
+    text = `⚠️ [EXPIRED]\n` + text;
   }
+  return text;
+}
+
+function composeWelcomeWhatsAppMessage(sale) {
+  const settings = STATE.data.settings || {};
+  const tpl = (settings.templateWelcome && settings.templateWelcome.trim())
+    ? settings.templateWelcome
+    : DEFAULT_TEMPLATES.welcome;
+  return formatCustomTemplate(tpl, sale);
+}
+
+function composePaidWhatsAppMessage(sale) {
+  const settings = STATE.data.settings || {};
+  const tpl = (settings.templatePaid && settings.templatePaid.trim())
+    ? settings.templatePaid
+    : DEFAULT_TEMPLATES.paid;
+  return formatCustomTemplate(tpl, sale);
+}
+
+let currentWaSale = null;
+let currentWaType = 'expiry';
+
+function openWhatsAppPickerModal(saleId, preferredType = null) {
+  const sale = (STATE.data.sales || []).find(s => s.id === saleId);
+  if (!sale) return;
+  currentWaSale = sale;
+
+  if (preferredType) {
+    currentWaType = preferredType;
+  } else if (sale.paymentStatus !== 'Paid') {
+    currentWaType = 'pending';
+  } else {
+    const days = calculateDaysRemaining(sale.expiryDate);
+    if (days !== null && days <= 2) {
+      currentWaType = 'expiry';
+    } else {
+      currentWaType = 'welcome';
+    }
+  }
+
+  const nameEl = document.getElementById('waModalCustomer');
+  const detEl = document.getElementById('waModalDetails');
+  const phoneEl = document.getElementById('waModalPhone');
+
+  if (nameEl) nameEl.textContent = sale.customerName || 'Customer';
+  if (detEl) detEl.textContent = `${sale.product} (${sale.planLabel || sale.planMonths + 'M'}) · Rs. ${(sale.amount || 0).toLocaleString('en-US')}`;
+  if (phoneEl) phoneEl.textContent = sale.customerPhone || 'No Phone';
+
+  updateWaTabsUI();
+  updateWaPreviewText();
+
+  openModal('whatsappModal');
+}
+
+function updateWaTabsUI() {
+  document.querySelectorAll('.wa-tab-btn').forEach(btn => {
+    if (btn.getAttribute('data-watype') === currentWaType) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
+
+function updateWaPreviewText() {
+  if (!currentWaSale) return;
+  let text = '';
+  if (currentWaType === 'expiry') {
+    const days = calculateDaysRemaining(currentWaSale.expiryDate);
+    text = composeExpiryWhatsAppMessage(currentWaSale, days === 1, days === 0, days < 0);
+  } else if (currentWaType === 'pending') {
+    text = composePendingWhatsAppMessage(currentWaSale);
+  } else if (currentWaType === 'welcome') {
+    text = composeWelcomeWhatsAppMessage(currentWaSale);
+  } else if (currentWaType === 'paid') {
+    text = composePaidWhatsAppMessage(currentWaSale);
+  }
+  const previewEl = document.getElementById('waModalPreview');
+  if (previewEl) previewEl.value = text;
 }
 
 function sendWhatsAppReminder(saleId) {
-  const sale = (STATE.data.sales || []).find(s => s.id === saleId);
-  if (!sale) return;
-
-  let msg = '';
-  if (sale.paymentStatus !== 'Paid') {
-    msg = composePendingWhatsAppMessage(sale);
-  } else {
-    const days = calculateDaysRemaining(sale.expiryDate);
-    msg = composeExpiryWhatsAppMessage(sale, days === 1, days === 0, days < 0);
-  }
-
-  openWhatsAppDirect(sale.customerPhone, encodeURIComponent(msg));
+  openWhatsAppPickerModal(saleId);
 }
+
+// Global Tag Insertion & Template Reset for UI
+window.insertTag = function(textareaId, tag) {
+  const el = document.getElementById(textareaId);
+  if (!el) return;
+  const start = el.selectionStart !== undefined ? el.selectionStart : el.value.length;
+  const end = el.selectionEnd !== undefined ? el.selectionEnd : el.value.length;
+  const current = el.value;
+  el.value = current.substring(0, start) + tag + current.substring(end);
+  el.focus();
+  el.selectionStart = el.selectionEnd = start + tag.length;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
+window.resetTemplate = function(type) {
+  const mapping = {
+    expiry: { id: 'settingTplExpiry', key: 'templateExpiry' },
+    pending: { id: 'settingTplPending', key: 'templatePending' },
+    welcome: { id: 'settingTplWelcome', key: 'templateWelcome' },
+    paid: { id: 'settingTplPaid', key: 'templatePaid' }
+  };
+  const item = mapping[type];
+  if (!item || !DEFAULT_TEMPLATES[type]) return;
+  const el = document.getElementById(item.id);
+  if (el) {
+    el.value = DEFAULT_TEMPLATES[type];
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+};
 
 function openWhatsAppDirect(phone, encodedText) {
   let cleanPhone = phone.replace(/[^0-9]/g, '');
@@ -1296,18 +1441,25 @@ function setupEventListeners() {
   document.getElementById('btnAddPlanRow')?.addEventListener('click', () => addPlanRow());
   document.getElementById('productForm')?.addEventListener('submit', handleProductSubmit);
 
-  // Business Settings Live Auto-Save Listeners
+  // Business Settings & WhatsApp Templates Live Auto-Save Listeners
   const nameInput = document.getElementById('settingBusinessNameInput');
   const currInput = document.getElementById('settingCurrencyInput');
-  const tplInput = document.getElementById('settingWhatsappTemplateInput');
+  const tplExpiry = document.getElementById('settingTplExpiry');
+  const tplPending = document.getElementById('settingTplPending');
+  const tplWelcome = document.getElementById('settingTplWelcome');
+  const tplPaid = document.getElementById('settingTplPaid');
   const feedbackMsg = document.getElementById('settingsFeedbackMsg');
+  const tplFeedbackMsg = document.getElementById('tplFeedbackMsg');
 
   let settingsDebounceTimer = null;
-  function onSettingChange() {
+  function onSettingChange(isTplChange = false) {
     STATE.data.settings = STATE.data.settings || {};
     if (nameInput) STATE.data.settings.businessName = nameInput.value.trim() || 'A&B Tools Business Manager';
     if (currInput) STATE.data.settings.currency = currInput.value.trim() || 'Rs.';
-    if (tplInput) STATE.data.settings.whatsappTemplate = tplInput.value.trim();
+    if (tplExpiry) STATE.data.settings.templateExpiry = tplExpiry.value;
+    if (tplPending) STATE.data.settings.templatePending = tplPending.value;
+    if (tplWelcome) STATE.data.settings.templateWelcome = tplWelcome.value;
+    if (tplPaid) STATE.data.settings.templatePaid = tplPaid.value;
 
     syncSettingsFormUI();
     renderApp();
@@ -1315,17 +1467,53 @@ function setupEventListeners() {
     if (settingsDebounceTimer) clearTimeout(settingsDebounceTimer);
     settingsDebounceTimer = setTimeout(() => {
       triggerAutoSaveSync();
-      if (feedbackMsg) {
-        feedbackMsg.className = 'pin-feedback-msg text-green';
-        feedbackMsg.textContent = 'Settings auto-saved & synced across devices! ⚡';
-        setTimeout(() => { if (feedbackMsg) feedbackMsg.textContent = ''; }, 3000);
+      const targetFeedback = isTplChange ? tplFeedbackMsg : feedbackMsg;
+      if (targetFeedback) {
+        targetFeedback.className = 'pin-feedback-msg text-green';
+        targetFeedback.textContent = isTplChange 
+          ? 'WhatsApp templates auto-saved & synced! ⚡' 
+          : 'Settings auto-saved & synced across devices! ⚡';
+        setTimeout(() => { if (targetFeedback) targetFeedback.textContent = ''; }, 3000);
       }
     }, 250);
   }
 
-  nameInput?.addEventListener('input', onSettingChange);
-  currInput?.addEventListener('input', onSettingChange);
-  tplInput?.addEventListener('input', onSettingChange);
+  nameInput?.addEventListener('input', () => onSettingChange(false));
+  currInput?.addEventListener('input', () => onSettingChange(false));
+  tplExpiry?.addEventListener('input', () => onSettingChange(true));
+  tplPending?.addEventListener('input', () => onSettingChange(true));
+  tplWelcome?.addEventListener('input', () => onSettingChange(true));
+  tplPaid?.addEventListener('input', () => onSettingChange(true));
+
+  // WhatsApp Modal Tabs & Actions
+  document.querySelectorAll('.wa-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentWaType = btn.getAttribute('data-watype');
+      updateWaTabsUI();
+      updateWaPreviewText();
+    });
+  });
+
+  document.getElementById('btnSendWaModal')?.addEventListener('click', () => {
+    if (!currentWaSale) return;
+    const text = document.getElementById('waModalPreview')?.value || '';
+    openWhatsAppDirect(currentWaSale.customerPhone, encodeURIComponent(text));
+    closeModal('whatsappModal');
+  });
+
+  document.getElementById('btnCopyWaMsg')?.addEventListener('click', () => {
+    const text = document.getElementById('waModalPreview')?.value || '';
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Message copied to clipboard! 📋');
+      });
+    } else {
+      const el = document.getElementById('waModalPreview');
+      el?.select();
+      document.execCommand('copy');
+      showToast('Message copied! 📋');
+    }
+  });
 
   // Admin Reset Sales & Expenses (Strictly Protected by Master Password: Sad12345@)
   document.getElementById('btnResetSalesExpenses')?.addEventListener('click', async () => {

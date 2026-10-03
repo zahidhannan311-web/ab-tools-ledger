@@ -405,7 +405,7 @@
             </div>
           </div>
 
-          <!-- 3. General Business Settings & Preferences (Auto-Synced) -->
+          <!-- 3. General Business Settings (Auto-Synced) -->
           <div class="admin-card">
             <div class="admin-card-header">
               <div class="admin-card-title">
@@ -414,7 +414,7 @@
               </div>
               <span class="badge-gold">Auto-Saved ⚡</span>
             </div>
-            <p class="admin-card-desc">Every change here is saved instantly across all your devices without refresh.</p>
+            <p class="admin-card-desc">Brand name and currency are auto-saved across all devices.</p>
 
             <form id="businessSettingsForm" class="admin-settings-form">
               <div class="form-row">
@@ -422,18 +422,111 @@
                   <label>Business / Brand Name</label>
                   <input type="text" id="settingBusinessNameInput" class="form-control" placeholder="A&B Tools Manager" value="A&B Tools Business Manager">
                 </div>
-                <div class="form-group" style="width: 120px;">
+                <div class="form-group" style="width: 130px;">
                   <label>Currency Symbol</label>
                   <input type="text" id="settingCurrencyInput" class="form-control" placeholder="Rs." value="Rs.">
                 </div>
               </div>
-              <div class="form-group">
-                <label>WhatsApp Renewal Message Template</label>
-                <textarea id="settingWhatsappTemplateInput" rows="2" class="form-control" placeholder="Assalam-o-Alaikum {customer}, your {product} subscription is expiring on {expiry}. Please let us know to renew."></textarea>
-                <small class="text-muted" style="font-size: 11px;">Available tags: {customer}, {product}, {expiry}, {amount}</small>
-              </div>
               <div id="settingsFeedbackMsg" class="pin-feedback-msg" style="margin-top: 4px;"></div>
             </form>
+          </div>
+
+          <!-- 4. WhatsApp Message Templates (Alag Alag Sections) -->
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <div class="admin-card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                <span>WhatsApp Message Templates</span>
+              </div>
+              <span class="badge-gold">Auto-Saved ⚡</span>
+            </div>
+            <p class="admin-card-desc">Har condition ka alag message template bana kar customize karein. Live auto-save aur sync laga hua hai.</p>
+
+            <!-- 1. Expiry / Renewal Notice -->
+            <div class="template-section-box">
+              <div class="template-box-header">
+                <div class="template-box-title">
+                  <span>⏰ 1. Expiry &amp; Renewal Reminder</span>
+                </div>
+                <button type="button" class="btn-reset-tpl" onclick="resetTemplate('expiry')">Reset Default</button>
+              </div>
+              <p class="text-muted" style="font-size: 11.5px; margin-bottom: 6px;">Jab account kal ya aaj expire ho raha ho to yeh notice send hoga.</p>
+              <textarea id="settingTplExpiry" rows="3" class="form-control tpl-textarea" placeholder="Hello {customer}! Notice from {business}: Your {product} ({account}) expires on {expiry}. Kindly renew to keep uninterrupted access. Thank you!"></textarea>
+              <div class="template-tag-pills">
+                <span class="text-muted" style="font-size: 10.5px;">Click tag to insert:</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplExpiry', '{customer}')">{customer}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplExpiry', '{product}')">{product}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplExpiry', '{account}')">{account}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplExpiry', '{expiry}')">{expiry}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplExpiry', '{business}')">{business}</span>
+              </div>
+            </div>
+
+            <!-- 2. Pending Payment Reminder -->
+            <div class="template-section-box">
+              <div class="template-box-header">
+                <div class="template-box-title">
+                  <span>⏳ 2. Pending Payment Reminder</span>
+                </div>
+                <button type="button" class="btn-reset-tpl" onclick="resetTemplate('pending')">Reset Default</button>
+              </div>
+              <p class="text-muted" style="font-size: 11.5px; margin-bottom: 6px;">Jab customer ki payment pending/unpaid ho to dues ka reminder bhejne ke liye.</p>
+              <textarea id="settingTplPending" rows="3" class="form-control tpl-textarea" placeholder="Hello {customer}! Friendly reminder from {business}: The payment of {currency} {amount} for your {product} ({plan}) is currently pending. Kindly clear the dues at your earliest convenience. Thank you!"></textarea>
+              <div class="template-tag-pills">
+                <span class="text-muted" style="font-size: 10.5px;">Click tag to insert:</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplPending', '{customer}')">{customer}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplPending', '{product}')">{product}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplPending', '{amount}')">{amount}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplPending', '{currency}')">{currency}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplPending', '{plan}')">{plan}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplPending', '{business}')">{business}</span>
+              </div>
+            </div>
+
+            <!-- 3. New Sale / Credentials Delivery -->
+            <div class="template-section-box">
+              <div class="template-box-header">
+                <div class="template-box-title">
+                  <span>📦 3. New Sale &amp; Login Credentials Delivery</span>
+                </div>
+                <button type="button" class="btn-reset-tpl" onclick="resetTemplate('welcome')">Reset Default</button>
+              </div>
+              <p class="text-muted" style="font-size: 11.5px; margin-bottom: 6px;">Sale ke baad customer ko login credentials aur validity deliver karne ke liye.</p>
+              <textarea id="settingTplWelcome" rows="3" class="form-control tpl-textarea" placeholder="Assalam-o-Alaikum {customer}! Thank you for choosing {business}. Here are your {product} ({plan}) details:&#10;Login: {account}&#10;Expiry: {expiry}&#10;Amount: {currency} {amount}&#10;Have a great experience!"></textarea>
+              <div class="template-tag-pills">
+                <span class="text-muted" style="font-size: 10.5px;">Click tag to insert:</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplWelcome', '{customer}')">{customer}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplWelcome', '{product}')">{product}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplWelcome', '{account}')">{account}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplWelcome', '{plan}')">{plan}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplWelcome', '{expiry}')">{expiry}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplWelcome', '{amount}')">{amount}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplWelcome', '{currency}')">{currency}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplWelcome', '{business}')">{business}</span>
+              </div>
+            </div>
+
+            <!-- 4. Payment Received Confirmation -->
+            <div class="template-section-box">
+              <div class="template-box-header">
+                <div class="template-box-title">
+                  <span>✅ 4. Payment Received Confirmation</span>
+                </div>
+                <button type="button" class="btn-reset-tpl" onclick="resetTemplate('paid')">Reset Default</button>
+              </div>
+              <p class="text-muted" style="font-size: 11.5px; margin-bottom: 6px;">Payment receive hone par receipt aur thank you confirmation bhejne ke liye.</p>
+              <textarea id="settingTplPaid" rows="3" class="form-control tpl-textarea" placeholder="Dear {customer}, we have received your payment of {currency} {amount} for {product} ({plan}). Thank you for trusting {business}!"></textarea>
+              <div class="template-tag-pills">
+                <span class="text-muted" style="font-size: 10.5px;">Click tag to insert:</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplPaid', '{customer}')">{customer}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplPaid', '{product}')">{product}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplPaid', '{amount}')">{amount}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplPaid', '{currency}')">{currency}</span>
+                <span class="template-tag-pill" onclick="insertTag('settingTplPaid', '{business}')">{business}</span>
+              </div>
+            </div>
+
+            <div id="tplFeedbackMsg" class="pin-feedback-msg" style="margin-top: 4px;"></div>
           </div>
 
           <!-- 4. Security & PIN Settings -->
@@ -736,6 +829,49 @@
           <button type="submit" id="btnSaveProduct" class="btn btn-gold flex-1">Save Product</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- WhatsApp Message Picker Modal -->
+  <div id="whatsappModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">💬 Send WhatsApp Message</h3>
+        <button class="modal-close-btn" data-close-modal="whatsappModal">&times;</button>
+      </div>
+      <div class="modal-form" style="padding-top: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <div>
+            <div id="waModalCustomer" style="font-weight: 600; color: #fff; font-size: 14px;">Customer Name</div>
+            <div id="waModalDetails" class="text-muted" style="font-size: 12px;">Product · Rs. 0</div>
+          </div>
+          <span id="waModalPhone" class="badge-gold" style="font-family: var(--font-mono); font-size: 12px;">+92...</span>
+        </div>
+
+        <label class="form-label" style="margin-bottom: 6px;">Select Message Type:</label>
+        <div class="wa-type-tabs" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 12px;">
+          <button type="button" class="wa-tab-btn active" data-watype="expiry">⏰ Expiry Reminder</button>
+          <button type="button" class="wa-tab-btn" data-watype="pending">⏳ Pending Payment</button>
+          <button type="button" class="wa-tab-btn" data-watype="welcome">📦 Credentials Delivery</button>
+          <button type="button" class="wa-tab-btn" data-watype="paid">✅ Payment Received</button>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label class="form-label" style="display: flex; justify-content: space-between;">
+            <span>Message Preview:</span>
+            <span class="text-muted" style="font-size: 11px;">(You can edit before sending)</span>
+          </label>
+          <textarea id="waModalPreview" rows="5" class="form-control" style="font-size: 13px; line-height: 1.5; resize: vertical;"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" data-close-modal="whatsappModal">Cancel</button>
+          <button type="button" id="btnCopyWaMsg" class="btn btn-outline" style="border-color: var(--border-color);">📋 Copy</button>
+          <button type="button" id="btnSendWaModal" class="btn btn-whatsapp flex-1">
+            <span>💬 Send via WhatsApp</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 

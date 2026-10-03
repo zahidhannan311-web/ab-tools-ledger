@@ -808,12 +808,16 @@ app.post('/api/sync', (req, res) => {
 // Update Business Settings Directly
 app.post('/api/settings', (req, res) => {
   try {
-    const { businessName, currency, whatsappTemplate, defaultPeriod } = req.body;
+    const { businessName, currency, whatsappTemplate, templateExpiry, templatePending, templateWelcome, templatePaid, defaultPeriod } = req.body;
     const db = readDb();
     db.settings = db.settings || {};
     if (businessName !== undefined) db.settings.businessName = String(businessName).trim();
     if (currency !== undefined) db.settings.currency = String(currency).trim();
     if (whatsappTemplate !== undefined) db.settings.whatsappTemplate = String(whatsappTemplate).trim();
+    if (templateExpiry !== undefined) db.settings.templateExpiry = String(templateExpiry).trim();
+    if (templatePending !== undefined) db.settings.templatePending = String(templatePending).trim();
+    if (templateWelcome !== undefined) db.settings.templateWelcome = String(templateWelcome).trim();
+    if (templatePaid !== undefined) db.settings.templatePaid = String(templatePaid).trim();
     if (defaultPeriod !== undefined) db.settings.defaultPeriod = String(defaultPeriod).trim();
     db.settings.lastModified = Date.now();
     writeDb(db);

@@ -1534,3 +1534,108 @@ body {
   100% { transform: scale(1.25); opacity: 1; }
 }
 
+/* ==================== WHATSAPP TEMPLATES CARD STYLING ==================== */
+.template-section-box {
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  padding: 13px 15px;
+  margin-bottom: 14px;
+  transition: all 0.2s ease;
+}
+.template-section-box:focus-within {
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 0 1px rgba(234, 179, 8, 0.25);
+}
+.template-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.template-box-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+}
+.template-tag-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.template-tag-pill {
+  font-size: 11px;
+  padding: 2.5px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  font-family: var(--font-mono);
+}
+.template-tag-pill:hover {
+  background: rgba(234, 179, 8, 0.15);
+  border-color: rgba(234, 179, 8, 0.4);
+  color: var(--gold-primary);
+  transform: translateY(-1px);
+}
+.btn-reset-tpl {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-reset-tpl:hover {
+  color: #fff;
+  border-color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+}
+.tpl-textarea {
+  font-size: 12.5px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 65px;
+}
+
+/* WhatsApp Picker Modal Styles */
+.wa-tab-btn {
+  text-align: left;
+  padding: 8px 10px !important;
+  font-size: 12px !important;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  color: var(--text-secondary) !important;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wa-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+.wa-tab-btn.active {
+  background: rgba(234, 179, 8, 0.15) !important;
+  border-color: var(--gold-primary) !important;
+  color: var(--gold-primary) !important;
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.15);
+}
+
+
+
