@@ -1470,6 +1470,189 @@ body {
 .toast.active {
   opacity: 1;
   transform: translateY(0);
+  pointer-events: auto;
+}
+.toast-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+}
+.toast-msg-text {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toast-undo-btn {
+  background: var(--gold-primary);
+  color: #0b0c10;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+  white-space: nowrap;
+}
+.toast-undo-btn:hover {
+  background: #fbbf24;
+  transform: scale(1.05);
+}
+
+/* ==================== RECYCLE BIN / TRASH STYLES ==================== */
+.btn-trash {
+  position: relative;
+}
+.badge-trash-count {
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  margin-left: 5px;
+  display: inline-block;
+  vertical-align: middle;
+}
+.recycle-bin-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: rgba(15, 17, 21, 0.7);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.recycle-tabs {
+  display: flex;
+  gap: 6px;
+}
+.recycle-tab-btn {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.recycle-tab-btn.active, .recycle-tab-btn:hover {
+  background: var(--bg-surface);
+  border-color: var(--gold-border);
+  color: var(--gold-primary);
+}
+.trash-item-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+.trash-item-card:hover {
+  border-color: var(--gold-border);
+  box-shadow: var(--shadow-sm);
+}
+.trash-item-info {
+  flex: 1;
+  min-width: 0;
+}
+.trash-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.trash-type-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  display: inline-block;
+}
+.trash-type-sale {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+.trash-type-expense {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+.trash-main-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.trash-sub-detail {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.trash-timestamp {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.trash-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.btn-restore {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+.btn-restore:hover {
+  background: #10b981;
+  color: #0b0c10;
+  transform: scale(1.03);
+}
+.btn-purge {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid var(--border-subtle);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-purge:hover {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.1);
 }
 
 /* ==================== MOBILE BOTTOM NAV ==================== */

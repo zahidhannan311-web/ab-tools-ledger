@@ -131,6 +131,15 @@
             <span class="btn-text-desktop">Excel Sheet</span>
           </button>
 
+          <button id="btnOpenRecycleBin" class="icon-btn btn-trash" title="Recycle Bin / Undo Deleted Items" aria-label="Recycle Bin">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span class="btn-text-desktop">Recycle Bin</span>
+            <span id="recycleBinBadge" class="badge-trash-count" style="display:none;">0</span>
+          </button>
+
           <button id="btnLockApp" class="icon-btn btn-lock" title="Lock App" aria-label="Lock App">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -873,6 +882,39 @@
             <span>💬 Send via WhatsApp</span>
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: RECYCLE BIN / UNDO (🗑️) ==================== -->
+  <div id="recycleBinModal" class="modal-overlay">
+    <div class="modal-card modal-search" style="max-width: 680px;">
+      <div class="modal-header">
+        <div class="flex items-center gap-2">
+          <div class="modal-icon-badge" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.35); color: #f87171;">
+            🗑️
+          </div>
+          <div>
+            <h3 class="modal-title">Recycle Bin / Trash</h3>
+            <p class="modal-subtitle">Recover accidentally deleted sales and expenses with 1-click</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" data-close-modal="recycleBinModal">&times;</button>
+      </div>
+
+      <div class="recycle-bin-toolbar">
+        <div class="recycle-tabs">
+          <button type="button" class="recycle-tab-btn active" data-trash-filter="all">All (<span id="trashCountAll">0</span>)</button>
+          <button type="button" class="recycle-tab-btn" data-trash-filter="sale">Sales (<span id="trashCountSales">0</span>)</button>
+          <button type="button" class="recycle-tab-btn" data-trash-filter="expense">Expenses (<span id="trashCountExpenses">0</span>)</button>
+        </div>
+        <button type="button" id="btnEmptyTrash" class="btn btn-xs btn-outline" style="border-color: rgba(239, 68, 68, 0.4); color: #f87171;">
+          🗑️ Empty Bin
+        </button>
+      </div>
+
+      <div id="recycleBinListContainer" class="search-results-container" style="max-height: 60vh; overflow-y: auto;">
+        <!-- Deleted items dynamically injected here -->
       </div>
     </div>
   </div>

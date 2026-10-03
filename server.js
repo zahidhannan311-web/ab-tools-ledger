@@ -219,6 +219,7 @@ function readDb() {
       if (parsed.expenses) {
         parsed.expenses = parsed.expenses.filter(e => e && e.id && !delExpenses.has(e.id));
       }
+      parsed.recycleBin = parsed.recycleBin || [];
       memoryDb = parsed;
       return memoryDb;
     }
@@ -227,6 +228,7 @@ function readDb() {
   }
 
   memoryDb = getInitialDb();
+  memoryDb.recycleBin = memoryDb.recycleBin || [];
   return memoryDb;
 }
 
@@ -235,6 +237,7 @@ function writeDb(data) {
   data.settings.lastModified = Date.now();
   data.settings.deletedSaleIds = data.settings.deletedSaleIds || [];
   data.settings.deletedExpenseIds = data.settings.deletedExpenseIds || [];
+  data.recycleBin = data.recycleBin || [];
   memoryDb = data;
   try {
     if (!fs.existsSync(WRITABLE_DATA_DIR)) {
@@ -409,6 +412,7 @@ app.get('/api/data', (req, res) => {
     sales: db.sales || [],
     expenses: db.expenses || [],
     products: db.products || DEFAULT_PRODUCTS,
+    recycleBin: db.recycleBin || [],
     settings: db.settings || {}
   });
 });
@@ -526,16 +530,27 @@ app.patch('/api/sales/:id/status', (req, res) => {
   res.json({ success: true, sale });
 });
 
-// Delete Sale
+// Delete Sale (Moves to Recycle Bin)
 app.delete('/api/sales/:id', (req, res) => {
   const { id } = req.params;
   const db = readDb();
-  const initialLength = db.sales.length;
-  db.sales = db.sales.filter(s => s.id !== id);
+  const sale = db.sales.find(s => s.id === id);
 
-  if (db.sales.length === initialLength) {
+  if (!sale) {
     return res.status(404).json({ error: 'Sale record not found' });
   }
+
+  db.sales = db.sales.filter(s => s.id !== id);
+
+  db.recycleBin = db.recycleBin || [];
+  db.recycleBin.unshift({
+    id: 'trash_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    originalId: id,
+    type: 'sale',
+    item: sale,
+    deletedAt: new Date().toISOString()
+  });
+  if (db.recycleBin.length > 200) db.recycleBin.pop();
 
   db.settings = db.settings || {};
   db.settings.deletedSaleIds = db.settings.deletedSaleIds || [];
@@ -545,7 +560,7 @@ app.delete('/api/sales/:id', (req, res) => {
   }
 
   writeDb(db);
-  res.json({ success: true, message: 'Sale deleted successfully' });
+  res.json({ success: true, message: 'Sale moved to Recycle Bin' });
 });
 
 // ======================== EXPENSES ========================
@@ -606,16 +621,27 @@ app.put('/api/expenses/:id', (req, res) => {
   res.json({ success: true, expense: db.expenses[index] });
 });
 
-// Delete Expense
+// Delete Expense (Moves to Recycle Bin)
 app.delete('/api/expenses/:id', (req, res) => {
   const { id } = req.params;
   const db = readDb();
-  const initialLength = db.expenses.length;
-  db.expenses = db.expenses.filter(e => e.id !== id);
+  const expense = db.expenses.find(e => e.id === id);
 
-  if (db.expenses.length === initialLength) {
+  if (!expense) {
     return res.status(404).json({ error: 'Expense record not found' });
   }
+
+  db.expenses = db.expenses.filter(e => e.id !== id);
+
+  db.recycleBin = db.recycleBin || [];
+  db.recycleBin.unshift({
+    id: 'trash_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    originalId: id,
+    type: 'expense',
+    item: expense,
+    deletedAt: new Date().toISOString()
+  });
+  if (db.recycleBin.length > 200) db.recycleBin.pop();
 
   db.settings = db.settings || {};
   db.settings.deletedExpenseIds = db.settings.deletedExpenseIds || [];
@@ -625,7 +651,66 @@ app.delete('/api/expenses/:id', (req, res) => {
   }
 
   writeDb(db);
-  res.json({ success: true, message: 'Expense deleted successfully' });
+  res.json({ success: true, message: 'Expense moved to Recycle Bin' });
+});
+
+// ======================== RECYCLE BIN ENDPOINTS ========================
+
+// Get Recycle Bin Items
+app.get('/api/recycle-bin', (req, res) => {
+  const db = readDb();
+  res.json({ success: true, items: db.recycleBin || [] });
+});
+
+// Restore Item from Recycle Bin
+app.post('/api/recycle-bin/restore/:id', (req, res) => {
+  const { id } = req.params;
+  const db = readDb();
+  db.recycleBin = db.recycleBin || [];
+  const index = db.recycleBin.findIndex(t => t.id === id || t.originalId === id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'Item not found in Recycle Bin' });
+  }
+
+  const trashEntry = db.recycleBin[index];
+  db.recycleBin.splice(index, 1);
+
+  if (trashEntry.type === 'sale') {
+    db.sales = db.sales || [];
+    const exists = db.sales.some(s => s.id === trashEntry.item.id);
+    if (!exists) db.sales.unshift(trashEntry.item);
+    if (db.settings?.deletedSaleIds) {
+      db.settings.deletedSaleIds = db.settings.deletedSaleIds.filter(sid => sid !== trashEntry.originalId && sid !== trashEntry.item.id);
+    }
+  } else if (trashEntry.type === 'expense') {
+    db.expenses = db.expenses || [];
+    const exists = db.expenses.some(e => e.id === trashEntry.item.id);
+    if (!exists) db.expenses.unshift(trashEntry.item);
+    if (db.settings?.deletedExpenseIds) {
+      db.settings.deletedExpenseIds = db.settings.deletedExpenseIds.filter(eid => eid !== trashEntry.originalId && eid !== trashEntry.item.id);
+    }
+  }
+
+  writeDb(db);
+  res.json({ success: true, message: 'Item restored successfully', item: trashEntry.item, type: trashEntry.type });
+});
+
+// Permanently Delete Item from Recycle Bin
+app.delete('/api/recycle-bin/:id', (req, res) => {
+  const { id } = req.params;
+  const db = readDb();
+  db.recycleBin = (db.recycleBin || []).filter(t => t.id !== id && t.originalId !== id);
+  writeDb(db);
+  res.json({ success: true, message: 'Item permanently deleted' });
+});
+
+// Empty Entire Recycle Bin
+app.delete('/api/recycle-bin', (req, res) => {
+  const db = readDb();
+  db.recycleBin = [];
+  writeDb(db);
+  res.json({ success: true, message: 'Recycle Bin emptied successfully' });
 });
 
 // ======================== PRODUCTS / CATALOG (ADMIN) ========================
@@ -745,18 +830,26 @@ app.post('/api/sync', (req, res) => {
       expenses: incomingExpenses,
       products: incomingProducts,
       settings: incomingSettings,
+      recycleBin: incomingRecycleBin,
       pin: incomingPin
     } = req.body;
     const db = readDb();
+
+    // Actively restored items should never be blocked by deleted sets
+    const activeIncomingSaleIds = new Set((incomingSales || []).map(s => s.id));
+    const activeIncomingExpenseIds = new Set((incomingExpenses || []).map(e => e.id));
 
     const deletedSales = new Set([
       ...(db.settings?.deletedSaleIds || []),
       ...(incomingSettings?.deletedSaleIds || [])
     ]);
+    activeIncomingSaleIds.forEach(id => deletedSales.delete(id));
+
     const deletedExpenses = new Set([
       ...(db.settings?.deletedExpenseIds || []),
       ...(incomingSettings?.deletedExpenseIds || [])
     ]);
+    activeIncomingExpenseIds.forEach(id => deletedExpenses.delete(id));
 
     if (Array.isArray(incomingSales)) {
       db.sales = mergeRecordLists(db.sales, incomingSales, deletedSales);
@@ -775,6 +868,10 @@ app.post('/api/sync', (req, res) => {
         if (p && p.id) prodMap.set(p.id, p);
       });
       db.products = Array.from(prodMap.values());
+    }
+
+    if (Array.isArray(incomingRecycleBin)) {
+      db.recycleBin = incomingRecycleBin;
     }
 
     if (incomingPin && String(incomingPin).trim().length >= 4) {
@@ -796,6 +893,7 @@ app.post('/api/sync', (req, res) => {
       sales: db.sales || [],
       expenses: db.expenses || [],
       products: db.products || DEFAULT_PRODUCTS,
+      recycleBin: db.recycleBin || [],
       settings: db.settings,
       pin: db.pin
     });

@@ -13,6 +13,7 @@ const STATE = {
     sales: [],
     expenses: [],
     products: [],
+    recycleBin: [],
     settings: {
       businessName: 'A&B Tools Business Manager',
       currency: 'Rs.'
@@ -330,6 +331,7 @@ async function performServerSync() {
         sales: STATE.data.sales || [],
         expenses: STATE.data.expenses || [],
         products: STATE.data.products || [],
+        recycleBin: STATE.data.recycleBin || [],
         settings: STATE.data.settings || {},
         pin: localStorage.getItem('ab_tools_pin')
       })
@@ -361,6 +363,10 @@ async function performServerSync() {
         STATE.data.expenses = mergedExpenses;
         if (serverResult.products && serverResult.products.length) {
           STATE.data.products = serverResult.products;
+        }
+        if (serverResult.recycleBin) {
+          STATE.data.recycleBin = serverResult.recycleBin;
+          updateRecycleBinBadge();
         }
         STATE.data.settings = {
           ...STATE.data.settings,
@@ -520,7 +526,9 @@ async function loadAppData() {
         if (parsed.sales) {
           parsed.sales = parsed.sales.filter(s => s && s.id && !delSet.has(s.id) && !ignoredSaleIds.has(s.id));
         }
+        parsed.recycleBin = parsed.recycleBin || [];
         STATE.data = parsed;
+        updateRecycleBinBadge();
         syncSettingsFormUI();
         populateProductDropdowns();
         renderAdminCatalog();
@@ -1408,6 +1416,23 @@ function setupEventListeners() {
   document.getElementById('btnDownloadExcel')?.addEventListener('click', triggerExcelDownload);
   document.getElementById('btnAdminDownloadExcel')?.addEventListener('click', triggerExcelDownload);
 
+  // Recycle Bin Modal Button & Listeners
+  document.getElementById('btnOpenRecycleBin')?.addEventListener('click', () => {
+    openModal('recycleBinModal');
+    renderRecycleBin('all');
+  });
+
+  document.querySelectorAll('.recycle-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.recycle-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const filter = btn.getAttribute('data-trash-filter') || 'all';
+      renderRecycleBin(filter);
+    });
+  });
+
+  document.getElementById('btnEmptyTrash')?.addEventListener('click', emptyRecycleBin);
+
   // JSON Backup and Restore
   document.getElementById('btnDownloadJsonBackup')?.addEventListener('click', downloadJsonBackup);
   document.getElementById('restoreFileInput')?.addEventListener('change', handleJsonRestore);
@@ -1755,16 +1780,38 @@ async function markSalePaid(id) {
 
 async function deleteSale(id) {
   if (!confirm('Are you sure you want to delete this sale record?')) return;
+  const sale = (STATE.data.sales || []).find(s => s.id === id);
+  if (!sale) return;
+
   STATE.data.sales = (STATE.data.sales || []).filter(s => s.id !== id);
+
+  const trashEntry = {
+    id: 'trash_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    originalId: id,
+    type: 'sale',
+    item: { ...sale },
+    deletedAt: new Date().toISOString()
+  };
+  STATE.data.recycleBin = STATE.data.recycleBin || [];
+  STATE.data.recycleBin.unshift(trashEntry);
+  if (STATE.data.recycleBin.length > 200) STATE.data.recycleBin.pop();
+
   STATE.data.settings = STATE.data.settings || {};
   STATE.data.settings.deletedSaleIds = STATE.data.settings.deletedSaleIds || [];
   if (!STATE.data.settings.deletedSaleIds.includes(id)) {
     STATE.data.settings.deletedSaleIds.push(id);
   }
+
   saveLocalState();
-  showToast('Sale record deleted');
   renderApp();
+  updateRecycleBinBadge();
   triggerAutoSaveSync();
+
+  const title = sale.customerPhone ? formatPhone(sale.customerPhone) : (sale.product || 'Sale');
+  showToast(`Sale deleted (${title})`, {
+    undoCallback: () => restoreFromRecycleBin(trashEntry.id),
+    duration: 8000
+  });
 }
 
 // ==================== EXPENSE FORM CRUD ====================
@@ -1832,17 +1879,208 @@ async function handleExpenseSubmit(e) {
 
 async function deleteExpense(id) {
   if (!confirm('Are you sure you want to delete this expense record?')) return;
+  const expense = (STATE.data.expenses || []).find(e => e.id === id);
+  if (!expense) return;
+
   STATE.data.expenses = (STATE.data.expenses || []).filter(e => e.id !== id);
+
+  const trashEntry = {
+    id: 'trash_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    originalId: id,
+    type: 'expense',
+    item: { ...expense },
+    deletedAt: new Date().toISOString()
+  };
+  STATE.data.recycleBin = STATE.data.recycleBin || [];
+  STATE.data.recycleBin.unshift(trashEntry);
+  if (STATE.data.recycleBin.length > 200) STATE.data.recycleBin.pop();
+
   STATE.data.settings = STATE.data.settings || {};
   STATE.data.settings.deletedExpenseIds = STATE.data.settings.deletedExpenseIds || [];
   if (!STATE.data.settings.deletedExpenseIds.includes(id)) {
     STATE.data.settings.deletedExpenseIds.push(id);
   }
+
   saveLocalState();
-  showToast('Expense record deleted');
   renderApp();
+  updateRecycleBinBadge();
   triggerAutoSaveSync();
+
+  const title = expense.category || 'Expense';
+  showToast(`Expense deleted (${title})`, {
+    undoCallback: () => restoreFromRecycleBin(trashEntry.id),
+    duration: 8000
+  });
 }
+
+// ==================== RECYCLE BIN (TRASH & UNDO) LOGIC ====================
+let currentTrashFilter = 'all';
+
+function updateRecycleBinBadge() {
+  const bin = STATE.data.recycleBin || [];
+  const count = bin.length;
+  const badge = document.getElementById('recycleBinBadge');
+  if (badge) {
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'inline-block' : 'none';
+  }
+
+  const salesCount = bin.filter(t => t.type === 'sale').length;
+  const expCount = bin.filter(t => t.type === 'expense').length;
+
+  const countAll = document.getElementById('trashCountAll');
+  const countSales = document.getElementById('trashCountSales');
+  const countExpenses = document.getElementById('trashCountExpenses');
+  if (countAll) countAll.textContent = count;
+  if (countSales) countSales.textContent = salesCount;
+  if (countExpenses) countExpenses.textContent = expCount;
+}
+
+function renderRecycleBin(filter = null) {
+  if (filter) currentTrashFilter = filter;
+  const container = document.getElementById('recycleBinListContainer');
+  if (!container) return;
+
+  updateRecycleBinBadge();
+
+  let bin = STATE.data.recycleBin || [];
+  if (currentTrashFilter === 'sale') {
+    bin = bin.filter(t => t.type === 'sale');
+  } else if (currentTrashFilter === 'expense') {
+    bin = bin.filter(t => t.type === 'expense');
+  }
+
+  if (bin.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 35px 15px;">
+        <div class="empty-state-icon">🌿</div>
+        <div class="empty-state-title">Recycle Bin is empty</div>
+        <p class="text-muted mt-2">No deleted records in trash. All your data is safe!</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = bin.map(entry => {
+    const isSale = entry.type === 'sale';
+    const item = entry.item || {};
+    const dateFormatted = formatDateDisplay(item.date);
+    const deletedTimeFormatted = formatDeletedTime(entry.deletedAt);
+
+    let title = '';
+    let subtitle = '';
+
+    if (isSale) {
+      const phone = formatPhone(item.customerPhone) || 'No Phone';
+      const name = item.customerName ? ` (${escapeHtml(item.customerName)})` : '';
+      title = `${phone}${name}`;
+      subtitle = `<strong class="text-gold">${escapeHtml(item.product || 'Product')}</strong> · ${escapeHtml(item.planLabel || item.planMonths + 'M')} · <span class="text-amber font-bold">Rs. ${(item.amount || 0).toLocaleString('en-US')}</span> · Account: <span class="font-mono text-muted">${escapeHtml(item.accountLogin || 'N/A')}</span>`;
+    } else {
+      title = escapeHtml(item.category || 'Expense');
+      subtitle = `${escapeHtml(item.description || item.category)} · <span class="text-rose font-bold">Rs. ${(item.amount || 0).toLocaleString('en-US')}</span>`;
+    }
+
+    return `
+      <div class="trash-item-card" data-trash-id="${entry.id}">
+        <div class="trash-item-info">
+          <div class="trash-badge-row">
+            <span class="trash-type-badge ${isSale ? 'trash-type-sale' : 'trash-type-expense'}">
+              ${isSale ? '🏷️ Sale' : '💸 Expense'}
+            </span>
+            <span class="text-muted" style="font-size: 11px;">Original Date: ${dateFormatted}</span>
+          </div>
+          <div class="trash-main-title">${title}</div>
+          <div class="trash-sub-detail">${subtitle}</div>
+          <div class="trash-timestamp">🕒 Deleted: ${deletedTimeFormatted}</div>
+        </div>
+        <div class="trash-item-actions">
+          <button type="button" class="btn-restore" title="Restore to ledger" onclick="restoreFromRecycleBin('${entry.id}')">
+            <span>🔄 Restore</span>
+          </button>
+          <button type="button" class="btn-purge" title="Delete permanently" onclick="permanentlyDeleteFromTrash('${entry.id}')">
+            <span>❌</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function formatDeletedTime(isoStr) {
+  if (!isoStr) return 'Recently';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return 'Recently';
+  const diffSec = Math.round((Date.now() - d.getTime()) / 1000);
+  if (diffSec < 60) return 'Just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} min(s) ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} hour(s) ago`;
+  return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function restoreFromRecycleBin(trashId) {
+  STATE.data.recycleBin = STATE.data.recycleBin || [];
+  const index = STATE.data.recycleBin.findIndex(t => t.id === trashId || t.originalId === trashId);
+  if (index === -1) return;
+
+  const entry = STATE.data.recycleBin[index];
+  STATE.data.recycleBin.splice(index, 1);
+
+  if (entry.type === 'sale') {
+    STATE.data.sales = STATE.data.sales || [];
+    if (!STATE.data.sales.some(s => s.id === entry.item.id)) {
+      STATE.data.sales.unshift(entry.item);
+    }
+    if (STATE.data.settings?.deletedSaleIds) {
+      STATE.data.settings.deletedSaleIds = STATE.data.settings.deletedSaleIds.filter(id => id !== entry.originalId && id !== entry.item.id);
+    }
+  } else if (entry.type === 'expense') {
+    STATE.data.expenses = STATE.data.expenses || [];
+    if (!STATE.data.expenses.some(e => e.id === entry.item.id)) {
+      STATE.data.expenses.unshift(entry.item);
+    }
+    if (STATE.data.settings?.deletedExpenseIds) {
+      STATE.data.settings.deletedExpenseIds = STATE.data.settings.deletedExpenseIds.filter(id => id !== entry.originalId && id !== entry.item.id);
+    }
+  }
+
+  saveLocalState();
+  renderApp();
+  updateRecycleBinBadge();
+  renderRecycleBin();
+  triggerAutoSaveSync();
+
+  const title = entry.type === 'sale' ? (entry.item.customerPhone ? formatPhone(entry.item.customerPhone) : entry.item.product) : entry.item.category;
+  showToast(`Restored: ${title}! ✨`);
+}
+
+function permanentlyDeleteFromTrash(trashId) {
+  if (!confirm('Are you sure you want to permanently delete this item? It cannot be recovered.')) return;
+  STATE.data.recycleBin = (STATE.data.recycleBin || []).filter(t => t.id !== trashId);
+  saveLocalState();
+  updateRecycleBinBadge();
+  renderRecycleBin();
+  triggerAutoSaveSync();
+  showToast('Item permanently deleted');
+}
+
+function emptyRecycleBin() {
+  const count = (STATE.data.recycleBin || []).length;
+  if (count === 0) {
+    showToast('Recycle Bin is already empty');
+    return;
+  }
+  if (!confirm(`Are you sure you want to permanently delete all ${count} item(s) from the Recycle Bin?`)) return;
+  STATE.data.recycleBin = [];
+  saveLocalState();
+  updateRecycleBinBadge();
+  renderRecycleBin();
+  triggerAutoSaveSync();
+  showToast('Recycle Bin emptied! 🗑️');
+}
+
+window.restoreFromRecycleBin = restoreFromRecycleBin;
+window.permanentlyDeleteFromTrash = permanentlyDeleteFromTrash;
+window.emptyRecycleBin = emptyRecycleBin;
 
 // ==================== ADMIN PRODUCTS CRUD ====================
 function openNewProductModal() {
@@ -2164,15 +2402,38 @@ function copyText(text) {
   });
 }
 
-function showToast(msg) {
+function showToast(msg, options = {}) {
   const toast = document.getElementById('toastNotification');
   if (!toast) return;
-  toast.textContent = msg;
-  toast.classList.add('active');
+
+  const { undoCallback = null, duration = (undoCallback ? 7000 : 2800) } = options;
+
   clearTimeout(window._toastTimer);
+
+  if (undoCallback) {
+    toast.innerHTML = `
+      <div class="toast-body">
+        <span class="toast-msg-text">🗑️ ${escapeHtml(msg)}</span>
+        <button type="button" class="toast-undo-btn" id="btnToastUndo">↩️ UNDO</button>
+      </div>
+    `;
+    const btnUndo = document.getElementById('btnToastUndo');
+    if (btnUndo) {
+      btnUndo.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearTimeout(window._toastTimer);
+        toast.classList.remove('active');
+        undoCallback();
+      });
+    }
+  } else {
+    toast.innerHTML = `<span class="toast-msg-text">${escapeHtml(msg)}</span>`;
+  }
+
+  toast.classList.add('active');
   window._toastTimer = setTimeout(() => {
     toast.classList.remove('active');
-  }, 2600);
+  }, duration);
 }
 
 function escapeHtml(str) {
