@@ -357,7 +357,13 @@ async function performServerSync() {
         const salesChanged = mergedSales.length !== (STATE.data.sales || []).length;
         const expChanged = mergedExpenses.length !== (STATE.data.expenses || []).length;
         const prodsChanged = JSON.stringify(serverResult.products || []) !== JSON.stringify(STATE.data.products || []);
-        const settingsChanged = JSON.stringify(serverResult.settings || {}) !== JSON.stringify(STATE.data.settings || {});
+        
+        // Exclude lastModified from settings comparison so periodic sync doesn't falsely report changes
+        const currentSettingsCopy = { ...(STATE.data.settings || {}) };
+        const incomingSettingsCopy = { ...(serverResult.settings || {}) };
+        delete currentSettingsCopy.lastModified;
+        delete incomingSettingsCopy.lastModified;
+        const settingsChanged = JSON.stringify(currentSettingsCopy) !== JSON.stringify(incomingSettingsCopy);
 
         STATE.data.sales = mergedSales;
         STATE.data.expenses = mergedExpenses;
@@ -383,11 +389,17 @@ async function performServerSync() {
         }
 
         saveLocalState();
-        syncSettingsFormUI();
 
-        if (salesChanged || expChanged || prodsChanged || settingsChanged) {
+        if (settingsChanged) {
+          syncSettingsFormUI();
+        }
+
+        if (prodsChanged) {
           populateProductDropdowns();
           renderAdminCatalog();
+        }
+
+        if (salesChanged || expChanged || prodsChanged) {
           renderApp();
         }
         updateSyncBadge('synced');
@@ -548,17 +560,34 @@ function populateProductDropdowns() {
   const filterSelect = document.getElementById('salesFilterProduct');
   if (!productSelect) return;
 
+  const currentSelectedProd = productSelect.value;
+  const currentFilterVal = filterSelect?.value || 'ALL';
+
   const products = STATE.data.products || [];
   const uniqueNames = [...new Set(products.map(p => p.name))];
 
+  // If sale modal is actively open, don't interrupt user unless needed
+  const isSaleModalOpen = document.getElementById('saleModal')?.classList.contains('active');
+
   productSelect.innerHTML = uniqueNames.map(name => `<option value="${name}">${name}</option>`).join('');
+
+  if (currentSelectedProd && uniqueNames.includes(currentSelectedProd)) {
+    productSelect.value = currentSelectedProd;
+  } else if (uniqueNames.length > 0) {
+    productSelect.value = uniqueNames[0];
+  }
 
   if (filterSelect) {
     filterSelect.innerHTML = '<option value="ALL">All Products</option>' + 
       uniqueNames.map(name => `<option value="${name}">${name}</option>`).join('');
+    if (currentFilterVal && (currentFilterVal === 'ALL' || uniqueNames.includes(currentFilterVal))) {
+      filterSelect.value = currentFilterVal;
+    }
   }
 
-  onProductChange();
+  if (!isSaleModalOpen) {
+    onProductChange();
+  }
 }
 
 function onProductChange() {
