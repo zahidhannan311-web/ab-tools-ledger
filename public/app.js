@@ -823,7 +823,19 @@ function renderSales() {
     list = list.filter(s => s.product === productFilter);
   }
   if (statusFilter !== 'ALL') {
-    list = list.filter(s => s.paymentStatus === statusFilter);
+    if (statusFilter === 'Expired') {
+      list = list.filter(s => {
+        const d = calculateDaysRemaining(s.expiryDate);
+        return d !== null && d < 0;
+      });
+    } else if (statusFilter === 'Active') {
+      list = list.filter(s => {
+        const d = calculateDaysRemaining(s.expiryDate);
+        return d === null || d >= 0;
+      });
+    } else {
+      list = list.filter(s => s.paymentStatus === statusFilter);
+    }
   }
 
   if (list.length === 0) {
@@ -843,14 +855,17 @@ function renderSales() {
 function renderSaleCardHtml(s) {
   const statusClass = s.paymentStatus === 'Paid' ? 'status-paid' : (s.paymentStatus === 'Pending' ? 'status-pending' : 'status-unpaid');
   const daysLeft = calculateDaysRemaining(s.expiryDate);
-  const isExpiringSoon = daysLeft !== null && daysLeft <= 1;
+  const isExpired = daysLeft !== null && daysLeft < 0;
+  const isExpiresToday = daysLeft === 0;
+  const isExpiresTomorrow = daysLeft === 1;
 
   return `
-    <div class="item-card" data-sale-id="${s.id}">
+    <div class="item-card ${isExpired ? 'is-expired' : ''}" data-sale-id="${s.id}">
       <div class="item-card-header">
         <div class="item-user-info">
           <span class="user-phone-badge">${formatPhone(s.customerPhone)}</span>
           ${s.customerName ? `<span class="user-name-tag">${escapeHtml(s.customerName)}</span>` : ''}
+          ${isExpired ? `<span class="badge-expired-header">🔴 Expired</span>` : (isExpiresToday ? `<span class="badge-urgent-pill">⚠️ Expires Today</span>` : '')}
         </div>
         <div class="item-price-tag">
           <span class="currency-sm">Rs.</span>
@@ -876,7 +891,7 @@ function renderSaleCardHtml(s) {
         </div>
         <div class="detail-item">
           <span class="detail-label">Expiry Date</span>
-          <span class="detail-value font-mono ${isExpiringSoon ? 'text-rose font-bold' : ''}">
+          <span class="detail-value font-mono ${isExpired ? 'text-rose font-bold' : (isExpiresToday ? 'text-rose font-bold' : (isExpiresTomorrow ? 'text-amber font-bold' : ''))}">
             ${formatDateDisplay(s.expiryDate)} ${formatDaysBadge(daysLeft)}
           </span>
         </div>
@@ -887,6 +902,7 @@ function renderSaleCardHtml(s) {
       <div class="item-actions-bar">
         <div class="badges-group">
           <span class="status-badge ${statusClass}">${s.paymentStatus}</span>
+          ${isExpired ? `<span class="status-badge status-expired">❌ Expired</span>` : ''}
           ${s.paymentStatus !== 'Paid' ? `
             <button class="btn btn-xs btn-gold" onclick="markSalePaid('${s.id}')">✓ Mark Paid</button>
           ` : ''}
@@ -1280,13 +1296,16 @@ function renderSearchResults(query) {
     const prod = (s.product || '').toLowerCase();
     const plan = (s.planLabel || '').toLowerCase();
     const notes = (s.notes || '').toLowerCase();
+    const daysLeft = calculateDaysRemaining(s.expiryDate);
+    const isExpired = daysLeft !== null && daysLeft < 0;
 
     return phone.includes(query) || 
            name.includes(query) || 
            login.includes(query) || 
            prod.includes(query) || 
            plan.includes(query) ||
-           notes.includes(query);
+           notes.includes(query) ||
+           (isExpired && (query === 'expired' || query === 'expire'));
   });
 
   if (filtered.length === 0) {
@@ -2114,9 +2133,9 @@ function calculateDaysRemaining(expiryDateStr) {
 
 function formatDaysBadge(days) {
   if (days === null) return '';
-  if (days < 0) return `<span class="badge-req">Expired (${Math.abs(days)}d ago)</span>`;
-  if (days === 0) return `<span class="badge-req font-bold">Expires Today!</span>`;
-  if (days === 1) return `<span class="badge-amber font-bold">Expires Tomorrow!</span>`;
+  if (days < 0) return `<span class="badge-expired-pill font-bold">🔴 EXPIRED (${Math.abs(days)}d ago)</span>`;
+  if (days === 0) return `<span class="badge-urgent-pill font-bold">⚠️ EXPIRES TODAY!</span>`;
+  if (days === 1) return `<span class="badge-warning-pill font-bold">⏰ Expires Tomorrow</span>`;
   return `<span class="text-muted" style="font-size: 11px;">(${days}d left)</span>`;
 }
 
