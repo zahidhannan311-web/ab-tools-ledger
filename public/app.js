@@ -1327,25 +1327,35 @@ function setupEventListeners() {
   currInput?.addEventListener('input', onSettingChange);
   tplInput?.addEventListener('input', onSettingChange);
 
-  // Admin Reset Sales & Expenses
+  // Admin Reset Sales & Expenses (Strictly Protected by Master Password: Sad12345@)
   document.getElementById('btnResetSalesExpenses')?.addEventListener('click', async () => {
-    const pin = prompt('Enter your 4-digit Security PIN to confirm resetting all sales and expenses:');
-    if (!pin) return;
+    const password = prompt('🔒 MASTER SECURITY PROTECTED:\nEnter Master Password to reset/wipe sales and expenses:\n(Warning: Without master password, deletion is blocked)');
+    if (!password) return;
+
+    if (password.trim() !== 'Sad12345@') {
+      alert('❌ Access Denied: Incorrect Master Password!\nSystem data deletion blocked.');
+      return;
+    }
+
+    const confirmAgain = confirm('⚠️ FINAL CONFIRMATION:\nAre you sure you want to permanently clear all sales & expenses? This action cannot be reversed.');
+    if (!confirmAgain) return;
+
     try {
       const res = await fetch('/api/reset-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: pin.trim() })
+        body: JSON.stringify({ password: password.trim() })
       });
       const data = await res.json();
       if (res.ok) {
-        showToast('All sales and expenses have been reset! Ready for fresh entry 🎉');
+        showToast('All sales and expenses cleared successfully! 🗑️');
+        triggerAutoSaveSync();
         await loadAppData();
       } else {
-        alert(data.error || 'Reset failed');
+        alert(data.error || 'Reset failed: Access denied');
       }
     } catch (err) {
-      alert('Could not complete reset');
+      alert('Could not complete reset: ' + err.message);
     }
   });
   // Quick Date Chips: Sale Modal

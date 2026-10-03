@@ -859,13 +859,16 @@ app.post('/api/backup/restore', (req, res) => {
   res.json({ success: true, message: 'Backup restored successfully!', salesCount: db.sales.length });
 });
 
-// Reset System
+// Reset System (Protected by Master Password Sad12345@)
 app.post('/api/reset-data', (req, res) => {
-  const { pin } = req.body;
-  const db = readDb();
-  if (db.pin && String(pin).trim() !== db.pin) {
-    return res.status(401).json({ error: 'Incorrect PIN! Cannot reset system data' });
+  const { password } = req.body;
+  const MASTER_RESET_PASSWORD = 'Sad12345@';
+
+  if (!password || String(password).trim() !== MASTER_RESET_PASSWORD) {
+    return res.status(403).json({ error: 'Incorrect Master Security Password! Reset is locked.' });
   }
+
+  const db = readDb();
   db.sales = [];
   db.expenses = [];
   writeDb(db);
