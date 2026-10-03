@@ -1515,15 +1515,10 @@ function setupEventListeners() {
     }
   });
 
-  // Admin Reset Sales & Expenses (Strictly Protected by Master Password: Sad12345@)
+  // Admin Reset Sales & Expenses (Strictly Protected by Master Password)
   document.getElementById('btnResetSalesExpenses')?.addEventListener('click', async () => {
     const password = prompt('🔒 MASTER SECURITY PROTECTED:\nEnter Master Password to reset/wipe sales and expenses:\n(Warning: Without master password, deletion is blocked)');
     if (!password) return;
-
-    if (password.trim() !== 'Sad12345@') {
-      alert('❌ Access Denied: Incorrect Master Password!\nSystem data deletion blocked.');
-      return;
-    }
 
     const confirmAgain = confirm('⚠️ FINAL CONFIRMATION:\nAre you sure you want to permanently clear all sales & expenses? This action cannot be reversed.');
     if (!confirmAgain) return;
