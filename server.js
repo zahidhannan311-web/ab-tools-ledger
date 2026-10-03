@@ -415,9 +415,10 @@ app.get('/api/data', (req, res) => {
 
 // ======================== SALES ========================
 
-// Add Sale
+// Add or Upsert Sale
 app.post('/api/sales', (req, res) => {
   const {
+    id,
     date,
     customerName,
     customerPhone,
@@ -428,7 +429,9 @@ app.post('/api/sales', (req, res) => {
     planLabel,
     amount,
     paymentStatus,
-    notes
+    notes,
+    createdAt,
+    updatedAt
   } = req.body;
 
   if (!customerPhone || !product || !accountLogin || !amount) {
@@ -441,9 +444,10 @@ app.post('/api/sales', (req, res) => {
   const saleDate = date || getLocalDateString();
   const months = Number(planMonths) || 1;
   const expiryDate = calculateExpiry(saleDate, months);
+  const saleId = id || ('sale_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6));
 
-  const newSale = {
-    id: 'sale_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+  const saleObj = {
+    id: saleId,
     date: saleDate,
     customerName: customerName ? customerName.trim() : '',
     customerPhone: customerPhone.trim(),
@@ -456,12 +460,19 @@ app.post('/api/sales', (req, res) => {
     paymentStatus: paymentStatus || 'Pending', // Paid, Pending, Unpaid
     expiryDate,
     notes: notes ? notes.trim() : '',
-    createdAt: new Date().toISOString()
+    createdAt: createdAt || new Date().toISOString(),
+    updatedAt: updatedAt || new Date().toISOString()
   };
 
-  db.sales.unshift(newSale);
+  const existingIdx = (db.sales || []).findIndex(s => s.id === saleId);
+  if (existingIdx !== -1) {
+    db.sales[existingIdx] = { ...db.sales[existingIdx], ...saleObj };
+  } else {
+    db.sales.unshift(saleObj);
+  }
+
   writeDb(db);
-  res.status(201).json({ success: true, sale: newSale });
+  res.status(201).json({ success: true, sale: saleObj });
 });
 
 // Update Sale
@@ -539,26 +550,35 @@ app.delete('/api/sales/:id', (req, res) => {
 
 // ======================== EXPENSES ========================
 
-// Add Expense
+// Add or Upsert Expense
 app.post('/api/expenses', (req, res) => {
-  const { date, category, description, amount } = req.body;
+  const { id, date, category, description, amount, createdAt, updatedAt } = req.body;
   if (!category || !amount) {
     return res.status(400).json({ error: 'Category and Amount are required!' });
   }
 
   const db = readDb();
-  const newExpense = {
-    id: 'exp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+  const expId = id || ('exp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6));
+
+  const expObj = {
+    id: expId,
     date: date || getLocalDateString(),
     category: category.trim(),
     description: (description && description.trim()) ? description.trim() : category.trim(),
     amount: Number(amount) || 0,
-    createdAt: new Date().toISOString()
+    createdAt: createdAt || new Date().toISOString(),
+    updatedAt: updatedAt || new Date().toISOString()
   };
 
-  db.expenses.unshift(newExpense);
+  const existingIdx = (db.expenses || []).findIndex(e => e.id === expId);
+  if (existingIdx !== -1) {
+    db.expenses[existingIdx] = { ...db.expenses[existingIdx], ...expObj };
+  } else {
+    db.expenses.unshift(expObj);
+  }
+
   writeDb(db);
-  res.status(201).json({ success: true, expense: newExpense });
+  res.status(201).json({ success: true, expense: expObj });
 });
 
 // Update Expense
@@ -716,6 +736,51 @@ function mergeRecordLists(existing = [], incoming = [], deletedSet = new Set()) 
   });
   return list;
 }
+
+// Universal Real-Time Sync endpoint (Cross-Device Instant Save without refresh)
+app.post('/api/sync', (req, res) => {
+  try {
+    const { sales: incomingSales, expenses: incomingExpenses, settings: incomingSettings } = req.body;
+    const db = readDb();
+
+    const deletedSales = new Set([
+      ...(db.settings?.deletedSaleIds || []),
+      ...(incomingSettings?.deletedSaleIds || [])
+    ]);
+    const deletedExpenses = new Set([
+      ...(db.settings?.deletedExpenseIds || []),
+      ...(incomingSettings?.deletedExpenseIds || [])
+    ]);
+
+    if (Array.isArray(incomingSales)) {
+      db.sales = mergeRecordLists(db.sales, incomingSales, deletedSales);
+    }
+    if (Array.isArray(incomingExpenses)) {
+      db.expenses = mergeRecordLists(db.expenses, incomingExpenses, deletedExpenses);
+    }
+
+    db.settings = {
+      ...db.settings,
+      ...(incomingSettings || {}),
+      lastModified: Date.now(),
+      deletedSaleIds: Array.from(deletedSales),
+      deletedExpenseIds: Array.from(deletedExpenses)
+    };
+
+    writeDb(db);
+
+    res.json({
+      success: true,
+      sales: db.sales || [],
+      expenses: db.expenses || [],
+      products: db.products || DEFAULT_PRODUCTS,
+      settings: db.settings
+    });
+  } catch (err) {
+    console.error('Realtime sync error:', err);
+    res.status(500).json({ error: 'Realtime sync failed: ' + err.message });
+  }
+});
 
 // JSON Full Restore (Smart Non-Destructive Merge)
 app.post('/api/backup/restore', (req, res) => {

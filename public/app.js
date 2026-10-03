@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await checkPinStatus();
   setDefaultDates();
   startDailyDateWatcher();
+  startRealtimeSync();
 });
 
 // Auto-adjust focused fields when mobile virtual keyboard opens without sluggish scroll locks
@@ -276,6 +277,126 @@ function saveLocalState() {
   }
 }
 
+// Visual Auto-Save & Sync Badge Indicator
+function updateSyncBadge(status) {
+  const badge = document.getElementById('liveSyncBadge');
+  if (!badge) return;
+  if (status === 'syncing') {
+    badge.innerHTML = '<span class="sync-dot pulse"></span> Auto-Saving...';
+    badge.className = 'sync-status-badge syncing';
+  } else if (status === 'synced') {
+    badge.innerHTML = '<span class="sync-dot success"></span> Saved &amp; Synced';
+    badge.className = 'sync-status-badge synced';
+  } else if (status === 'offline') {
+    badge.innerHTML = '<span class="sync-dot warning"></span> Saved Locally';
+    badge.className = 'sync-status-badge offline';
+  }
+}
+
+let autoSyncTimer = null;
+let isSyncInProgress = false;
+
+// Trigger instant cloud auto-save on any edit without needing page refresh
+function triggerAutoSaveSync() {
+  saveLocalState();
+  updateSyncBadge('syncing');
+  if (autoSyncTimer) clearTimeout(autoSyncTimer);
+  autoSyncTimer = setTimeout(() => {
+    performServerSync();
+  }, 100);
+}
+
+// Real-time synchronization with server
+async function performServerSync() {
+  if (isSyncInProgress) return;
+  isSyncInProgress = true;
+  updateSyncBadge('syncing');
+
+  try {
+    const res = await fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sales: STATE.data.sales || [],
+        expenses: STATE.data.expenses || [],
+        settings: STATE.data.settings || {}
+      })
+    });
+
+    if (res.ok) {
+      const serverResult = await res.json();
+      if (serverResult && serverResult.success) {
+        const ignoredSaleIds = ['sale_1790808573942_ktuq', 'sale_1790891345201_z6tu'];
+        const combinedDeletedSales = Array.from(new Set([
+          ...(STATE.data.settings?.deletedSaleIds || []),
+          ...(serverResult.settings?.deletedSaleIds || []),
+          ...ignoredSaleIds
+        ]));
+        const combinedDeletedExpenses = Array.from(new Set([
+          ...(STATE.data.settings?.deletedExpenseIds || []),
+          ...(serverResult.settings?.deletedExpenseIds || [])
+        ]));
+
+        const mergedSales = mergeClientRecords(STATE.data.sales, serverResult.sales, combinedDeletedSales);
+        const mergedExpenses = mergeClientRecords(STATE.data.expenses, serverResult.expenses, combinedDeletedExpenses);
+
+        const salesChanged = mergedSales.length !== (STATE.data.sales || []).length;
+        const expChanged = mergedExpenses.length !== (STATE.data.expenses || []).length;
+
+        STATE.data.sales = mergedSales;
+        STATE.data.expenses = mergedExpenses;
+        if (serverResult.products && serverResult.products.length) {
+          STATE.data.products = serverResult.products;
+        }
+        STATE.data.settings = {
+          ...STATE.data.settings,
+          ...(serverResult.settings || {}),
+          deletedSaleIds: combinedDeletedSales,
+          deletedExpenseIds: combinedDeletedExpenses
+        };
+
+        saveLocalState();
+        if (salesChanged || expChanged) {
+          populateProductDropdowns();
+          renderApp();
+        }
+        updateSyncBadge('synced');
+      }
+    } else {
+      updateSyncBadge('offline');
+    }
+  } catch (err) {
+    console.warn('Real-time sync error:', err);
+    updateSyncBadge('offline');
+  } finally {
+    isSyncInProgress = false;
+  }
+}
+
+// Background cross-device sync loop (Phone <-> Laptop)
+function startRealtimeSync() {
+  // Sync every 6 seconds in background
+  setInterval(() => {
+    if (STATE.unlocked) {
+      performServerSync();
+    }
+  }, 6000);
+
+  // Sync immediately when phone tab/screen is brought to foreground
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && STATE.unlocked) {
+      performServerSync();
+    }
+  });
+
+  // Sync immediately on window focus
+  window.addEventListener('focus', () => {
+    if (STATE.unlocked) {
+      performServerSync();
+    }
+  });
+}
+
 // Smart non-destructive record merge helper
 function mergeClientRecords(localList = [], serverList = [], deletedIds = []) {
   const deletedSet = new Set(deletedIds || []);
@@ -342,76 +463,8 @@ async function loadAppData() {
     }
   }
 
-  // 2. Fetch fresh data from server in background (Server is Cloud Source of Truth)
-  try {
-    const res = await fetch('/api/data');
-    if (res.ok) {
-      const serverData = await res.json();
-
-      const serverDeletedSales = serverData.settings?.deletedSaleIds || [];
-      const combinedDeletedSales = Array.from(new Set([
-        ...(STATE.data.settings?.deletedSaleIds || []),
-        ...serverDeletedSales,
-        ...ignoredSaleIds
-      ]));
-
-      const combinedDeletedExpenses = Array.from(new Set([
-        ...(STATE.data.settings?.deletedExpenseIds || []),
-        ...(serverData.settings?.deletedExpenseIds || [])
-      ]));
-
-      const delSaleSet = new Set(combinedDeletedSales);
-      const delExpenseSet = new Set(combinedDeletedExpenses);
-
-      // Clean server and local data against deleted tombstones
-      const freshSales = (serverData.sales || []).filter(s => s && s.id && !delSaleSet.has(s.id));
-      const freshExpenses = (serverData.expenses || []).filter(e => e && e.id && !delExpenseSet.has(e.id));
-      const freshProducts = (serverData.products && serverData.products.length) ? serverData.products : (STATE.data.products || []);
-
-      const localValidSales = (STATE.data.sales || []).filter(s => s && s.id && !delSaleSet.has(s.id));
-      const localValidExpenses = (STATE.data.expenses || []).filter(e => e && e.id && !delExpenseSet.has(e.id));
-
-      // SMART NON-DESTRUCTIVE MERGE: Never lose local entries on refresh or cross-device load
-      const mergedSales = mergeClientRecords(localValidSales, freshSales, combinedDeletedSales);
-      const mergedExpenses = mergeClientRecords(localValidExpenses, freshExpenses, combinedDeletedExpenses);
-
-      // Detect if server is missing records that exist locally (e.g. serverless cold container or cross-device sync)
-      const serverMissingSales = (serverData.sales || []).length < mergedSales.length;
-      const serverMissingExpenses = (serverData.expenses || []).length < mergedExpenses.length;
-
-      STATE.data.sales = mergedSales;
-      STATE.data.expenses = mergedExpenses;
-      STATE.data.products = freshProducts;
-      STATE.data.settings = {
-        ...STATE.data.settings,
-        ...(serverData.settings || {}),
-        deletedSaleIds: combinedDeletedSales,
-        deletedExpenseIds: combinedDeletedExpenses
-      };
-
-      saveLocalState();
-      populateProductDropdowns();
-      renderApp();
-
-      // If server was missing records (e.g. serverless container cold-start), push to server
-      if (serverMissingSales || serverMissingExpenses) {
-        fetch('/api/backup/restore', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            backupData: {
-              sales: mergedSales,
-              expenses: mergedExpenses,
-              products: freshProducts,
-              settings: STATE.data.settings
-            }
-          })
-        }).catch(err => console.warn('Auto restore sync warning:', err));
-      }
-    }
-  } catch (err) {
-    console.warn('Background data sync:', err);
-  }
+  // 2. Instant Sync with Server (fetches fresh changes + auto-pushes local changes)
+  await performServerSync();
 }
 
 function populateProductDropdowns() {
@@ -1369,39 +1422,32 @@ async function handleSaleSubmit(e) {
     updatedAt: new Date().toISOString()
   };
 
+  const saleId = editId || ('sale_' + Date.now());
+  const saleItem = {
+    id: saleId,
+    ...payload,
+    expiryDate: calculateExpiry(date, planMonths),
+    createdAt: editId ? (STATE.data.sales.find(s => s.id === editId)?.createdAt || new Date().toISOString()) : new Date().toISOString()
+  };
+
   // Immediate Local Update (Never lost on refresh)
   STATE.data.sales = STATE.data.sales || [];
   if (editId) {
     const idx = STATE.data.sales.findIndex(s => s.id === editId);
     if (idx !== -1) {
-      STATE.data.sales[idx] = { ...STATE.data.sales[idx], ...payload, expiryDate: calculateExpiry(date, planMonths) };
+      STATE.data.sales[idx] = saleItem;
     }
   } else {
-    STATE.data.sales.unshift({
-      id: 'sale_' + Date.now(),
-      ...payload,
-      expiryDate: calculateExpiry(date, planMonths),
-      createdAt: new Date().toISOString()
-    });
+    STATE.data.sales.unshift(saleItem);
   }
 
   saveLocalState();
   closeModal('saleModal');
-  showToast(editId ? 'Sale updated successfully!' : 'New sale added successfully! 🎉');
+  showToast(editId ? 'Sale updated successfully! 💾' : 'New sale added & auto-saved! 🎉');
   renderApp();
 
-  // Background server sync
-  try {
-    const url = editId ? `/api/sales/${editId}` : '/api/sales';
-    const method = editId ? 'PUT' : 'POST';
-    await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-  } catch (err) {
-    console.warn('Network sync error:', err);
-  }
+  // Instant Cloud Auto-Save (NO REFRESH NEEDED)
+  triggerAutoSaveSync();
 }
 
 async function markSalePaid(id) {
@@ -1412,16 +1458,7 @@ async function markSalePaid(id) {
     saveLocalState();
     showToast('Marked as Paid! ✓');
     renderApp();
-  }
-
-  try {
-    await fetch(`/api/sales/${id}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentStatus: 'Paid' })
-    });
-  } catch (err) {
-    console.warn('Network sync error:', err);
+    triggerAutoSaveSync();
   }
 }
 
@@ -1436,12 +1473,7 @@ async function deleteSale(id) {
   saveLocalState();
   showToast('Sale record deleted');
   renderApp();
-
-  try {
-    await fetch(`/api/sales/${id}`, { method: 'DELETE' });
-  } catch (err) {
-    console.warn('Network sync error:', err);
-  }
+  triggerAutoSaveSync();
 }
 
 // ==================== EXPENSE FORM CRUD ====================
@@ -1482,36 +1514,29 @@ async function handleExpenseSubmit(e) {
     updatedAt: new Date().toISOString()
   };
 
+  const expId = editId || ('exp_' + Date.now());
+  const expItem = {
+    id: expId,
+    ...payload,
+    createdAt: editId ? (STATE.data.expenses.find(e => e.id === editId)?.createdAt || new Date().toISOString()) : new Date().toISOString()
+  };
+
   // Immediate Local Update (Never lost on refresh)
   STATE.data.expenses = STATE.data.expenses || [];
   if (editId) {
     const idx = STATE.data.expenses.findIndex(e => e.id === editId);
-    if (idx !== -1) STATE.data.expenses[idx] = { ...STATE.data.expenses[idx], ...payload };
+    if (idx !== -1) STATE.data.expenses[idx] = expItem;
   } else {
-    STATE.data.expenses.unshift({
-      id: 'exp_' + Date.now(),
-      ...payload,
-      createdAt: new Date().toISOString()
-    });
+    STATE.data.expenses.unshift(expItem);
   }
 
   saveLocalState();
   closeModal('expenseModal');
-  showToast(editId ? 'Expense updated!' : 'Expense recorded successfully!');
+  showToast(editId ? 'Expense updated! 💾' : 'Expense recorded & auto-saved! 💸');
   renderApp();
 
-  // Background server sync
-  try {
-    const url = editId ? `/api/expenses/${editId}` : '/api/expenses';
-    const method = editId ? 'PUT' : 'POST';
-    await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-  } catch (err) {
-    console.warn('Network sync error:', err);
-  }
+  // Instant Cloud Auto-Save (NO REFRESH NEEDED)
+  triggerAutoSaveSync();
 }
 
 async function deleteExpense(id) {
@@ -1525,12 +1550,7 @@ async function deleteExpense(id) {
   saveLocalState();
   showToast('Expense record deleted');
   renderApp();
-
-  try {
-    await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-  } catch (err) {
-    console.warn('Network sync error:', err);
-  }
+  triggerAutoSaveSync();
 }
 
 // ==================== ADMIN PRODUCTS CRUD ====================
