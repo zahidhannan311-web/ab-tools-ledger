@@ -860,21 +860,21 @@ app.post('/api/sync', async (req, res) => {
     } = req.body;
     const db = readDb();
 
-    // Actively restored items should never be blocked by deleted sets
-    const activeIncomingSaleIds = new Set((incomingSales || []).map(s => s.id));
-    const activeIncomingExpenseIds = new Set((incomingExpenses || []).map(e => e.id));
+    // Only explicitly restored items can be un-deleted
+    const restoredSales = new Set(incomingSettings?.restoredSaleIds || []);
+    const restoredExpenses = new Set(incomingSettings?.restoredExpenseIds || []);
 
     const deletedSales = new Set([
       ...(db.settings?.deletedSaleIds || []),
       ...(incomingSettings?.deletedSaleIds || [])
     ]);
-    activeIncomingSaleIds.forEach(id => deletedSales.delete(id));
+    restoredSales.forEach(id => deletedSales.delete(id));
 
     const deletedExpenses = new Set([
       ...(db.settings?.deletedExpenseIds || []),
       ...(incomingSettings?.deletedExpenseIds || [])
     ]);
-    activeIncomingExpenseIds.forEach(id => deletedExpenses.delete(id));
+    restoredExpenses.forEach(id => deletedExpenses.delete(id));
 
     if (Array.isArray(incomingSales)) {
       db.sales = mergeRecordLists(db.sales, incomingSales, deletedSales);

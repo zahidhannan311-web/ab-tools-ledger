@@ -130,9 +130,9 @@
       "planMonths": 1,
       "planLabel": "1 Month (30 Days)",
       "amount": 200,
-      "paymentStatus": "Pending",
+      "paymentStatus": "Paid",
       "notes": "",
-      "updatedAt": "2026-10-05T08:04:30.511Z",
+      "updatedAt": "2026-10-05T13:31:45.342Z",
       "expiryDate": "2026-11-03",
       "createdAt": "2026-10-05T08:04:30.511Z"
     },
@@ -1717,11 +1717,35 @@
       ]
     }
   ],
-  "recycleBin": [],
+  "recycleBin": [
+    {
+      "id": "trash_1791207085147_aaou",
+      "originalId": "sale_1791207076706",
+      "type": "sale",
+      "item": {
+        "id": "sale_1791207076706",
+        "date": "2026-10-05",
+        "customerPhone": "hjhj",
+        "customerName": "",
+        "product": "Surfshark",
+        "accountType": "Shared",
+        "accountLogin": "hch",
+        "planMonths": 1,
+        "planLabel": "1 Month (30 Days)",
+        "amount": 250,
+        "paymentStatus": "Pending",
+        "notes": "",
+        "updatedAt": "2026-10-05T13:31:16.706Z",
+        "expiryDate": "2026-11-03",
+        "createdAt": "2026-10-05T13:31:16.707Z"
+      },
+      "deletedAt": "2026-10-05T13:31:25.147Z"
+    }
+  ],
   "settings": {
     "businessName": "A&B Tools Business Manager",
     "currency": "Rs.",
-    "lastModified": 1791206444330,
+    "lastModified": 1791207340727,
     "deletedSaleIds": [
       "sale_1790808573942_ktuq",
       "sale_1790891345201_z6tu",
@@ -1730,7 +1754,8 @@
       "sale_1790972905387_rym0",
       "sale_1790987581614",
       "sale_1790987667039",
-      "sale_1791018553805"
+      "sale_1791018553805",
+      "sale_1791207076706"
     ],
     "deletedExpenseIds": [
       "exp_1790946533413"

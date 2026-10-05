@@ -1871,6 +1871,9 @@ async function deleteSale(id) {
   if (!STATE.data.settings.deletedSaleIds.includes(id)) {
     STATE.data.settings.deletedSaleIds.push(id);
   }
+  if (STATE.data.settings.restoredSaleIds) {
+    STATE.data.settings.restoredSaleIds = STATE.data.settings.restoredSaleIds.filter(x => x !== id);
+  }
 
   saveLocalState();
   renderApp();
@@ -1969,6 +1972,9 @@ async function deleteExpense(id) {
   STATE.data.settings.deletedExpenseIds = STATE.data.settings.deletedExpenseIds || [];
   if (!STATE.data.settings.deletedExpenseIds.includes(id)) {
     STATE.data.settings.deletedExpenseIds.push(id);
+  }
+  if (STATE.data.settings.restoredExpenseIds) {
+    STATE.data.settings.restoredExpenseIds = STATE.data.settings.restoredExpenseIds.filter(x => x !== id);
   }
 
   saveLocalState();
@@ -2100,6 +2106,12 @@ function restoreFromRecycleBin(trashId) {
     if (!STATE.data.sales.some(s => s.id === entry.item.id)) {
       STATE.data.sales.unshift(entry.item);
     }
+    STATE.data.settings = STATE.data.settings || {};
+    STATE.data.settings.restoredSaleIds = STATE.data.settings.restoredSaleIds || [];
+    const saleId = entry.item?.id || entry.originalId;
+    if (saleId && !STATE.data.settings.restoredSaleIds.includes(saleId)) {
+      STATE.data.settings.restoredSaleIds.push(saleId);
+    }
     if (STATE.data.settings?.deletedSaleIds) {
       STATE.data.settings.deletedSaleIds = STATE.data.settings.deletedSaleIds.filter(id => id !== entry.originalId && id !== entry.item.id);
     }
@@ -2107,6 +2119,12 @@ function restoreFromRecycleBin(trashId) {
     STATE.data.expenses = STATE.data.expenses || [];
     if (!STATE.data.expenses.some(e => e.id === entry.item.id)) {
       STATE.data.expenses.unshift(entry.item);
+    }
+    STATE.data.settings = STATE.data.settings || {};
+    STATE.data.settings.restoredExpenseIds = STATE.data.settings.restoredExpenseIds || [];
+    const expId = entry.item?.id || entry.originalId;
+    if (expId && !STATE.data.settings.restoredExpenseIds.includes(expId)) {
+      STATE.data.settings.restoredExpenseIds.push(expId);
     }
     if (STATE.data.settings?.deletedExpenseIds) {
       STATE.data.settings.deletedExpenseIds = STATE.data.settings.deletedExpenseIds.filter(id => id !== entry.originalId && id !== entry.item.id);
