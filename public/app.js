@@ -306,27 +306,42 @@ function updateSyncBadge(status) {
 
 let autoSyncTimer = null;
 let isSyncInProgress = false;
+let syncPendingAgain = false;
 
 // Trigger instant cloud auto-save on any edit without needing page refresh
-function triggerAutoSaveSync() {
+function triggerAutoSaveSync(immediate = false) {
   saveLocalState();
   updateSyncBadge('syncing');
   if (autoSyncTimer) clearTimeout(autoSyncTimer);
-  autoSyncTimer = setTimeout(() => {
+  if (immediate) {
     performServerSync();
-  }, 100);
+  } else {
+    autoSyncTimer = setTimeout(() => {
+      performServerSync();
+    }, 120);
+  }
 }
 
-// Real-time synchronization with server
+// Real-time synchronization with server (Mobile & Desktop)
 async function performServerSync() {
-  if (isSyncInProgress) return;
+  if (isSyncInProgress) {
+    syncPendingAgain = true;
+    return;
+  }
   isSyncInProgress = true;
   updateSyncBadge('syncing');
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 9000);
 
   try {
     const res = await fetch('/api/sync', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
+      },
+      signal: controller.signal,
       body: JSON.stringify({
         sales: STATE.data.sales || [],
         expenses: STATE.data.expenses || [],
@@ -336,6 +351,8 @@ async function performServerSync() {
         pin: localStorage.getItem('ab_tools_pin')
       })
     });
+
+    clearTimeout(timeoutId);
 
     if (res.ok) {
       const serverResult = await res.json();
@@ -354,8 +371,9 @@ async function performServerSync() {
         const mergedSales = mergeClientRecords(STATE.data.sales, serverResult.sales, combinedDeletedSales);
         const mergedExpenses = mergeClientRecords(STATE.data.expenses, serverResult.expenses, combinedDeletedExpenses);
 
-        const salesChanged = mergedSales.length !== (STATE.data.sales || []).length;
-        const expChanged = mergedExpenses.length !== (STATE.data.expenses || []).length;
+        // Robust deep comparison: detect ANY addition, deletion, or status update (e.g. Paid)
+        const salesChanged = JSON.stringify(mergedSales) !== JSON.stringify(STATE.data.sales || []);
+        const expChanged = JSON.stringify(mergedExpenses) !== JSON.stringify(STATE.data.expenses || []);
         const prodsChanged = JSON.stringify(serverResult.products || []) !== JSON.stringify(STATE.data.products || []);
         
         // Exclude lastModified from settings comparison so periodic sync doesn't falsely report changes
@@ -408,10 +426,15 @@ async function performServerSync() {
       updateSyncBadge('offline');
     }
   } catch (err) {
-    console.warn('Real-time sync error:', err);
+    clearTimeout(timeoutId);
+    console.warn('Real-time sync notice:', err.message);
     updateSyncBadge('offline');
   } finally {
     isSyncInProgress = false;
+    if (syncPendingAgain) {
+      syncPendingAgain = false;
+      setTimeout(() => performServerSync(), 200);
+    }
   }
 }
 
@@ -459,16 +482,23 @@ function syncSettingsFormUI() {
 
 // Background cross-device sync loop (Phone <-> Laptop)
 function startRealtimeSync() {
-  // Sync every 6 seconds in background
+  // Sync every 4 seconds in background when tab is active
   setInterval(() => {
-    if (STATE.unlocked) {
+    if (STATE.unlocked && !document.hidden) {
       performServerSync();
     }
-  }, 6000);
+  }, 4000);
 
   // Sync immediately when phone tab/screen is brought to foreground
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && STATE.unlocked) {
+      performServerSync();
+    }
+  });
+
+  // Mobile browser navigation or return from sleep / background
+  window.addEventListener('pageshow', () => {
+    if (STATE.unlocked) {
       performServerSync();
     }
   });
@@ -479,6 +509,17 @@ function startRealtimeSync() {
       performServerSync();
     }
   });
+
+  // Tap-to-sync: user can tap the sync badge to force an immediate cloud sync
+  const badge = document.getElementById('syncStatusBadge');
+  if (badge) {
+    badge.style.cursor = 'pointer';
+    badge.setAttribute('title', 'Tap to sync immediately with Cloud');
+    badge.addEventListener('click', (e) => {
+      e.preventDefault();
+      performServerSync();
+    });
+  }
 }
 
 // Smart non-destructive record merge helper
@@ -1792,7 +1833,7 @@ async function handleSaleSubmit(e) {
   renderApp();
 
   // Instant Cloud Auto-Save (NO REFRESH NEEDED)
-  triggerAutoSaveSync();
+  triggerAutoSaveSync(true);
 }
 
 async function markSalePaid(id) {
@@ -1803,7 +1844,7 @@ async function markSalePaid(id) {
     saveLocalState();
     showToast('Marked as Paid! ✓');
     renderApp();
-    triggerAutoSaveSync();
+    triggerAutoSaveSync(true);
   }
 }
 
@@ -1834,7 +1875,7 @@ async function deleteSale(id) {
   saveLocalState();
   renderApp();
   updateRecycleBinBadge();
-  triggerAutoSaveSync();
+  triggerAutoSaveSync(true);
 
   const title = sale.customerPhone ? formatPhone(sale.customerPhone) : (sale.product || 'Sale');
   showToast(`Sale deleted (${title})`, {
@@ -1903,7 +1944,7 @@ async function handleExpenseSubmit(e) {
   renderApp();
 
   // Instant Cloud Auto-Save (NO REFRESH NEEDED)
-  triggerAutoSaveSync();
+  triggerAutoSaveSync(true);
 }
 
 async function deleteExpense(id) {
@@ -1933,7 +1974,7 @@ async function deleteExpense(id) {
   saveLocalState();
   renderApp();
   updateRecycleBinBadge();
-  triggerAutoSaveSync();
+  triggerAutoSaveSync(true);
 
   const title = expense.category || 'Expense';
   showToast(`Expense deleted (${title})`, {
@@ -2076,7 +2117,7 @@ function restoreFromRecycleBin(trashId) {
   renderApp();
   updateRecycleBinBadge();
   renderRecycleBin();
-  triggerAutoSaveSync();
+  triggerAutoSaveSync(true);
 
   const title = entry.type === 'sale' ? (entry.item.customerPhone ? formatPhone(entry.item.customerPhone) : entry.item.product) : entry.item.category;
   showToast(`Restored: ${title}! ✨`);
@@ -2088,7 +2129,7 @@ function permanentlyDeleteFromTrash(trashId) {
   saveLocalState();
   updateRecycleBinBadge();
   renderRecycleBin();
-  triggerAutoSaveSync();
+  triggerAutoSaveSync(true);
   showToast('Item permanently deleted');
 }
 
@@ -2103,7 +2144,7 @@ function emptyRecycleBin() {
   saveLocalState();
   updateRecycleBinBadge();
   renderRecycleBin();
-  triggerAutoSaveSync();
+  triggerAutoSaveSync(true);
   showToast('Recycle Bin emptied! 🗑️');
 }
 

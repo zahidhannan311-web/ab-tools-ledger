@@ -32,6 +32,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Disable caching for all API responses so mobile browsers and CDNs never serve stale data
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 // Cloud KV / Redis Persistent Storage Adapter (Upstash Redis / Vercel KV)
 const KV_REST_API_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const KV_REST_API_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -56,6 +64,12 @@ async function syncFromCloudKV() {
           if (parsed.sales) {
             parsed.sales = parsed.sales.filter(s => s && s.id && !delSales.has(s.id) && s.id !== 'sale_1790808573942_ktuq' && s.id !== 'sale_1790891345201_z6tu');
           }
+          parsed.settings.deletedExpenseIds = parsed.settings.deletedExpenseIds || [];
+          const delExpenses = new Set(parsed.settings.deletedExpenseIds);
+          if (parsed.expenses) {
+            parsed.expenses = parsed.expenses.filter(e => e && e.id && !delExpenses.has(e.id));
+          }
+          parsed.recycleBin = parsed.recycleBin || [];
           memoryDb = parsed;
           return true;
         }
@@ -68,9 +82,9 @@ async function syncFromCloudKV() {
 }
 
 async function syncToCloudKV(data) {
-  if (!KV_REST_API_URL || !KV_REST_API_TOKEN) return;
+  if (!KV_REST_API_URL || !KV_REST_API_TOKEN) return false;
   try {
-    await fetch(`${KV_REST_API_URL}/set/ab_tools_db`, {
+    const res = await fetch(`${KV_REST_API_URL}/set/ab_tools_db`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${KV_REST_API_TOKEN}`,
@@ -78,8 +92,15 @@ async function syncToCloudKV(data) {
       },
       body: JSON.stringify(JSON.stringify(data))
     });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      console.warn('Cloud KV write warning:', res.status, txt);
+      return false;
+    }
+    return true;
   } catch (err) {
     console.warn('Cloud KV write warning:', err.message);
+    return false;
   }
 }
 
@@ -232,7 +253,7 @@ function readDb() {
   return memoryDb;
 }
 
-function writeDb(data) {
+async function writeDb(data) {
   data.settings = data.settings || {};
   data.settings.lastModified = Date.now();
   data.settings.deletedSaleIds = data.settings.deletedSaleIds || [];
@@ -248,9 +269,13 @@ function writeDb(data) {
     console.warn('Filesystem write warning (continuing with in-memory):', err.message);
   }
 
-  // Push to Cloud KV / Redis if configured
+  // Push to Cloud KV / Redis if configured - AWAIT is required on serverless to prevent freeze
   if (KV_REST_API_URL && KV_REST_API_TOKEN) {
-    syncToCloudKV(data).catch(err => console.warn('Cloud KV sync write warning:', err.message));
+    try {
+      await syncToCloudKV(data);
+    } catch (err) {
+      console.warn('Cloud KV sync write warning:', err.message);
+    }
   }
 
   if (!isServerless) {
@@ -363,7 +388,7 @@ app.get('/api/status', (req, res) => {
 });
 
 // Setup Initial PIN
-app.post('/api/auth/setup-pin', (req, res) => {
+app.post('/api/auth/setup-pin', async (req, res) => {
   const { pin } = req.body;
   if (!pin || pin.length < 4) {
     return res.status(400).json({ error: 'PIN must be at least 4 digits' });
@@ -373,7 +398,7 @@ app.post('/api/auth/setup-pin', (req, res) => {
     return res.status(400).json({ error: 'PIN is already configured' });
   }
   db.pin = String(pin).trim();
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, message: 'PIN configured successfully!' });
 });
 
@@ -391,7 +416,7 @@ app.post('/api/auth/verify-pin', (req, res) => {
 });
 
 // Change PIN
-app.post('/api/auth/change-pin', (req, res) => {
+app.post('/api/auth/change-pin', async (req, res) => {
   const { oldPin, newPin } = req.body;
   const db = readDb();
   if (!db.pin || String(oldPin).trim() === db.pin) {
@@ -399,7 +424,7 @@ app.post('/api/auth/change-pin', (req, res) => {
       return res.status(400).json({ error: 'New PIN must be at least 4 digits' });
     }
     db.pin = String(newPin).trim();
-    writeDb(db);
+    await writeDb(db);
     return res.json({ success: true, message: 'PIN changed successfully!' });
   }
   return res.status(401).json({ error: 'Current PIN is incorrect' });
@@ -420,7 +445,7 @@ app.get('/api/data', (req, res) => {
 // ======================== SALES ========================
 
 // Add or Upsert Sale
-app.post('/api/sales', (req, res) => {
+app.post('/api/sales', async (req, res) => {
   const {
     id,
     date,
@@ -475,12 +500,12 @@ app.post('/api/sales', (req, res) => {
     db.sales.unshift(saleObj);
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.status(201).json({ success: true, sale: saleObj });
 });
 
 // Update Sale
-app.put('/api/sales/:id', (req, res) => {
+app.put('/api/sales/:id', async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   const index = db.sales.findIndex(s => s.id === id);
@@ -506,12 +531,12 @@ app.put('/api/sales/:id', (req, res) => {
     updatedAt: new Date().toISOString()
   };
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, sale: db.sales[index] });
 });
 
 // Quick Update Payment Status
-app.patch('/api/sales/:id/status', (req, res) => {
+app.patch('/api/sales/:id/status', async (req, res) => {
   const { id } = req.params;
   const { paymentStatus } = req.body;
   if (!['Paid', 'Pending', 'Unpaid'].includes(paymentStatus)) {
@@ -526,12 +551,12 @@ app.patch('/api/sales/:id/status', (req, res) => {
 
   sale.paymentStatus = paymentStatus;
   sale.updatedAt = new Date().toISOString();
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, sale });
 });
 
 // Delete Sale (Moves to Recycle Bin)
-app.delete('/api/sales/:id', (req, res) => {
+app.delete('/api/sales/:id', async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   const sale = db.sales.find(s => s.id === id);
@@ -559,14 +584,14 @@ app.delete('/api/sales/:id', (req, res) => {
     if (db.settings.deletedSaleIds.length > 500) db.settings.deletedSaleIds.shift();
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, message: 'Sale moved to Recycle Bin' });
 });
 
 // ======================== EXPENSES ========================
 
 // Add or Upsert Expense
-app.post('/api/expenses', (req, res) => {
+app.post('/api/expenses', async (req, res) => {
   const { id, date, category, description, amount, createdAt, updatedAt } = req.body;
   if (!category || !amount) {
     return res.status(400).json({ error: 'Category and Amount are required!' });
@@ -592,12 +617,12 @@ app.post('/api/expenses', (req, res) => {
     db.expenses.unshift(expObj);
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.status(201).json({ success: true, expense: expObj });
 });
 
 // Update Expense
-app.put('/api/expenses/:id', (req, res) => {
+app.put('/api/expenses/:id', async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   const index = db.expenses.findIndex(e => e.id === id);
@@ -617,12 +642,12 @@ app.put('/api/expenses/:id', (req, res) => {
     updatedAt: new Date().toISOString()
   };
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, expense: db.expenses[index] });
 });
 
 // Delete Expense (Moves to Recycle Bin)
-app.delete('/api/expenses/:id', (req, res) => {
+app.delete('/api/expenses/:id', async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   const expense = db.expenses.find(e => e.id === id);
@@ -650,7 +675,7 @@ app.delete('/api/expenses/:id', (req, res) => {
     if (db.settings.deletedExpenseIds.length > 500) db.settings.deletedExpenseIds.shift();
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, message: 'Expense moved to Recycle Bin' });
 });
 
@@ -663,7 +688,7 @@ app.get('/api/recycle-bin', (req, res) => {
 });
 
 // Restore Item from Recycle Bin
-app.post('/api/recycle-bin/restore/:id', (req, res) => {
+app.post('/api/recycle-bin/restore/:id', async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   db.recycleBin = db.recycleBin || [];
@@ -692,31 +717,31 @@ app.post('/api/recycle-bin/restore/:id', (req, res) => {
     }
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, message: 'Item restored successfully', item: trashEntry.item, type: trashEntry.type });
 });
 
 // Permanently Delete Item from Recycle Bin
-app.delete('/api/recycle-bin/:id', (req, res) => {
+app.delete('/api/recycle-bin/:id', async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   db.recycleBin = (db.recycleBin || []).filter(t => t.id !== id && t.originalId !== id);
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, message: 'Item permanently deleted' });
 });
 
 // Empty Entire Recycle Bin
-app.delete('/api/recycle-bin', (req, res) => {
+app.delete('/api/recycle-bin', async (req, res) => {
   const db = readDb();
   db.recycleBin = [];
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, message: 'Recycle Bin emptied successfully' });
 });
 
 // ======================== PRODUCTS / CATALOG (ADMIN) ========================
 
 // Add or Update Full Product
-app.post('/api/products', (req, res) => {
+app.post('/api/products', async (req, res) => {
   const { name, type, plans } = req.body;
   if (!name) {
     return res.status(400).json({ error: 'Product name is required' });
@@ -739,16 +764,16 @@ app.post('/api/products', (req, res) => {
     db.products.push(productObj);
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, product: productObj });
 });
 
 // Delete Product
-app.delete('/api/products/:id', (req, res) => {
+app.delete('/api/products/:id', async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   db.products = db.products.filter(p => p.id !== id);
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, message: 'Product deleted successfully' });
 });
 
@@ -823,7 +848,7 @@ function mergeRecordLists(existing = [], incoming = [], deletedSet = new Set()) 
 }
 
 // Universal Real-Time Sync endpoint (Cross-Device Instant Save without refresh)
-app.post('/api/sync', (req, res) => {
+app.post('/api/sync', async (req, res) => {
   try {
     const {
       sales: incomingSales,
@@ -886,7 +911,7 @@ app.post('/api/sync', (req, res) => {
       deletedExpenseIds: Array.from(deletedExpenses)
     };
 
-    writeDb(db);
+    await writeDb(db);
 
     res.json({
       success: true,
@@ -904,7 +929,7 @@ app.post('/api/sync', (req, res) => {
 });
 
 // Update Business Settings Directly
-app.post('/api/settings', (req, res) => {
+app.post('/api/settings', async (req, res) => {
   try {
     const { businessName, currency, whatsappTemplate, templateExpiry, templatePending, templateWelcome, templatePaid, defaultPeriod } = req.body;
     const db = readDb();
@@ -918,7 +943,7 @@ app.post('/api/settings', (req, res) => {
     if (templatePaid !== undefined) db.settings.templatePaid = String(templatePaid).trim();
     if (defaultPeriod !== undefined) db.settings.defaultPeriod = String(defaultPeriod).trim();
     db.settings.lastModified = Date.now();
-    writeDb(db);
+    await writeDb(db);
     res.json({ success: true, settings: db.settings });
   } catch (err) {
     console.error('Settings save error:', err);
@@ -927,7 +952,7 @@ app.post('/api/settings', (req, res) => {
 });
 
 // JSON Full Restore (Smart Non-Destructive Merge)
-app.post('/api/backup/restore', (req, res) => {
+app.post('/api/backup/restore', async (req, res) => {
   const { backupData } = req.body;
   if (!backupData || (!backupData.sales && !backupData.products)) {
     return res.status(400).json({ error: 'Invalid backup file format' });
@@ -957,12 +982,12 @@ app.post('/api/backup/restore', (req, res) => {
     deletedSaleIds: Array.from(deletedSales),
     deletedExpenseIds: Array.from(deletedExpenses)
   };
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, message: 'Backup restored successfully!', salesCount: db.sales.length });
 });
 
 // Reset System (Protected by Master Password Sad12345@)
-app.post('/api/reset-data', (req, res) => {
+app.post('/api/reset-data', async (req, res) => {
   const { password } = req.body;
   const MASTER_RESET_PASSWORD = 'Sad12345@';
 
@@ -973,7 +998,7 @@ app.post('/api/reset-data', (req, res) => {
   const db = readDb();
   db.sales = [];
   db.expenses = [];
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, message: 'Sales and Expenses cleared successfully!' });
 });
 

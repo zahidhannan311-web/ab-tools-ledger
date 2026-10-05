@@ -1,149 +1,583 @@
 {
-  "pin": "2580",
-  "products": [
-    {
-      "id": "prod_surfshark_shared",
-      "name": "Surfshark",
-      "type": "Shared",
-      "plans": [
-        {
-          "months": 1,
-          "label": "1 Month (30 Days)",
-          "price": 250
-        },
-        {
-          "months": 2,
-          "label": "2 Months (60 Days)",
-          "price": 400
-        },
-        {
-          "months": 3,
-          "label": "3 Months (90 Days)",
-          "price": 600
-        },
-        {
-          "months": 6,
-          "label": "6 Months (180 Days)",
-          "price": 1000
-        },
-        {
-          "months": 12,
-          "label": "12 Months (360 Days)",
-          "price": 1600
-        }
-      ]
-    },
-    {
-      "id": "prod_surfshark_private",
-      "name": "Surfshark",
-      "type": "Private",
-      "plans": [
-        {
-          "months": 2,
-          "label": "2 Months (60 Days)",
-          "price": 2200
-        },
-        {
-          "months": 12,
-          "label": "1 Year (360 Days)",
-          "price": 9499
-        }
-      ]
-    },
-    {
-      "id": "prod_nord_shared",
-      "name": "Nord",
-      "type": "Shared",
-      "plans": [
-        {
-          "months": 3,
-          "label": "3 Months (90 Days)",
-          "price": 500
-        },
-        {
-          "months": 6,
-          "label": "6 Months (180 Days)",
-          "price": 900
-        },
-        {
-          "months": 9,
-          "label": "9 Months (270 Days)",
-          "price": 1300
-        },
-        {
-          "months": 12,
-          "label": "12 Months (360 Days)",
-          "price": 1600
-        }
-      ]
-    },
-    {
-      "id": "prod_nord_private",
-      "name": "Nord",
-      "type": "Private",
-      "plans": [
-        {
-          "months": 3,
-          "label": "3 Months (90 Days)",
-          "price": 1800
-        },
-        {
-          "months": 12,
-          "label": "12 Months (360 Days)",
-          "price": 6500
-        }
-      ]
-    },
-    {
-      "id": "prod_gemini_pro",
-      "name": "Gemini Pro",
-      "type": "Shared",
-      "plans": [
-        {
-          "months": 18,
-          "label": "18 Months (540 Days)",
-          "price": 750
-        }
-      ]
-    },
-    {
-      "id": "prod_capcut",
-      "name": "CapCut",
-      "type": "Shared",
-      "plans": [
-        {
-          "months": 1,
-          "label": "1 Month (30 Days)",
-          "price": 450
-        }
-      ]
-    },
-    {
-      "id": "prod_chatgpt",
-      "name": "ChatGPT",
-      "type": "Shared",
-      "plans": [
-        {
-          "months": 1,
-          "label": "1 Month (30 Days)",
-          "price": 800
-        }
-      ]
-    },
-    {
-      "id": "prod_muse_ai",
-      "name": "Muse AI",
-      "type": "Shared",
-      "plans": [
-        {
-          "months": 1,
-          "label": "1 Month (30 Days)",
-          "price": 500
-        }
-      ]
-    }
-  ],
   "sales": [
+    {
+      "id": "sale_1791205614503",
+      "date": "2026-10-05",
+      "customerPhone": "+92 344 9282193",
+      "customerName": "",
+      "product": "Muse AI",
+      "accountType": "Private",
+      "accountLogin": "NA",
+      "planMonths": 1,
+      "planLabel": "1 Month(s)",
+      "amount": 1000,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-05T13:06:54.503Z",
+      "expiryDate": "2026-11-03",
+      "createdAt": "2026-10-05T13:06:54.503Z"
+    },
+    {
+      "id": "sale_1791205520863",
+      "date": "2026-10-05",
+      "customerPhone": "+92 336 2088885",
+      "customerName": "",
+      "product": "CapCut",
+      "accountType": "Private",
+      "accountLogin": "baktionopradana64@akunku.site  masuk123  qaoyxh@apricity.tech  masuk123",
+      "planMonths": 1,
+      "planLabel": "1 Month (25 Days)",
+      "amount": 1100,
+      "paymentStatus": "Paid",
+      "notes": "2 Capcut",
+      "updatedAt": "2026-10-05T13:05:20.863Z",
+      "expiryDate": "2026-11-03",
+      "createdAt": "2026-10-05T13:05:20.863Z"
+    },
+    {
+      "id": "sale_1791205472496",
+      "date": "2026-10-05",
+      "customerPhone": "+92 300 2689698",
+      "customerName": "",
+      "product": "Muse AI",
+      "accountType": "Private",
+      "accountLogin": "NA",
+      "planMonths": 1,
+      "planLabel": "1 Month(s)",
+      "amount": 1000,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-05T13:04:32.496Z",
+      "expiryDate": "2026-11-03",
+      "createdAt": "2026-10-05T13:04:32.497Z"
+    },
+    {
+      "id": "sale_1791193680484",
+      "date": "2026-10-05",
+      "customerPhone": "+92 341 5984031",
+      "customerName": "",
+      "product": "Muse AI",
+      "accountType": "Private",
+      "accountLogin": "NA",
+      "planMonths": 1,
+      "planLabel": "1 Month(s)",
+      "amount": 800,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-05T09:48:00.484Z",
+      "expiryDate": "2026-11-03",
+      "createdAt": "2026-10-05T09:48:00.484Z"
+    },
+    {
+      "id": "sale_1791191267464",
+      "date": "2026-10-05",
+      "customerPhone": "3317376555",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd151@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-05T09:07:47.464Z",
+      "expiryDate": "2026-11-03",
+      "createdAt": "2026-10-05T09:07:47.464Z"
+    },
+    {
+      "id": "sale_1791187749963",
+      "date": "2026-10-05",
+      "customerPhone": "+92 326 4813460",
+      "customerName": "",
+      "product": "Nord",
+      "accountType": "Shared",
+      "accountLogin": "nord10@kuromee.com",
+      "planMonths": 3,
+      "planLabel": "3 Months (90 Days)",
+      "amount": 400,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-05T08:09:09.963Z",
+      "expiryDate": "2027-01-02",
+      "createdAt": "2026-10-05T08:09:09.963Z"
+    },
+    {
+      "id": "sale_1791187520074",
+      "date": "2026-10-05",
+      "customerPhone": "3005130980",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd151@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-05T08:09:41.621Z",
+      "expiryDate": "2026-11-03",
+      "createdAt": "2026-10-05T08:05:20.074Z"
+    },
+    {
+      "id": "sale_1791187470511",
+      "date": "2026-10-05",
+      "customerPhone": "3443570380",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd151@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 200,
+      "paymentStatus": "Pending",
+      "notes": "",
+      "updatedAt": "2026-10-05T08:04:30.511Z",
+      "expiryDate": "2026-11-03",
+      "createdAt": "2026-10-05T08:04:30.511Z"
+    },
+    {
+      "id": "sale_1791187181909",
+      "date": "2026-10-05",
+      "customerPhone": "+92 319 5466691",
+      "customerName": "",
+      "product": "Gemini Pro",
+      "accountType": "Private",
+      "accountLogin": "NA",
+      "planMonths": 18,
+      "planLabel": "18 Months (540 Days)",
+      "amount": 750,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-05T07:59:41.909Z",
+      "expiryDate": "2028-03-27",
+      "createdAt": "2026-10-05T07:59:41.909Z"
+    },
+    {
+      "id": "sale_1791184673171",
+      "date": "2026-10-05",
+      "customerPhone": "+92 303 5733146",
+      "customerName": "",
+      "product": "Muse AI",
+      "accountType": "Private",
+      "accountLogin": "NA",
+      "planMonths": 1,
+      "planLabel": "1 Month(s)",
+      "amount": 1000,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-05T07:17:53.171Z",
+      "expiryDate": "2026-11-03",
+      "createdAt": "2026-10-05T07:17:53.172Z"
+    },
+    {
+      "id": "sale_1791183478163",
+      "date": "2026-10-05",
+      "customerPhone": "3425091286",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd151@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-05T06:57:58.163Z",
+      "expiryDate": "2026-11-03",
+      "createdAt": "2026-10-05T06:57:58.163Z"
+    },
+    {
+      "id": "sale_1791183466887",
+      "date": "2026-10-05",
+      "customerPhone": "3199182226",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd151@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-05T06:57:46.887Z",
+      "expiryDate": "2026-11-03",
+      "createdAt": "2026-10-05T06:57:46.887Z"
+    },
+    {
+      "id": "sale_1791153252198",
+      "date": "2026-10-05",
+      "customerPhone": "+92 326 7000168",
+      "customerName": "",
+      "product": "Nord",
+      "accountType": "Shared",
+      "accountLogin": "nord9@kuromee.com",
+      "planMonths": 3,
+      "planLabel": "3 Months (90 Days)",
+      "amount": 500,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-04T22:34:12.198Z",
+      "expiryDate": "2027-01-02",
+      "createdAt": "2026-10-04T22:34:12.198Z"
+    },
+    {
+      "id": "sale_1791138731891",
+      "date": "2026-10-04",
+      "customerPhone": "+92 309 6116899",
+      "customerName": "",
+      "product": "Gemini Pro",
+      "accountType": "Private",
+      "accountLogin": "NA",
+      "planMonths": 18,
+      "planLabel": "18 Months (540 Days)",
+      "amount": 500,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-04T18:32:11.891Z",
+      "expiryDate": "2028-03-26",
+      "createdAt": "2026-10-04T18:32:11.892Z"
+    },
+    {
+      "id": "sale_1791137994648",
+      "date": "2026-10-04",
+      "customerPhone": "+92 302 4827701",
+      "customerName": "",
+      "product": "Gemini Pro",
+      "accountType": "Shared",
+      "accountLogin": "NA",
+      "planMonths": 18,
+      "planLabel": "18 Months (540 Days)",
+      "amount": 600,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-04T18:19:54.648Z",
+      "expiryDate": "2028-03-26",
+      "createdAt": "2026-10-04T18:19:54.648Z"
+    },
+    {
+      "id": "sale_1791136834025",
+      "date": "2026-10-04",
+      "customerPhone": "3126811828",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd151@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-04T18:00:34.025Z",
+      "expiryDate": "2026-11-02",
+      "createdAt": "2026-10-04T18:00:34.025Z"
+    },
+    {
+      "id": "sale_1791136775857",
+      "date": "2026-10-04",
+      "customerPhone": "+92 311 7274561",
+      "customerName": "",
+      "product": "Muse AI",
+      "accountType": "Private",
+      "accountLogin": "n",
+      "planMonths": 1,
+      "planLabel": "1 Month(s)",
+      "amount": 1000,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-04T17:59:35.857Z",
+      "expiryDate": "2026-11-02",
+      "createdAt": "2026-10-04T17:59:35.857Z"
+    },
+    {
+      "id": "sale_1791136760132",
+      "date": "2026-10-04",
+      "customerPhone": "+92 308 5413116",
+      "customerName": "",
+      "product": "Muse AI",
+      "accountType": "Private",
+      "accountLogin": "NA",
+      "planMonths": 1,
+      "planLabel": "1 Month(s)",
+      "amount": 1000,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-04T17:59:20.132Z",
+      "expiryDate": "2026-11-02",
+      "createdAt": "2026-10-04T17:59:20.132Z"
+    },
+    {
+      "id": "sale_1791134215437",
+      "date": "2026-10-04",
+      "customerPhone": "3157839993",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd151@kuromee.com",
+      "planMonths": 12,
+      "planLabel": "12 Months (360 Days)",
+      "amount": 1000,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-04T17:16:55.437Z",
+      "expiryDate": "2027-09-28",
+      "createdAt": "2026-10-04T17:16:55.437Z"
+    },
+    {
+      "id": "sale_1791106255456",
+      "date": "2026-10-04",
+      "customerPhone": "971558178928",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd151@kuromee.com",
+      "planMonths": 3,
+      "planLabel": "3 Months (90 Days)",
+      "amount": 600,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-04T09:30:55.456Z",
+      "expiryDate": "2027-01-01",
+      "createdAt": "2026-10-04T09:30:55.457Z"
+    },
+    {
+      "id": "sale_1791103826297",
+      "date": "2026-10-04",
+      "customerPhone": "3006831690",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd151@kuromee.com",
+      "planMonths": 12,
+      "planLabel": "12 Months (360 Days)",
+      "amount": 1500,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-04T08:50:58.303Z",
+      "expiryDate": "2027-09-28",
+      "createdAt": "2026-10-04T08:50:26.297Z"
+    },
+    {
+      "id": "sale_1791102228323",
+      "date": "2026-10-04",
+      "customerPhone": "3047732450",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd151@kuromee.com",
+      "planMonths": 12,
+      "planLabel": "12 Months (360 Days)",
+      "amount": 1400,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-04T08:23:48.323Z",
+      "expiryDate": "2027-09-28",
+      "createdAt": "2026-10-04T08:23:48.324Z"
+    },
+    {
+      "id": "sale_1791099523357",
+      "date": "2026-10-04",
+      "customerPhone": "3081503007",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd150@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-04T07:41:47.824Z",
+      "expiryDate": "2026-11-02",
+      "createdAt": "2026-10-04T07:38:43.357Z"
+    },
+    {
+      "id": "sale_1791098261508",
+      "date": "2026-10-04",
+      "customerPhone": "3007034330",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd150@kuromee.com",
+      "planMonths": 2,
+      "planLabel": "2 Months (60 Days)",
+      "amount": 400,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-04T07:23:18.836Z",
+      "expiryDate": "2026-12-02",
+      "createdAt": "2026-10-04T07:17:41.508Z"
+    },
+    {
+      "id": "sale_1791064529531",
+      "date": "2026-10-03",
+      "customerPhone": "+92 302 7283125",
+      "customerName": "",
+      "product": "Muse AI",
+      "accountType": "Private",
+      "accountLogin": "NA",
+      "planMonths": 1,
+      "planLabel": "1 Month(s)",
+      "amount": 1500,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-03T21:55:34.558Z",
+      "expiryDate": "2026-11-01",
+      "createdAt": "2026-10-03T21:55:29.531Z"
+    },
+    {
+      "id": "sale_1791064497321",
+      "date": "2026-10-03",
+      "customerPhone": "+92 300 6831690",
+      "customerName": "",
+      "product": "Muse AI",
+      "accountType": "Private",
+      "accountLogin": "NA",
+      "planMonths": 1,
+      "planLabel": "1 Month(s)",
+      "amount": 1000,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-03T21:54:57.321Z",
+      "expiryDate": "2026-11-01",
+      "createdAt": "2026-10-03T21:54:57.321Z"
+    },
+    {
+      "id": "sale_1791037027100",
+      "date": "2026-10-03",
+      "customerPhone": "+92 309 3030483",
+      "customerName": "",
+      "product": "Muse AI",
+      "accountType": "Private",
+      "accountLogin": "NA",
+      "planMonths": 1,
+      "planLabel": "1 Month(s)",
+      "amount": 800,
+      "paymentStatus": "Pending",
+      "notes": "",
+      "updatedAt": "2026-10-03T14:17:07.100Z",
+      "expiryDate": "2026-11-01",
+      "createdAt": "2026-10-03T14:17:07.100Z"
+    },
+    {
+      "id": "sale_1791036095236",
+      "date": "2026-10-03",
+      "customerPhone": "3413317078",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd150@kuromee.com",
+      "planMonths": 2,
+      "planLabel": "2 Months (60 Days)",
+      "amount": 400,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-03T14:05:06.341Z",
+      "expiryDate": "2026-12-01",
+      "createdAt": "2026-10-03T14:01:35.236Z"
+    },
+    {
+      "id": "sale_1791035943610",
+      "date": "2026-10-03",
+      "customerPhone": "3158206979",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd150@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-03T13:59:03.610Z",
+      "expiryDate": "2026-11-01",
+      "createdAt": "2026-10-03T13:59:03.610Z"
+    },
+    {
+      "id": "sale_1791035347968",
+      "date": "2026-10-03",
+      "customerPhone": "3091259797",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd150@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-03T13:49:07.968Z",
+      "expiryDate": "2026-11-01",
+      "createdAt": "2026-10-03T13:49:07.968Z"
+    },
+    {
+      "id": "sale_1791035307158",
+      "date": "2026-10-03",
+      "customerPhone": "3241266815",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd150@kuromee.com",
+      "planMonths": 3,
+      "planLabel": "3 Months (90 Days)",
+      "amount": 500,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-03T13:52:06.748Z",
+      "expiryDate": "2026-12-31",
+      "createdAt": "2026-10-03T13:48:27.158Z"
+    },
+    {
+      "id": "sale_1791035284989",
+      "date": "2026-10-03",
+      "customerPhone": "+92 314 7659690",
+      "customerName": "",
+      "product": "CapCut",
+      "accountType": "Private",
+      "accountLogin": "jinawidamanik6@ccpro.id|masuk123",
+      "planMonths": 1,
+      "planLabel": "1 Month (25 Days)",
+      "amount": 550,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-03T13:48:04.989Z",
+      "expiryDate": "2026-11-01",
+      "createdAt": "2026-10-03T13:48:04.990Z"
+    },
+    {
+      "id": "sale_1791028064145",
+      "date": "2026-10-03",
+      "customerPhone": "+92 342 9665704",
+      "customerName": "",
+      "product": "CapCut",
+      "accountType": "Private",
+      "accountLogin": "NA",
+      "planMonths": 1,
+      "planLabel": "1 Month (25 Days)",
+      "amount": 750,
+      "paymentStatus": "Paid",
+      "notes": "arthurwestbrook00q61@klingaii.com Capcut#1122",
+      "updatedAt": "2026-10-03T12:29:49.465Z",
+      "expiryDate": "2026-11-01",
+      "createdAt": "2026-10-03T11:47:44.145Z"
+    },
+    {
+      "id": "sale_1791024242646",
+      "date": "2026-10-03",
+      "customerPhone": "+92 319 5466691",
+      "customerName": "",
+      "product": "Muse AI",
+      "accountType": "Private",
+      "accountLogin": "NA",
+      "planMonths": 1,
+      "planLabel": "1 Month(s)",
+      "amount": 1500,
+      "paymentStatus": "Paid",
+      "notes": "",
+      "updatedAt": "2026-10-03T11:07:26.240Z",
+      "expiryDate": "2026-11-01",
+      "createdAt": "2026-10-03T10:44:02.646Z"
+    },
     {
       "id": "sale_1790972901458",
       "date": "2026-10-03",
@@ -157,7 +591,7 @@
       "amount": 500,
       "paymentStatus": "Paid",
       "notes": "",
-      "updatedAt": "2026-10-02T20:28:21.458Z",
+      "updatedAt": "2026-10-03T01:06:35.980Z",
       "expiryDate": "2026-12-31",
       "createdAt": "2026-10-02T20:28:21.458Z"
     },
@@ -398,6 +832,23 @@
       "updatedAt": "2026-10-02T10:17:01.232Z",
       "expiryDate": "2026-10-31",
       "createdAt": "2026-10-02T10:17:01.232Z"
+    },
+    {
+      "id": "sale_1790934821042_1qpo",
+      "date": "2026-10-02",
+      "customerName": "",
+      "customerPhone": "3362088885",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd150@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Paid",
+      "expiryDate": "2026-10-31",
+      "notes": "",
+      "createdAt": "2026-10-02T09:53:41.042Z",
+      "updatedAt": "2026-10-02T10:17:10.531Z"
     },
     {
       "id": "sale_1790934819273",
@@ -901,10 +1352,11 @@
       "planMonths": 1,
       "planLabel": "1 Month (30 Days)",
       "amount": 750,
-      "paymentStatus": "Pending",
+      "paymentStatus": "Paid",
       "expiryDate": "2026-10-30",
       "notes": "vukdsas@apricity.tech  masuk123",
-      "createdAt": "2026-10-01T11:15:14.445Z"
+      "createdAt": "2026-10-01T11:15:14.445Z",
+      "updatedAt": "2026-10-03T09:55:58.833Z"
     },
     {
       "id": "sale_1790852538710",
@@ -1017,33 +1469,44 @@
       "expiryDate": "2026-12-29",
       "notes": "",
       "createdAt": "2026-10-01T07:17:11.379Z"
-    },
-    {
-      "id": "sale_1790838846301",
-      "date": "2026-10-01",
-      "customerPhone": "3085352533",
-      "customerName": "",
-      "product": "Surfshark",
-      "accountType": "Shared",
-      "accountLogin": "abd149@kuromee.com",
-      "planMonths": 2,
-      "planLabel": "2 Months (60 Days)",
-      "amount": 800,
-      "paymentStatus": "Pending",
-      "expiryDate": "2026-11-29",
-      "notes": "2 Devices",
-      "createdAt": "2026-10-01T07:14:06.302Z"
     }
   ],
   "expenses": [
     {
-      "id": "exp_1790946533413",
-      "date": "2026-10-02",
+      "id": "exp_1791205545999",
+      "date": "2026-10-05",
       "category": "Vendor Purchasing",
-      "description": "Nord purchasing",
-      "amount": 850,
-      "updatedAt": "2026-10-02T13:08:53.413Z",
-      "createdAt": "2026-10-02T13:08:53.414Z"
+      "description": "baktionopradana64@akunku.site|masuk123 qaoyxh@apricity.tech:masuk123",
+      "amount": 700,
+      "updatedAt": "2026-10-05T13:05:45.998Z",
+      "createdAt": "2026-10-05T13:05:45.999Z"
+    },
+    {
+      "id": "exp_1791035398823",
+      "date": "2026-10-03",
+      "category": "Vendor Purchasing",
+      "description": "arthurwestbrook00q61@klingaii.com Capcut#1122",
+      "amount": 380,
+      "updatedAt": "2026-10-03T13:49:58.823Z",
+      "createdAt": "2026-10-03T13:49:58.823Z"
+    },
+    {
+      "id": "exp_1791035383336",
+      "date": "2026-10-03",
+      "category": "Vendor Purchasing",
+      "description": "jinawidamanik6@ccpro.id|masuk123",
+      "amount": 350,
+      "updatedAt": "2026-10-03T13:49:43.336Z",
+      "createdAt": "2026-10-03T13:49:43.337Z"
+    },
+    {
+      "id": "exp_1791018590950",
+      "date": "2026-10-02",
+      "category": "Meta Ads",
+      "description": "",
+      "amount": 2000,
+      "updatedAt": "2026-10-03T09:09:50.950Z",
+      "createdAt": "2026-10-03T09:09:50.950Z"
     },
     {
       "id": "exp_1790940392222",
@@ -1087,15 +1550,195 @@
       "createdAt": "2026-09-30T23:28:01.227Z"
     }
   ],
+  "products": [
+    {
+      "id": "prod_surfshark_shared",
+      "name": "Surfshark",
+      "type": "Shared",
+      "plans": [
+        {
+          "months": 1,
+          "label": "1 Month (30 Days)",
+          "price": 250
+        },
+        {
+          "months": 2,
+          "label": "2 Months (60 Days)",
+          "price": 400
+        },
+        {
+          "months": 3,
+          "label": "3 Months (90 Days)",
+          "price": 600
+        },
+        {
+          "months": 6,
+          "label": "6 Months (180 Days)",
+          "price": 1000
+        },
+        {
+          "months": 12,
+          "label": "12 Months (360 Days)",
+          "price": 1600
+        }
+      ]
+    },
+    {
+      "id": "prod_surfshark_private",
+      "name": "Surfshark",
+      "type": "Private",
+      "plans": [
+        {
+          "months": 2,
+          "label": "2 Months (60 Days)",
+          "price": 2200
+        },
+        {
+          "months": 12,
+          "label": "1 Year (360 Days)",
+          "price": 9499
+        }
+      ]
+    },
+    {
+      "id": "prod_nord_shared",
+      "name": "Nord",
+      "type": "Shared",
+      "plans": [
+        {
+          "months": 3,
+          "label": "3 Months (90 Days)",
+          "price": 500
+        },
+        {
+          "months": 6,
+          "label": "6 Months (180 Days)",
+          "price": 900
+        },
+        {
+          "months": 9,
+          "label": "9 Months (270 Days)",
+          "price": 1300
+        },
+        {
+          "months": 12,
+          "label": "12 Months (360 Days)",
+          "price": 1600
+        }
+      ]
+    },
+    {
+      "id": "prod_nord_private",
+      "name": "Nord",
+      "type": "Private",
+      "plans": [
+        {
+          "months": 3,
+          "label": "3 Months (90 Days)",
+          "price": 1800
+        },
+        {
+          "months": 12,
+          "label": "12 Months (360 Days)",
+          "price": 6500
+        }
+      ]
+    },
+    {
+      "id": "prod_gemini_pro",
+      "name": "Gemini Pro",
+      "type": "Shared",
+      "plans": [
+        {
+          "months": 18,
+          "label": "18 Months (540 Days)",
+          "price": 750
+        }
+      ]
+    },
+    {
+      "id": "prod_capcut",
+      "name": "CapCut",
+      "type": "Private",
+      "plans": [
+        {
+          "months": 1,
+          "label": "1 Month (25 Days)",
+          "price": 550
+        }
+      ]
+    },
+    {
+      "id": "prod_chatgpt",
+      "name": "ChatGPT",
+      "type": "Shared",
+      "plans": [
+        {
+          "months": 1,
+          "label": "1 Month (30 Days)",
+          "price": 800
+        }
+      ]
+    },
+    {
+      "id": "prod_muse_ai",
+      "name": "Muse AI",
+      "type": "Private",
+      "plans": [
+        {
+          "months": 1,
+          "label": "1 Month(s)",
+          "price": 1000
+        }
+      ]
+    },
+    {
+      "id": "prod_gemini_pro_private",
+      "name": "Gemini Pro",
+      "type": "Private",
+      "plans": [
+        {
+          "months": 18,
+          "label": "18 Months (540 Days)",
+          "price": 750
+        }
+      ]
+    },
+    {
+      "id": "prod_capcut_private",
+      "name": "CapCut",
+      "type": "Private",
+      "plans": [
+        {
+          "months": 1,
+          "label": "1 Month (25 Days)",
+          "price": 550
+        }
+      ]
+    }
+  ],
+  "recycleBin": [],
   "settings": {
     "businessName": "A&B Tools Business Manager",
     "currency": "Rs.",
-    "lastModified": 1790988002846,
+    "lastModified": 1791206444330,
     "deletedSaleIds": [
       "sale_1790808573942_ktuq",
-      "sale_1790891345201_z6tu"
+      "sale_1790891345201_z6tu",
+      "sale_1790841889749",
+      "sale_1790838846301",
+      "sale_1790972905387_rym0",
+      "sale_1790987581614",
+      "sale_1790987667039",
+      "sale_1791018553805"
     ],
-    "deletedExpenseIds": [],
-    "lastExcelExport": "2026-10-03T00:26:51.787Z"
+    "deletedExpenseIds": [
+      "exp_1790946533413"
+    ],
+    "lastExcelExport": null,
+    "templateExpiry": "Hello {customer}! Notice from {business}: Your {product} ({account}) expires on {expiry}. Kindly renew to keep uninterrupted access. Thank you!",
+    "templatePending": "Hello {customer}! Friendly reminder from {business}: The payment of {currency} {amount} for your {product} ({plan}) is currently pending. Kindly clear the dues at your earliest convenience. Thank you!\n\n📱 JazzCash / EasyPaisa\n\nAccount Number: 03079335948\nAccount Holder: Muhammad Hannan\n(Same number for both Accounts)\n\n🏦 UBL Bank Transfer\n\nAccount Title: Muhammad Hannan\nAccount Number: 0967288558941\nBank Name: United Bank Limited (UBL)",
+    "templateWelcome": "Assalam-o-Alaikum {customer}! Thank you for choosing {business}. Here are your {product} ({plan}) details:\nLogin: {account}\nExpiry: {expiry}\nAmount: {currency} {amount}\nHave a great experience!",
+    "templatePaid": "Dear {customer}, we have received your payment of {currency} {amount} for {product} ({plan}). Thank you for trusting {business}!"
   }
 }
