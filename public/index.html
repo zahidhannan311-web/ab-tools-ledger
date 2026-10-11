@@ -177,6 +177,32 @@
           <button class="period-tab" data-period="week">This Week</button>
           <button class="period-tab" data-period="month">This Month</button>
           <button class="period-tab" data-period="all">All Time</button>
+          <button class="period-tab" data-period="custom" id="btnPeriodCustomDate">📅 Specific Date</button>
+        </div>
+
+        <!-- Specific Date Interactive Selector Bar -->
+        <div class="custom-date-bar" id="customDateBar" style="display: none;">
+          <div class="custom-date-container">
+            <div class="custom-date-controls">
+              <button type="button" class="btn-date-nav" id="btnPrevDate" title="Previous Day">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <span>Prev</span>
+              </button>
+              <div class="custom-date-input-wrap">
+                <svg class="date-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <input type="date" id="periodCustomDateInput" class="custom-date-picker" />
+              </div>
+              <button type="button" class="btn-date-nav" id="btnNextDate" title="Next Day">
+                <span>Next</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+              <button type="button" class="btn-date-chip" id="btnJumpTodayDate">Today</button>
+            </div>
+            <div class="custom-date-meta">
+              <span class="custom-date-title" id="customDateFormattedLabel">Monday, 12 Oct 2026</span>
+              <span class="custom-date-badge" id="customDateStatsSummary">0 sales · Rs. 0</span>
+            </div>
+          </div>
         </div>
       </div>
     </header>
@@ -413,6 +439,46 @@
                 </label>
                 <input type="file" id="restoreFileInput" accept=".json" style="display:none;">
               </div>
+            </div>
+          </div>
+
+          <!-- 3. Cross-Device Cloud Sync (Mobile & Laptop Sync) -->
+          <div class="admin-card" id="adminCloudSyncCard">
+            <div class="admin-card-header">
+              <div class="admin-card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>
+                <span>Cross-Device Cloud Sync (Mobile &amp; Laptop)</span>
+              </div>
+              <span id="cloudSyncStatusBadge" class="badge-subtle">Checking...</span>
+            </div>
+            <p class="admin-card-desc">Phone aur Laptop me automatically same real-time data sync karne ke liye Upstash Redis Cloud Database connect karein (100% Free Forever).</p>
+
+            <form id="cloudSyncForm" class="admin-settings-form">
+              <div class="form-group">
+                <label>Upstash Redis REST URL</label>
+                <input type="url" id="settingKvUrlInput" class="form-control" style="font-family: var(--font-mono); font-size: 12px;" placeholder="https://xxx-xxx-12345.upstash.io">
+              </div>
+              <div class="form-group">
+                <label>Upstash Redis REST Token</label>
+                <input type="password" id="settingKvTokenInput" class="form-control" style="font-family: var(--font-mono); font-size: 12px;" placeholder="AXxxxxxxx...">
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 8px;">
+                <button type="button" id="btnSaveConnectCloudKv" class="btn btn-gold flex-1">
+                  <span>⚡ Save &amp; Connect Cloud Sync</span>
+                </button>
+                <button type="button" id="btnTestCloudKv" class="btn btn-subtle" style="white-space:nowrap;">
+                  <span>Test Connection</span>
+                </button>
+              </div>
+              <div id="cloudKvFeedbackMsg" class="pin-feedback-msg" style="margin-top: 6px;"></div>
+            </form>
+
+            <div class="cloud-sync-help-box">
+              <div class="help-box-title">💡 Phone aur Laptop Sync Guide:</div>
+              <ol class="help-box-steps">
+                <li><strong>24/7 Auto-Sync (Recommended):</strong> <a href="https://console.upstash.com" target="_blank" rel="noopener" style="color: var(--gold-accent); text-decoration: underline;">Upstash.com</a> par free sign up karke 1 click me Free Redis banayein. Wahan se REST URL aur Token copy karke upar paste karke Save karein. Dono devices par same data khud ba khud live sync hoga!</li>
+                <li><strong>Instant Data Transfer (Without Setup):</strong> Laptop se "Download JSON Backup" download karein aur phone par WhatsApp/Drive ke zariye bhej kar phone me "Restore Data from Backup File" karein. Sara laptop data phone me aa jayega!</li>
+              </ol>
             </div>
           </div>
 

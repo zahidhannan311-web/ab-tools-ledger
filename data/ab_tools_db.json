@@ -1764,6 +1764,8 @@
     "templateExpiry": "Hello {customer}! Notice from {business}: Your {product} ({account}) expires on {expiry}. Kindly renew to keep uninterrupted access. Thank you!",
     "templatePending": "Hello {customer}! Friendly reminder from {business}: The payment of {currency} {amount} for your {product} ({plan}) is currently pending. Kindly clear the dues at your earliest convenience. Thank you!\n\n📱 JazzCash / EasyPaisa\n\nAccount Number: 03079335948\nAccount Holder: Muhammad Hannan\n(Same number for both Accounts)\n\n🏦 UBL Bank Transfer\n\nAccount Title: Muhammad Hannan\nAccount Number: 0967288558941\nBank Name: United Bank Limited (UBL)",
     "templateWelcome": "Assalam-o-Alaikum {customer}! Thank you for choosing {business}. Here are your {product} ({plan}) details:\nLogin: {account}\nExpiry: {expiry}\nAmount: {currency} {amount}\nHave a great experience!",
-    "templatePaid": "Dear {customer}, we have received your payment of {currency} {amount} for {product} ({plan}). Thank you for trusting {business}!"
+    "templatePaid": "Dear {customer}, we have received your payment of {currency} {amount} for {product} ({plan}). Thank you for trusting {business}!",
+    "kvUrl": "https://desired-elephant-221971.upstash.io",
+    "kvToken": "gQAAAAAAA2MTAAIgcDFkZTgzY2JmODU0YWE0YjI3OGFiODkyZjMyNzUxMzcyMw"
   }
 }

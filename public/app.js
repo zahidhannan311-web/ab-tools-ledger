@@ -7,7 +7,8 @@
 const STATE = {
   pinSet: false,
   unlocked: false,
-  currentPeriod: 'today', // today, yesterday, week, month, all
+  currentPeriod: 'today', // today, yesterday, week, month, all, custom
+  customSelectedDate: '',
   currentView: 'salesView',
   data: {
     sales: [],
@@ -312,6 +313,7 @@ let syncPendingAgain = false;
 function triggerAutoSaveSync(immediate = false) {
   saveLocalState();
   updateSyncBadge('syncing');
+  pushDirectUpstashRedis();
   if (autoSyncTimer) clearTimeout(autoSyncTimer);
   if (immediate) {
     performServerSync();
@@ -471,6 +473,27 @@ function syncSettingsFormUI() {
     el.textContent = currencyStr;
   });
 
+  const kvUrlInput = document.getElementById('settingKvUrlInput');
+  const kvTokenInput = document.getElementById('settingKvTokenInput');
+  const cloudBadge = document.getElementById('cloudSyncStatusBadge');
+
+  if (kvUrlInput && document.activeElement !== kvUrlInput) {
+    kvUrlInput.value = settings.kvUrl || localStorage.getItem('ab_tools_kv_url') || '';
+  }
+  if (kvTokenInput && document.activeElement !== kvTokenInput) {
+    kvTokenInput.value = settings.kvToken || localStorage.getItem('ab_tools_kv_token') || '';
+  }
+  if (cloudBadge) {
+    const hasKv = !!((settings.kvUrl && settings.kvToken) || (localStorage.getItem('ab_tools_kv_url') && localStorage.getItem('ab_tools_kv_token')));
+    if (hasKv) {
+      cloudBadge.className = 'badge-green font-bold';
+      cloudBadge.innerHTML = '🟢 Connected &amp; Auto-Syncing';
+    } else {
+      cloudBadge.className = 'badge-subtle';
+      cloudBadge.innerHTML = '🟡 Local Mode (No Cloud)';
+    }
+  }
+
   const brandTitle = document.querySelector('.header-title');
   if (brandTitle && settings.businessName) {
     brandTitle.textContent = settings.businessName;
@@ -486,6 +509,7 @@ function startRealtimeSync() {
   setInterval(() => {
     if (STATE.unlocked && !document.hidden) {
       performServerSync();
+      syncDirectUpstashRedis();
     }
   }, 4000);
 
@@ -493,6 +517,7 @@ function startRealtimeSync() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && STATE.unlocked) {
       performServerSync();
+      syncDirectUpstashRedis();
     }
   });
 
@@ -500,6 +525,7 @@ function startRealtimeSync() {
   window.addEventListener('pageshow', () => {
     if (STATE.unlocked) {
       performServerSync();
+      syncDirectUpstashRedis();
     }
   });
 
@@ -594,6 +620,7 @@ async function loadAppData() {
 
   // 2. Instant Sync with Server (fetches fresh changes + auto-pushes local changes)
   await performServerSync();
+  await syncDirectUpstashRedis();
 }
 
 function populateProductDropdowns() {
@@ -737,6 +764,30 @@ function getFormattedLiveDate() {
   return `${dayName}, ${dayNum} ${monthName} ${year}`;
 }
 
+function formatDateWithDay(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-').map(Number);
+  if (parts.length !== 3) return dateStr;
+  const [y, m, d] = parts;
+  const dt = new Date(y, m - 1, d);
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dayName = days[dt.getDay()] || '';
+  const monthName = months[dt.getMonth()] || '';
+  return `${dayName}, ${String(d).padStart(2, '0')} ${monthName} ${y}`;
+}
+
+function shiftDateByDays(dateStr, offsetDays) {
+  if (!dateStr) dateStr = getLocalTodayDateString();
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + offsetDays);
+  const resY = dt.getFullYear();
+  const resM = String(dt.getMonth() + 1).padStart(2, '0');
+  const resD = String(dt.getDate()).padStart(2, '0');
+  return `${resY}-${resM}-${resD}`;
+}
+
 let lastCheckedLocalDate = getLocalTodayDateString();
 
 function startDailyDateWatcher() {
@@ -800,6 +851,11 @@ function isDateInPeriod(dateStr, period) {
   if (period === 'yesterday') {
     const yesterdayStr = getLocalYesterdayDateString();
     return dateStr === yesterdayStr;
+  }
+
+  if (period === 'custom' || period === 'specific') {
+    const target = STATE.customSelectedDate || todayStr;
+    return dateStr === target;
   }
 
   const itemDate = new Date(dateStr + 'T00:00:00');
@@ -884,6 +940,18 @@ function renderKPIs() {
   document.getElementById('navExpenseCount').textContent = filteredExpenses.length;
   document.getElementById('navPendingCount').textContent = filteredPendingSales.length;
   document.getElementById('pendingTabTotal').textContent = filteredPendingTotal.toLocaleString('en-US');
+
+  // Update specific date custom bar summary if active
+  if (period === 'custom') {
+    const summaryBadge = document.getElementById('customDateStatsSummary');
+    if (summaryBadge) {
+      summaryBadge.textContent = `${filteredSales.length} sale${filteredSales.length === 1 ? '' : 's'} · Rs. ${totalRevenue.toLocaleString('en-US')}`;
+    }
+    const labelEl = document.getElementById('customDateFormattedLabel');
+    if (labelEl) {
+      labelEl.textContent = formatDateWithDay(STATE.customSelectedDate || getLocalTodayDateString());
+    }
+  }
 }
 
 // ==================== RENDER SALES LIST ====================
@@ -916,18 +984,31 @@ function renderSales() {
     }
   }
 
+  let bannerHtml = '';
+  if (period === 'custom') {
+    const formattedDate = formatDateWithDay(STATE.customSelectedDate || getLocalTodayDateString());
+    bannerHtml = `
+      <div class="custom-date-sales-banner">
+        <span>📅 Showing sales for <strong>${formattedDate}</strong></span>
+        <span class="badge-gold">${list.length} transaction${list.length === 1 ? '' : 's'}</span>
+      </div>
+    `;
+  }
+
   if (list.length === 0) {
+    const dateDesc = period === 'custom' ? `on ${formatDateDisplay(STATE.customSelectedDate || getLocalTodayDateString())}` : 'for this period';
     container.innerHTML = `
+      ${bannerHtml}
       <div class="empty-state">
         <div class="empty-state-icon">📋</div>
-        <div class="empty-state-title">No sales found for this period</div>
-        <p class="text-muted mt-2">Click '+ New Sale' to record a transaction</p>
+        <div class="empty-state-title">No sales found ${dateDesc}</div>
+        <p class="text-muted mt-2">Click '+ New Sale' to record a transaction for this date</p>
       </div>
     `;
     return;
   }
 
-  container.innerHTML = list.map(s => renderSaleCardHtml(s)).join('');
+  container.innerHTML = bannerHtml + list.map(s => renderSaleCardHtml(s)).join('');
 }
 
 function renderSaleCardHtml(s) {
@@ -1457,10 +1538,55 @@ function setupEventListeners() {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
-      STATE.currentPeriod = tab.getAttribute('data-period');
+      const period = tab.getAttribute('data-period');
+      STATE.currentPeriod = period;
+
+      const customBar = document.getElementById('customDateBar');
+      if (period === 'custom') {
+        if (!STATE.customSelectedDate) {
+          STATE.customSelectedDate = getLocalTodayDateString();
+        }
+        if (customBar) customBar.style.display = 'block';
+        const dateInput = document.getElementById('periodCustomDateInput');
+        if (dateInput) dateInput.value = STATE.customSelectedDate;
+      } else {
+        if (customBar) customBar.style.display = 'none';
+      }
+
       renderApp();
     });
   });
+
+  // Specific Date Navigation Controls
+  const customDateInput = document.getElementById('periodCustomDateInput');
+  if (customDateInput) {
+    customDateInput.addEventListener('change', (e) => {
+      STATE.customSelectedDate = e.target.value || getLocalTodayDateString();
+      renderApp();
+    });
+  }
+
+  document.getElementById('btnPrevDate')?.addEventListener('click', () => {
+    STATE.customSelectedDate = shiftDateByDays(STATE.customSelectedDate || getLocalTodayDateString(), -1);
+    if (customDateInput) customDateInput.value = STATE.customSelectedDate;
+    renderApp();
+  });
+
+  document.getElementById('btnNextDate')?.addEventListener('click', () => {
+    STATE.customSelectedDate = shiftDateByDays(STATE.customSelectedDate || getLocalTodayDateString(), 1);
+    if (customDateInput) customDateInput.value = STATE.customSelectedDate;
+    renderApp();
+  });
+
+  document.getElementById('btnJumpTodayDate')?.addEventListener('click', () => {
+    STATE.customSelectedDate = getLocalTodayDateString();
+    if (customDateInput) customDateInput.value = STATE.customSelectedDate;
+    renderApp();
+  });
+
+  // Cloud Sync Form Buttons
+  document.getElementById('btnSaveConnectCloudKv')?.addEventListener('click', handleSaveCloudKv);
+  document.getElementById('btnTestCloudKv')?.addEventListener('click', handleTestCloudKv);
 
   // Quick Action Buttons
   document.getElementById('btnOpenNewSaleModal')?.addEventListener('click', () => openSaleModal());
@@ -2440,6 +2566,215 @@ async function handleChangePin(e) {
   } catch (err) {
     msgEl.className = 'pin-feedback-msg text-rose';
     msgEl.textContent = 'Could not connect to server';
+  }
+}
+
+// ==================== CLOUD SYNC (UPSTASH REDIS) ====================
+async function handleSaveCloudKv() {
+  const urlInput = document.getElementById('settingKvUrlInput');
+  const tokenInput = document.getElementById('settingKvTokenInput');
+  const msgEl = document.getElementById('cloudKvFeedbackMsg');
+  const badge = document.getElementById('cloudSyncStatusBadge');
+  if (!urlInput || !tokenInput) return;
+
+  const kvUrl = urlInput.value.trim();
+  const kvToken = tokenInput.value.trim();
+
+  if (msgEl) {
+    msgEl.className = 'pin-feedback-msg';
+    msgEl.textContent = 'Saving & verifying connection...';
+  }
+
+  // Cache locally immediately so mobile client has direct credentials
+  if (kvUrl && kvToken) {
+    localStorage.setItem('ab_tools_kv_url', kvUrl);
+    localStorage.setItem('ab_tools_kv_token', kvToken);
+    STATE.data.settings = STATE.data.settings || {};
+    STATE.data.settings.kvUrl = kvUrl;
+    STATE.data.settings.kvToken = kvToken;
+  } else {
+    localStorage.removeItem('ab_tools_kv_url');
+    localStorage.removeItem('ab_tools_kv_token');
+    if (STATE.data.settings) {
+      delete STATE.data.settings.kvUrl;
+      delete STATE.data.settings.kvToken;
+    }
+  }
+
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kvUrl, kvToken })
+    });
+    const result = await res.json();
+    if (res.ok) {
+      if (msgEl) {
+        msgEl.className = 'pin-feedback-msg text-green';
+        msgEl.textContent = 'Cloud KV settings saved & auto-synced across all devices! ✓';
+      }
+      if (badge) {
+        badge.className = 'badge-green font-bold';
+        badge.innerHTML = '🟢 Connected &amp; Auto-Syncing';
+      }
+      showToast('Cloud Sync settings configured & auto-saved! ⚡');
+      await syncDirectUpstashRedis();
+      triggerAutoSaveSync(true);
+    } else {
+      if (msgEl) {
+        msgEl.className = 'pin-feedback-msg text-rose';
+        msgEl.textContent = result.error || 'Failed to save settings';
+      }
+    }
+  } catch (err) {
+    if (msgEl) {
+      msgEl.className = 'pin-feedback-msg text-amber';
+      msgEl.textContent = 'Settings saved locally on this device! ✓';
+    }
+    await syncDirectUpstashRedis();
+  }
+}
+
+async function handleTestCloudKv() {
+  const urlInput = document.getElementById('settingKvUrlInput');
+  const tokenInput = document.getElementById('settingKvTokenInput');
+  const msgEl = document.getElementById('cloudKvFeedbackMsg');
+  const kvUrl = urlInput?.value.trim();
+  const kvToken = tokenInput?.value.trim();
+
+  if (!kvUrl || !kvToken) {
+    if (msgEl) {
+      msgEl.className = 'pin-feedback-msg text-rose';
+      msgEl.textContent = 'Please enter both Upstash Redis URL and Token first';
+    }
+    return;
+  }
+
+  if (msgEl) {
+    msgEl.className = 'pin-feedback-msg';
+    msgEl.textContent = 'Testing connection...';
+  }
+
+  // Direct fetch test from client
+  try {
+    const directRes = await fetch(`${kvUrl}/get/ping`, {
+      headers: { Authorization: `Bearer ${kvToken}` }
+    });
+    if (directRes.ok) {
+      if (msgEl) {
+        msgEl.className = 'pin-feedback-msg text-green';
+        msgEl.textContent = 'Connected successfully! Direct Cloud link verified. ✓';
+      }
+      return;
+    }
+  } catch (_) {}
+
+  // Fallback to server test
+  try {
+    const res = await fetch('/api/cloud-kv/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kvUrl, kvToken })
+    });
+    const result = await res.json();
+    if (res.ok && result.success) {
+      if (msgEl) {
+        msgEl.className = 'pin-feedback-msg text-green';
+        msgEl.textContent = result.message || 'Connection verified successfully! ✓';
+      }
+    } else {
+      if (msgEl) {
+        msgEl.className = 'pin-feedback-msg text-rose';
+        msgEl.textContent = result.error || 'Connection failed. Please check your Upstash credentials.';
+      }
+    }
+  } catch (err) {
+    if (msgEl) {
+      msgEl.className = 'pin-feedback-msg text-rose';
+      msgEl.textContent = 'Test failed: ' + err.message;
+    }
+  }
+}
+
+const DEFAULT_CLIENT_KV_URL = 'https://desired-elephant-221971.upstash.io';
+const DEFAULT_CLIENT_KV_TOKEN = 'gQAAAAAAA2MTAAIgcDFkZTgzY2JmODU0YWE0YjI3OGFiODkyZjMyNzUxMzcyMw';
+
+async function syncDirectUpstashRedis() {
+  const url = STATE.data.settings?.kvUrl || localStorage.getItem('ab_tools_kv_url') || DEFAULT_CLIENT_KV_URL;
+  const token = STATE.data.settings?.kvToken || localStorage.getItem('ab_tools_kv_token') || DEFAULT_CLIENT_KV_TOKEN;
+  if (!url || !token) return;
+
+  try {
+    const res = await fetch(`${url}/get/ab_tools_db`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.result) {
+        let parsed = data.result;
+        if (typeof parsed === 'string') {
+          try { parsed = JSON.parse(parsed); } catch (_) {}
+        }
+        if (typeof parsed === 'string') {
+          try { parsed = JSON.parse(parsed); } catch (_) {}
+        }
+        if (parsed && typeof parsed === 'object') {
+          const ignoredSaleIds = ['sale_1790808573942_ktuq', 'sale_1790891345201_z6tu'];
+          const combinedDelSales = Array.from(new Set([
+            ...(STATE.data.settings?.deletedSaleIds || []),
+            ...(parsed.settings?.deletedSaleIds || []),
+            ...ignoredSaleIds
+          ]));
+          const combinedDelExp = Array.from(new Set([
+            ...(STATE.data.settings?.deletedExpenseIds || []),
+            ...(parsed.settings?.deletedExpenseIds || [])
+          ]));
+
+          const mergedSales = mergeClientRecords(STATE.data.sales, parsed.sales, combinedDelSales);
+          const mergedExpenses = mergeClientRecords(STATE.data.expenses, parsed.expenses, combinedDelExp);
+
+          const salesChanged = JSON.stringify(mergedSales) !== JSON.stringify(STATE.data.sales || []);
+          const expChanged = JSON.stringify(mergedExpenses) !== JSON.stringify(STATE.data.expenses || []);
+
+          STATE.data.sales = mergedSales;
+          STATE.data.expenses = mergedExpenses;
+          if (parsed.products && parsed.products.length) STATE.data.products = parsed.products;
+          if (parsed.recycleBin) STATE.data.recycleBin = parsed.recycleBin;
+
+          STATE.data.settings = {
+            ...STATE.data.settings,
+            ...(parsed.settings || {}),
+            deletedSaleIds: combinedDelSales,
+            deletedExpenseIds: combinedDelExp
+          };
+          saveLocalState();
+          if (salesChanged || expChanged) {
+            renderApp();
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Direct Upstash pull notice:', err.message);
+  }
+}
+
+async function pushDirectUpstashRedis() {
+  const url = STATE.data.settings?.kvUrl || localStorage.getItem('ab_tools_kv_url') || DEFAULT_CLIENT_KV_URL;
+  const token = STATE.data.settings?.kvToken || localStorage.getItem('ab_tools_kv_token') || DEFAULT_CLIENT_KV_TOKEN;
+  if (!url || !token) return;
+
+  try {
+    await fetch(`${url}/set/ab_tools_db`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(STATE.data)
+    });
+  } catch (err) {
+    console.warn('Direct Upstash push notice:', err.message);
   }
 }
 

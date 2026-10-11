@@ -41,19 +41,36 @@ app.use('/api', (req, res, next) => {
 });
 
 // Cloud KV / Redis Persistent Storage Adapter (Upstash Redis / Vercel KV)
-const KV_REST_API_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const KV_REST_API_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+const DEFAULT_KV_URL = 'https://desired-elephant-221971.upstash.io';
+const DEFAULT_KV_TOKEN = 'gQAAAAAAA2MTAAIgcDFkZTgzY2JmODU0YWE0YjI3OGFiODkyZjMyNzUxMzcyMw';
+
+function getCloudKvCredentials() {
+  const db = memoryDb || {};
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || db?.settings?.kvUrl || DEFAULT_KV_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || db?.settings?.kvToken || DEFAULT_KV_TOKEN;
+  return {
+    url: url ? String(url).trim() : null,
+    token: token ? String(token).trim() : null
+  };
+}
 
 async function syncFromCloudKV() {
-  if (!KV_REST_API_URL || !KV_REST_API_TOKEN) return false;
+  const { url, token } = getCloudKvCredentials();
+  if (!url || !token) return false;
   try {
-    const res = await fetch(`${KV_REST_API_URL}/get/ab_tools_db`, {
-      headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }
+    const res = await fetch(`${url}/get/ab_tools_db`, {
+      headers: { Authorization: `Bearer ${token}` }
     });
     if (res.ok) {
       const data = await res.json();
       if (data && data.result) {
-        const parsed = typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
+        let parsed = data.result;
+        if (typeof parsed === 'string') {
+          try { parsed = JSON.parse(parsed); } catch (_) {}
+        }
+        if (typeof parsed === 'string') {
+          try { parsed = JSON.parse(parsed); } catch (_) {}
+        }
         if (parsed && typeof parsed === 'object') {
           parsed.settings = parsed.settings || {};
           parsed.settings.deletedSaleIds = parsed.settings.deletedSaleIds || [];
@@ -82,15 +99,16 @@ async function syncFromCloudKV() {
 }
 
 async function syncToCloudKV(data) {
-  if (!KV_REST_API_URL || !KV_REST_API_TOKEN) return false;
+  const { url, token } = getCloudKvCredentials();
+  if (!url || !token) return false;
   try {
-    const res = await fetch(`${KV_REST_API_URL}/set/ab_tools_db`, {
+    const res = await fetch(`${url}/set/ab_tools_db`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${KV_REST_API_TOKEN}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(JSON.stringify(data))
+      body: JSON.stringify(data)
     });
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
@@ -106,7 +124,8 @@ async function syncToCloudKV(data) {
 
 // Auto-sync Cloud KV for incoming API calls if configured
 app.use(async (req, res, next) => {
-  if (KV_REST_API_URL && KV_REST_API_TOKEN && req.path.startsWith('/api')) {
+  const { url, token } = getCloudKvCredentials();
+  if (url && token && req.path.startsWith('/api') && !req.path.startsWith('/api/cloud-kv/test')) {
     await syncFromCloudKV();
   }
   next();
@@ -270,7 +289,8 @@ async function writeDb(data) {
   }
 
   // Push to Cloud KV / Redis if configured - AWAIT is required on serverless to prevent freeze
-  if (KV_REST_API_URL && KV_REST_API_TOKEN) {
+  const { url: kvUrl, token: kvToken } = getCloudKvCredentials();
+  if (kvUrl && kvToken) {
     try {
       await syncToCloudKV(data);
     } catch (err) {
@@ -379,12 +399,42 @@ function syncExcelWorkbook(data) {
 // Status / PIN Check
 app.get('/api/status', (req, res) => {
   const db = readDb();
+  const creds = getCloudKvCredentials();
   res.json({
     pinSet: !!db.pin,
     businessName: db.settings?.businessName || 'A&B Tools Business Manager',
     salesCount: (db.sales || []).length,
-    expensesCount: (db.expenses || []).length
+    expensesCount: (db.expenses || []).length,
+    cloudKvConfigured: !!(creds.url && creds.token),
+    cloudKvUrl: creds.url ? (creds.url.slice(0, 18) + '...') : ''
   });
+});
+
+// Test Cloud KV Connection
+app.post('/api/cloud-kv/test', async (req, res) => {
+  try {
+    let { kvUrl, kvToken } = req.body;
+    if (!kvUrl || !kvToken) {
+      const creds = getCloudKvCredentials();
+      kvUrl = kvUrl || creds.url;
+      kvToken = kvToken || creds.token;
+    }
+    if (!kvUrl || !kvToken) {
+      return res.status(400).json({ success: false, error: 'Upstash URL and Token are required' });
+    }
+    const cleanUrl = String(kvUrl).trim();
+    const cleanToken = String(kvToken).trim();
+    const testRes = await fetch(`${cleanUrl}/get/ping`, {
+      headers: { Authorization: `Bearer ${cleanToken}` }
+    });
+    if (testRes.ok) {
+      return res.json({ success: true, message: 'Cloud KV Connected successfully! 🎉' });
+    }
+    const txt = await testRes.text().catch(() => '');
+    return res.status(400).json({ success: false, error: `Connection failed (${testRes.status}): ${txt || testRes.statusText}` });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Connection error: ' + err.message });
+  }
 });
 
 // Setup Initial PIN
@@ -931,7 +981,7 @@ app.post('/api/sync', async (req, res) => {
 // Update Business Settings Directly
 app.post('/api/settings', async (req, res) => {
   try {
-    const { businessName, currency, whatsappTemplate, templateExpiry, templatePending, templateWelcome, templatePaid, defaultPeriod } = req.body;
+    const { businessName, currency, whatsappTemplate, templateExpiry, templatePending, templateWelcome, templatePaid, defaultPeriod, kvUrl, kvToken } = req.body;
     const db = readDb();
     db.settings = db.settings || {};
     if (businessName !== undefined) db.settings.businessName = String(businessName).trim();
@@ -942,6 +992,8 @@ app.post('/api/settings', async (req, res) => {
     if (templateWelcome !== undefined) db.settings.templateWelcome = String(templateWelcome).trim();
     if (templatePaid !== undefined) db.settings.templatePaid = String(templatePaid).trim();
     if (defaultPeriod !== undefined) db.settings.defaultPeriod = String(defaultPeriod).trim();
+    if (kvUrl !== undefined) db.settings.kvUrl = String(kvUrl).trim();
+    if (kvToken !== undefined) db.settings.kvToken = String(kvToken).trim();
     db.settings.lastModified = Date.now();
     await writeDb(db);
     res.json({ success: true, settings: db.settings });
