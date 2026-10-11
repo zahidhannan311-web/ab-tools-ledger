@@ -473,15 +473,73 @@ app.post('/api/auth/setup-pin', async (req, res) => {
   res.json({ success: true, message: 'PIN configured successfully!', pinLength: cleanPin.length });
 });
 
+// Public Profiles for Login Gate (Safe, no PINs exposed)
+app.get('/api/auth/profiles', (req, res) => {
+  const db = readDb();
+  const emps = (db.employees || []).filter(e => e && e.status !== 'frozen').map(e => ({
+    id: e.id,
+    name: e.name,
+    phone: e.phone || '',
+    role: 'employee',
+    commissionRate: Number(e.commissionRate) || 0
+  }));
+  res.json({
+    success: true,
+    profiles: [
+      { id: 'admin', name: 'Admin (Boss)', role: 'admin', phone: '' },
+      ...emps
+    ]
+  });
+});
+
 // Verify PIN (Admin OR Employee)
 app.post('/api/auth/verify-pin', (req, res) => {
-  const { pin } = req.body;
+  const { pin, profileId } = req.body;
   const db = readDb();
   if (!db.pin) {
     return res.status(400).json({ error: 'Please set your PIN first' });
   }
   const cleanPin = String(pin || '').trim();
 
+  // If a profileId was explicitly selected:
+  if (profileId === 'admin') {
+    if (cleanPin === String(db.pin).trim()) {
+      return res.json({
+        success: true,
+        role: 'admin',
+        name: 'Admin',
+        message: 'Welcome back Boss! 👑'
+      });
+    }
+    return res.status(401).json({ error: 'Incorrect Boss PIN! Please try again' });
+  }
+
+  if (profileId && profileId !== 'admin') {
+    const employees = db.employees || [];
+    const emp = employees.find(e => e && e.id === profileId);
+    if (!emp) {
+      return res.status(404).json({ error: 'Staff account not found' });
+    }
+    if (emp.status === 'frozen') {
+      return res.status(403).json({ error: 'Account is temporarily frozen by Admin. Contact Boss.' });
+    }
+    if (String(emp.pin).trim() === cleanPin) {
+      return res.json({
+        success: true,
+        role: 'employee',
+        employee: {
+          id: emp.id,
+          name: emp.name,
+          commissionRate: Number(emp.commissionRate) || 0,
+          phone: emp.phone || ''
+        },
+        message: `Welcome back, ${emp.name}! 🚀`
+      });
+    }
+    return res.status(401).json({ error: `Incorrect PIN for ${emp.name}! Please try again` });
+  }
+
+  // Fallback if no profileId specified (Direct PIN unlock)
   // 1. Check Master Admin PIN
   if (cleanPin === String(db.pin).trim()) {
     return res.json({

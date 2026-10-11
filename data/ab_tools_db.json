@@ -3194,7 +3194,7 @@
     "businessName": "Monkey Tools",
     "currency": "Rs.",
     "lastExcelExport": null,
-    "lastModified": 1791760718547,
+    "lastModified": 1791761809140,
     "deletedSaleIds": [
       "sale_1790808573942_ktuq",
       "sale_1790841889749",
@@ -3243,6 +3243,25 @@
       "deletedAt": "2026-10-05T13:31:25.147Z"
     }
   ],
-  "pin": "078666",
-  "employees": []
+  "employees": [
+    {
+      "id": "emp_1791761609185_p5ry",
+      "name": "M.Ali",
+      "pin": "0000",
+      "commissionRate": 20,
+      "phone": "03481503418",
+      "status": "active",
+      "createdAt": "2026-10-11T23:33:29.185Z"
+    },
+    {
+      "id": "emp_ahmed_1791762277928",
+      "name": "Ahmed",
+      "pin": "0000",
+      "commissionRate": 15,
+      "phone": "03001234567",
+      "status": "active",
+      "createdAt": "2026-10-11T23:44:37.929Z"
+    }
+  ],
+  "pin": "078666"
 }

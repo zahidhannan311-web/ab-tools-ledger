@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.1">
+  <link rel="stylesheet" href="style.css?v=3.2">
 </head>
 <body>
 
@@ -73,42 +73,78 @@
 
       <!-- PIN Unlock State (Existing Users) -->
       <div id="pinUnlockContainer" class="pin-state-section">
-        <div class="pin-prompt-box">
-          <span class="security-tag">🔒 Private Business Ledger</span>
-          <h2 class="pin-heading">Enter Your Security PIN</h2>
-          <p class="pin-desc">Enter your 4 to 6 digit PIN to access your financial records.</p>
+
+        <!-- Step 1: Profile Selection Screen (Admin, Ali, Ahmed, etc.) -->
+        <div id="loginProfileSelectSection">
+          <div class="pin-prompt-box">
+            <span class="security-tag">👥 Select Account / Portal</span>
+            <h2 class="pin-heading">Who is Logging In?</h2>
+            <p class="pin-desc">Click your name below to enter your private dashboard.</p>
+          </div>
+
+          <!-- Search Bar for Name / Phone -->
+          <div class="login-search-box mb-3">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="search" id="loginProfileSearchInput" class="login-search-input" placeholder="Search name or number (e.g. Ali, Ahmed, 0300...)" autocomplete="off">
+            <button type="button" id="btnClearProfileSearch" class="btn-clear-search" style="display:none;">&times;</button>
+          </div>
+
+          <!-- Grid of Profile Cards -->
+          <div id="loginProfilesGrid" class="login-profiles-grid">
+            <!-- Dynamically populated: Admin, Ali, Ahmed, etc. -->
+          </div>
         </div>
 
-        <div class="pin-dots-display" id="pinDotsDisplay">
-          <span class="pin-dot"></span>
-          <span class="pin-dot"></span>
-          <span class="pin-dot"></span>
-          <span class="pin-dot"></span>
+        <!-- Step 2: PIN Pad for Selected Profile -->
+        <div id="loginPinPadSection" style="display: none;">
+          <div class="profile-selected-bar mb-3">
+            <button type="button" class="btn-back-profile" id="btnBackToProfiles">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              <span>Change User</span>
+            </button>
+            <div class="selected-profile-pill" id="selectedProfilePill">
+              <span id="selectedProfileAvatar">👑</span>
+              <strong id="selectedProfileName">Admin</strong>
+            </div>
+          </div>
+
+          <div class="pin-prompt-box">
+            <h2 class="pin-heading" id="loginPinPromptHeading">Enter Security PIN</h2>
+            <p class="pin-desc" id="loginPinPromptDesc">Enter your 4 to 6 digit security PIN.</p>
+          </div>
+
+          <div class="pin-dots-display" id="pinDotsDisplay">
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+            <span class="pin-dot"></span>
+          </div>
+
+          <input type="password" id="unlockPinInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" class="hidden-pin-input" autofocus autocomplete="off">
+
+          <!-- Mobile Touch Numpad -->
+          <div class="numpad-grid">
+            <button class="numpad-btn" data-key="1">1</button>
+            <button class="numpad-btn" data-key="2">2</button>
+            <button class="numpad-btn" data-key="3">3</button>
+            <button class="numpad-btn" data-key="4">4</button>
+            <button class="numpad-btn" data-key="5">5</button>
+            <button class="numpad-btn" data-key="6">6</button>
+            <button class="numpad-btn" data-key="7">7</button>
+            <button class="numpad-btn" data-key="8">8</button>
+            <button class="numpad-btn" data-key="9">9</button>
+            <button class="numpad-btn key-action" id="btnClearPin">C</button>
+            <button class="numpad-btn" data-key="0">0</button>
+            <button class="numpad-btn key-action" id="btnBackspacePin">⌫</button>
+          </div>
+
+          <div id="pinUnlockError" class="pin-error-msg"></div>
+
+          <button id="btnUnlockSubmit" class="btn btn-gold btn-block mt-3">
+            <span>Unlock Dashboard</span>
+          </button>
         </div>
 
-        <input type="password" id="unlockPinInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" class="hidden-pin-input" autofocus autocomplete="off">
-
-        <!-- Mobile Touch Numpad -->
-        <div class="numpad-grid">
-          <button class="numpad-btn" data-key="1">1</button>
-          <button class="numpad-btn" data-key="2">2</button>
-          <button class="numpad-btn" data-key="3">3</button>
-          <button class="numpad-btn" data-key="4">4</button>
-          <button class="numpad-btn" data-key="5">5</button>
-          <button class="numpad-btn" data-key="6">6</button>
-          <button class="numpad-btn" data-key="7">7</button>
-          <button class="numpad-btn" data-key="8">8</button>
-          <button class="numpad-btn" data-key="9">9</button>
-          <button class="numpad-btn key-action" id="btnClearPin">C</button>
-          <button class="numpad-btn" data-key="0">0</button>
-          <button class="numpad-btn key-action" id="btnBackspacePin">⌫</button>
-        </div>
-
-        <div id="pinUnlockError" class="pin-error-msg"></div>
-
-        <button id="btnUnlockSubmit" class="btn btn-gold btn-block mt-3">
-          <span>Unlock Dashboard</span>
-        </button>
       </div>
     </div>
   </div>
@@ -1265,6 +1301,6 @@
   <!-- Notification Toast -->
   <div id="toastNotification" class="toast"></div>
 
-  <script src="app.js?v=2.4"></script>
+  <script src="app.js?v=2.5"></script>
 </body>
 </html>

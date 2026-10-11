@@ -11,6 +11,8 @@ const STATE = {
   currentPeriod: 'today', // today, yesterday, week, month, all, custom
   customSelectedDate: '',
   currentView: 'salesView',
+  selectedLoginProfile: null,
+  loginProfiles: [],
   currentUser: {
     role: 'admin',
     name: 'Admin',
@@ -161,6 +163,7 @@ function showPinGate() {
 
   pinGate.classList.add('active');
   STATE.enteredPin = '';
+  STATE.selectedLoginProfile = null;
   renderPinDots();
   updatePinDots();
 
@@ -170,8 +173,147 @@ function showPinGate() {
   } else {
     setupBox.style.display = 'none';
     unlockBox.style.display = 'block';
+
+    const profileSelectSec = document.getElementById('loginProfileSelectSection');
+    const pinPadSec = document.getElementById('loginPinPadSection');
+    if (profileSelectSec) profileSelectSec.style.display = 'block';
+    if (pinPadSec) pinPadSec.style.display = 'none';
+
+    const searchInput = document.getElementById('loginProfileSearchInput');
+    if (searchInput) searchInput.value = '';
+
+    loadLoginProfiles();
   }
 }
+
+async function loadLoginProfiles() {
+  // First load from cached state immediately for 0ms render
+  let profiles = [
+    { id: 'admin', name: 'Admin (Boss)', role: 'admin', phone: '' }
+  ];
+
+  if (STATE.data.employees && STATE.data.employees.length > 0) {
+    STATE.data.employees.forEach(emp => {
+      if (emp && emp.status !== 'frozen') {
+        profiles.push({
+          id: emp.id,
+          name: emp.name,
+          phone: emp.phone || '',
+          role: 'employee',
+          commissionRate: emp.commissionRate || 0
+        });
+      }
+    });
+  }
+
+  STATE.loginProfiles = profiles;
+  renderLoginProfiles();
+
+  // Background fetch fresh profiles from server
+  try {
+    const res = await fetch('/api/auth/profiles');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.profiles) && data.profiles.length > 0) {
+        STATE.loginProfiles = data.profiles;
+        renderLoginProfiles(document.getElementById('loginProfileSearchInput')?.value || '');
+      }
+    }
+  } catch (err) {
+    console.warn('Profile fetch background notice:', err.message);
+  }
+}
+
+function renderLoginProfiles(filterQuery = '') {
+  const container = document.getElementById('loginProfilesGrid');
+  if (!container) return;
+
+  const q = String(filterQuery || '').trim().toLowerCase();
+  const profiles = (STATE.loginProfiles || []).filter(p => {
+    if (!q) return true;
+    const nameMatch = (p.name || '').toLowerCase().includes(q);
+    const phoneMatch = (p.phone || '').includes(q);
+    return nameMatch || phoneMatch;
+  });
+
+  if (profiles.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 25px 10px; color: var(--text-muted); font-size: 13px;">
+        🔍 Koi staff member ya account nahi mila ("${escapeHtml(filterQuery)}")
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = profiles.map(p => {
+    const isAdmin = p.role === 'admin';
+    const initial = isAdmin ? '👑' : (p.name || 'E').charAt(0).toUpperCase();
+    const roleBadge = isAdmin ? '👑 Boss Admin' : `👤 Staff (${p.commissionRate || 0}% Comm)`;
+
+    return `
+      <div class="login-profile-card ${isAdmin ? 'card-admin' : 'card-employee'}" onclick="selectLoginProfile('${escapeHtml(p.id)}')">
+        <div class="login-profile-avatar">${initial}</div>
+        <div class="login-profile-info">
+          <div class="login-profile-name">${escapeHtml(p.name)}</div>
+          <div class="login-profile-role">${roleBadge}</div>
+          ${p.phone ? `<div class="login-profile-phone">📱 ${escapeHtml(p.phone)}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function selectLoginProfile(profileId) {
+  const profile = (STATE.loginProfiles || []).find(p => p.id === profileId);
+  if (!profile) return;
+
+  STATE.selectedLoginProfile = profile;
+  STATE.enteredPin = '';
+  updatePinDots();
+
+  const profileSelectSec = document.getElementById('loginProfileSelectSection');
+  const pinPadSec = document.getElementById('loginPinPadSection');
+
+  if (profileSelectSec) profileSelectSec.style.display = 'none';
+  if (pinPadSec) pinPadSec.style.display = 'block';
+
+  const avatarEl = document.getElementById('selectedProfileAvatar');
+  const nameEl = document.getElementById('selectedProfileName');
+  const headingEl = document.getElementById('loginPinPromptHeading');
+  const descEl = document.getElementById('loginPinPromptDesc');
+  const errEl = document.getElementById('pinUnlockError');
+
+  if (errEl) errEl.textContent = '';
+  if (avatarEl) avatarEl.textContent = profile.role === 'admin' ? '👑' : '👤';
+  if (nameEl) nameEl.textContent = profile.name;
+  if (headingEl) headingEl.textContent = `${profile.name} PIN`;
+  if (descEl) descEl.textContent = `Enter 4 to 6 digit security PIN for ${profile.name}.`;
+
+  const inputEl = document.getElementById('unlockPinInput');
+  if (inputEl) {
+    inputEl.value = '';
+    setTimeout(() => inputEl.focus(), 100);
+  }
+}
+
+function backToProfileSelect() {
+  STATE.selectedLoginProfile = null;
+  STATE.enteredPin = '';
+  updatePinDots();
+
+  const profileSelectSec = document.getElementById('loginProfileSelectSection');
+  const pinPadSec = document.getElementById('loginPinPadSection');
+
+  if (profileSelectSec) profileSelectSec.style.display = 'block';
+  if (pinPadSec) pinPadSec.style.display = 'none';
+
+  const errEl = document.getElementById('pinUnlockError');
+  if (errEl) errEl.textContent = '';
+}
+
+// Global exposure for onclick handlers
+window.selectLoginProfile = selectLoginProfile;
+window.backToProfileSelect = backToProfileSelect;
 
 // ==================== TOUCH NUMPAD & PIN SYSTEM (4 TO 6 DIGITS) ====================
 function renderPinDots() {
@@ -244,6 +386,12 @@ function setupTouchNumpad() {
   // Keyboard navigation support
   window.addEventListener('keydown', (e) => {
     if (!STATE.unlocked && STATE.pinSet) {
+      // Do not capture digits if still on profile selection screen
+      if (!STATE.selectedLoginProfile) return;
+      // Do not capture if user is typing in another input/textarea
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        if (e.target.id !== 'unlockPinInput') return;
+      }
       if (e.key >= '0' && e.key <= '9') {
         onPinDigitInput(e.key);
       } else if (e.key === 'Backspace') {
@@ -266,12 +414,17 @@ async function handleUnlockSubmit() {
     return;
   }
 
+  const payload = { pin: STATE.enteredPin };
+  if (STATE.selectedLoginProfile && STATE.selectedLoginProfile.id) {
+    payload.profileId = STATE.selectedLoginProfile.id;
+  }
+
   // Always verify PIN directly with server so PIN changes on other devices sync immediately
   try {
     const res = await fetch('/api/auth/verify-pin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin: STATE.enteredPin })
+      body: JSON.stringify(payload)
     });
     const result = await res.json();
 
@@ -314,7 +467,11 @@ async function handleUnlockSubmit() {
     const localPin = localStorage.getItem('ab_tools_pin');
     if (localPin && STATE.enteredPin === localPin) {
       STATE.unlocked = true;
-      STATE.currentUser = { role: 'admin', name: 'Admin', id: 'admin', commissionRate: 0 };
+      if (STATE.selectedLoginProfile && STATE.selectedLoginProfile.role === 'employee') {
+        STATE.currentUser = { ...STATE.selectedLoginProfile };
+      } else {
+        STATE.currentUser = { role: 'admin', name: 'Admin', id: 'admin', commissionRate: 0 };
+      }
       sessionStorage.setItem('ab_tools_user', JSON.stringify(STATE.currentUser));
       sessionStorage.setItem('ab_tools_unlocked', 'true');
       updateUserHeaderBadge();
@@ -1824,9 +1981,40 @@ function setupEventListeners() {
     showPinGate();
   });
 
-  // PIN Setup Form
   document.getElementById('btnSavePin')?.addEventListener('click', handlePinSetup);
   document.getElementById('btnUnlockSubmit')?.addEventListener('click', handleUnlockSubmit);
+
+  // Login Profile Search & Navigation
+  const profileSearchInput = document.getElementById('loginProfileSearchInput');
+  const btnClearProfileSearch = document.getElementById('btnClearProfileSearch');
+  const btnBackProfile = document.getElementById('btnBackToProfiles');
+
+  profileSearchInput?.addEventListener('input', (e) => {
+    const val = e.target.value;
+    if (btnClearProfileSearch) {
+      btnClearProfileSearch.style.display = val ? 'inline-block' : 'none';
+    }
+    renderLoginProfiles(val);
+  });
+
+  profileSearchInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const firstCard = document.querySelector('.login-profile-card');
+      if (firstCard) firstCard.click();
+    }
+  });
+
+  btnClearProfileSearch?.addEventListener('click', () => {
+    if (profileSearchInput) {
+      profileSearchInput.value = '';
+      profileSearchInput.focus();
+    }
+    if (btnClearProfileSearch) btnClearProfileSearch.style.display = 'none';
+    renderLoginProfiles('');
+  });
+
+  btnBackProfile?.addEventListener('click', backToProfileSelect);
 
   // Change PIN Form
   document.getElementById('changePinForm')?.addEventListener('submit', handleChangePin);
