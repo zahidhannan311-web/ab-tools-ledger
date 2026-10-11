@@ -199,8 +199,7 @@ async function loadLoginProfiles() {
           id: emp.id,
           name: emp.name,
           phone: emp.phone || '',
-          role: 'employee',
-          commissionRate: emp.commissionRate || 0
+          role: 'employee'
         });
       }
     });
@@ -248,7 +247,7 @@ function renderLoginProfiles(filterQuery = '') {
   container.innerHTML = profiles.map(p => {
     const isAdmin = p.role === 'admin';
     const initial = isAdmin ? '👑' : (p.name || 'E').charAt(0).toUpperCase();
-    const roleBadge = isAdmin ? '👑 Boss Admin' : `👤 Staff (${p.commissionRate || 0}% Comm)`;
+    const roleBadge = isAdmin ? '👑 Boss Portal' : '👤 Staff Member';
 
     return `
       <div class="login-profile-card ${isAdmin ? 'card-admin' : 'card-employee'}" onclick="selectLoginProfile('${escapeHtml(p.id)}')">

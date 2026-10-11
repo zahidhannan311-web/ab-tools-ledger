@@ -480,8 +480,7 @@ app.get('/api/auth/profiles', (req, res) => {
     id: e.id,
     name: e.name,
     phone: e.phone || '',
-    role: 'employee',
-    commissionRate: Number(e.commissionRate) || 0
+    role: 'employee'
   }));
   res.json({
     success: true,
