@@ -223,6 +223,7 @@ function getInitialDb() {
     products: DEFAULT_PRODUCTS,
     sales: [],
     expenses: [],
+    employees: [],
     settings: {
       businessName: 'Monkey Tools',
       currency: 'Rs.',
@@ -241,6 +242,7 @@ function readDb() {
     if (memoryDb.settings) {
       memoryDb.settings.businessName = sanitizeBusinessName(memoryDb.settings.businessName);
     }
+    memoryDb.employees = memoryDb.employees || [];
     return memoryDb;
   }
   try {
@@ -257,6 +259,7 @@ function readDb() {
       if (!parsed.products || parsed.products.length === 0) {
         parsed.products = DEFAULT_PRODUCTS;
       }
+      parsed.employees = parsed.employees || [];
       parsed.settings = parsed.settings || {};
       parsed.settings.businessName = sanitizeBusinessName(parsed.settings.businessName);
       parsed.settings.deletedSaleIds = parsed.settings.deletedSaleIds || [];
@@ -282,6 +285,7 @@ function readDb() {
 
   memoryDb = getInitialDb();
   memoryDb.recycleBin = memoryDb.recycleBin || [];
+  memoryDb.employees = memoryDb.employees || [];
   return memoryDb;
 }
 
@@ -292,6 +296,7 @@ async function writeDb(data) {
   data.settings.deletedSaleIds = data.settings.deletedSaleIds || [];
   data.settings.deletedExpenseIds = data.settings.deletedExpenseIds || [];
   data.recycleBin = data.recycleBin || [];
+  data.employees = data.employees || [];
   memoryDb = data;
   try {
     if (!fs.existsSync(WRITABLE_DATA_DIR)) {
@@ -468,7 +473,7 @@ app.post('/api/auth/setup-pin', async (req, res) => {
   res.json({ success: true, message: 'PIN configured successfully!', pinLength: cleanPin.length });
 });
 
-// Verify PIN
+// Verify PIN (Admin OR Employee)
 app.post('/api/auth/verify-pin', (req, res) => {
   const { pin } = req.body;
   const db = readDb();
@@ -476,13 +481,41 @@ app.post('/api/auth/verify-pin', (req, res) => {
     return res.status(400).json({ error: 'Please set your PIN first' });
   }
   const cleanPin = String(pin || '').trim();
+
+  // 1. Check Master Admin PIN
   if (cleanPin === String(db.pin).trim()) {
-    return res.json({ success: true, message: 'Welcome back' });
+    return res.json({
+      success: true,
+      role: 'admin',
+      name: 'Admin',
+      message: 'Welcome back Boss! 👑'
+    });
   }
+
+  // 2. Check Employee PIN
+  const employees = db.employees || [];
+  const emp = employees.find(e => e && String(e.pin).trim() === cleanPin);
+  if (emp) {
+    if (emp.status === 'frozen') {
+      return res.status(403).json({ error: 'Account is temporarily frozen by Admin. Contact Boss.' });
+    }
+    return res.json({
+      success: true,
+      role: 'employee',
+      employee: {
+        id: emp.id,
+        name: emp.name,
+        commissionRate: Number(emp.commissionRate) || 0,
+        phone: emp.phone || ''
+      },
+      message: `Welcome back, ${emp.name}! 🚀`
+    });
+  }
+
   return res.status(401).json({ error: 'Incorrect PIN! Please try again' });
 });
 
-// Change PIN
+// Change PIN (Master Admin)
 app.post('/api/auth/change-pin', async (req, res) => {
   const { oldPin, newPin } = req.body;
   const db = readDb();
@@ -515,8 +548,109 @@ app.get('/api/data', (req, res) => {
     expenses: db.expenses || [],
     products: db.products || DEFAULT_PRODUCTS,
     recycleBin: db.recycleBin || [],
+    employees: db.employees || [],
     settings: db.settings || {}
   });
+});
+
+// ======================== EMPLOYEES MANAGEMENT ========================
+
+// List Employees
+app.get('/api/employees', (req, res) => {
+  const db = readDb();
+  res.json({
+    success: true,
+    employees: db.employees || []
+  });
+});
+
+// Add Employee
+app.post('/api/employees', async (req, res) => {
+  const { name, pin, commissionRate, phone } = req.body;
+  const cleanName = String(name || '').trim();
+  const cleanPin = String(pin || '').trim();
+  const rate = Math.max(0, Math.min(100, Number(commissionRate) || 0));
+
+  if (!cleanName) {
+    return res.status(400).json({ error: 'Employee name is required' });
+  }
+  if (!cleanPin || cleanPin.length < 4 || cleanPin.length > 6 || !/^\d{4,6}$/.test(cleanPin)) {
+    return res.status(400).json({ error: 'PIN must be between 4 and 6 numeric digits' });
+  }
+
+  const db = readDb();
+  db.employees = db.employees || [];
+
+  if (cleanPin === String(db.pin).trim()) {
+    return res.status(400).json({ error: 'PIN matches Master Boss PIN! Please choose a unique PIN.' });
+  }
+  if (db.employees.some(e => e && String(e.pin).trim() === cleanPin)) {
+    return res.status(400).json({ error: 'This PIN is already assigned to another employee.' });
+  }
+
+  const newEmp = {
+    id: 'emp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    name: cleanName,
+    pin: cleanPin,
+    commissionRate: rate,
+    phone: String(phone || '').trim(),
+    status: 'active',
+    createdAt: new Date().toISOString()
+  };
+
+  db.employees.unshift(newEmp);
+  await writeDb(db);
+  res.status(201).json({ success: true, employee: newEmp });
+});
+
+// Update Employee (Edit PIN, Commission %, Phone, or Freeze/Activate)
+app.put('/api/employees/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, pin, commissionRate, phone, status } = req.body;
+  const db = readDb();
+  db.employees = db.employees || [];
+
+  const index = db.employees.findIndex(e => e && e.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Employee not found' });
+  }
+
+  const existing = db.employees[index];
+  if (name !== undefined && String(name).trim()) existing.name = String(name).trim();
+  if (phone !== undefined) existing.phone = String(phone).trim();
+  if (commissionRate !== undefined) existing.commissionRate = Math.max(0, Math.min(100, Number(commissionRate) || 0));
+  if (status !== undefined) existing.status = status === 'frozen' ? 'frozen' : 'active';
+
+  if (pin !== undefined && String(pin).trim()) {
+    const cleanPin = String(pin).trim();
+    if (cleanPin.length < 4 || cleanPin.length > 6 || !/^\d{4,6}$/.test(cleanPin)) {
+      return res.status(400).json({ error: 'PIN must be between 4 and 6 numeric digits' });
+    }
+    if (cleanPin === String(db.pin).trim()) {
+      return res.status(400).json({ error: 'Cannot assign Master Boss PIN to an employee' });
+    }
+    const duplicate = db.employees.some(e => e && e.id !== id && String(e.pin).trim() === cleanPin);
+    if (duplicate) {
+      return res.status(400).json({ error: 'This PIN is already assigned to another employee' });
+    }
+    existing.pin = cleanPin;
+  }
+
+  existing.updatedAt = new Date().toISOString();
+  db.employees[index] = existing;
+
+  await writeDb(db);
+  res.json({ success: true, employee: existing });
+});
+
+// Delete Employee
+app.delete('/api/employees/:id', async (req, res) => {
+  const { id } = req.params;
+  const db = readDb();
+  db.employees = db.employees || [];
+  db.employees = db.employees.filter(e => e && e.id !== id);
+  await writeDb(db);
+  res.json({ success: true, message: 'Employee removed successfully' });
 });
 
 // ======================== SALES ========================
@@ -564,6 +698,10 @@ app.post('/api/sales', async (req, res) => {
     planLabel: planLabel || `${months} Month(s)`,
     amount: Number(amount) || 0,
     paymentStatus: paymentStatus || 'Pending', // Paid, Pending, Unpaid
+    soldBy: req.body.soldBy ? String(req.body.soldBy).trim() : 'Admin',
+    employeeId: req.body.employeeId ? String(req.body.employeeId).trim() : 'admin',
+    paymentProof: req.body.paymentProof || null,
+    paymentReceivedIn: req.body.paymentReceivedIn || 'Boss Account',
     expiryDate,
     notes: notes ? notes.trim() : '',
     createdAt: createdAt || new Date().toISOString(),
@@ -604,6 +742,10 @@ app.put('/api/sales/:id', async (req, res) => {
     date: saleDate,
     planMonths: months,
     amount: Number(updatedData.amount !== undefined ? updatedData.amount : existing.amount),
+    soldBy: updatedData.soldBy !== undefined ? String(updatedData.soldBy).trim() : (existing.soldBy || 'Admin'),
+    employeeId: updatedData.employeeId !== undefined ? String(updatedData.employeeId).trim() : (existing.employeeId || 'admin'),
+    paymentProof: updatedData.paymentProof !== undefined ? updatedData.paymentProof : existing.paymentProof,
+    paymentReceivedIn: updatedData.paymentReceivedIn !== undefined ? updatedData.paymentReceivedIn : existing.paymentReceivedIn,
     expiryDate,
     updatedAt: new Date().toISOString()
   };
@@ -615,7 +757,7 @@ app.put('/api/sales/:id', async (req, res) => {
 // Quick Update Payment Status
 app.patch('/api/sales/:id/status', async (req, res) => {
   const { id } = req.params;
-  const { paymentStatus } = req.body;
+  const { paymentStatus, paymentProof, paymentReceivedIn } = req.body;
   if (!['Paid', 'Pending', 'Unpaid'].includes(paymentStatus)) {
     return res.status(400).json({ error: 'Status must be Paid, Pending, or Unpaid' });
   }
@@ -627,14 +769,17 @@ app.patch('/api/sales/:id/status', async (req, res) => {
   }
 
   sale.paymentStatus = paymentStatus;
+  if (paymentProof !== undefined) sale.paymentProof = paymentProof;
+  if (paymentReceivedIn !== undefined) sale.paymentReceivedIn = paymentReceivedIn;
   sale.updatedAt = new Date().toISOString();
   await writeDb(db);
   res.json({ success: true, sale });
 });
 
-// Delete Sale (Moves to Recycle Bin)
+// Delete Sale (Moves to Recycle Bin with Mandatory Reason)
 app.delete('/api/sales/:id', async (req, res) => {
   const { id } = req.params;
+  const { reason, deletedBy } = req.body || {};
   const db = readDb();
   const sale = db.sales.find(s => s.id === id);
 
@@ -644,12 +789,21 @@ app.delete('/api/sales/:id', async (req, res) => {
 
   db.sales = db.sales.filter(s => s.id !== id);
 
+  const deleteReason = String(reason || 'No reason specified').trim();
+  const deleterName = String(deletedBy || sale.soldBy || 'Admin').trim();
+
   db.recycleBin = db.recycleBin || [];
   db.recycleBin.unshift({
     id: 'trash_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     originalId: id,
     type: 'sale',
-    item: sale,
+    item: {
+      ...sale,
+      deleteReason,
+      deletedBy: deleterName
+    },
+    deleteReason,
+    deletedBy: deleterName,
     deletedAt: new Date().toISOString()
   });
   if (db.recycleBin.length > 200) db.recycleBin.pop();
@@ -931,6 +1085,7 @@ app.post('/api/sync', async (req, res) => {
       sales: incomingSales,
       expenses: incomingExpenses,
       products: incomingProducts,
+      employees: incomingEmployees,
       settings: incomingSettings,
       recycleBin: incomingRecycleBin,
       pin: incomingPin
@@ -972,6 +1127,29 @@ app.post('/api/sync', async (req, res) => {
       db.products = Array.from(prodMap.values());
     }
 
+    if (Array.isArray(incomingEmployees)) {
+      // Non-destructive employee merge
+      const empMap = new Map();
+      (db.employees || []).forEach(e => {
+        if (e && e.id) empMap.set(e.id, e);
+      });
+      incomingEmployees.forEach(e => {
+        if (e && e.id) {
+          if (!empMap.has(e.id)) {
+            empMap.set(e.id, e);
+          } else {
+            const existing = empMap.get(e.id);
+            const inTime = new Date(e.updatedAt || e.createdAt || 0).getTime();
+            const exTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+            if (inTime >= exTime) {
+              empMap.set(e.id, e);
+            }
+          }
+        }
+      });
+      db.employees = Array.from(empMap.values());
+    }
+
     if (Array.isArray(incomingRecycleBin)) {
       db.recycleBin = incomingRecycleBin;
     }
@@ -995,6 +1173,7 @@ app.post('/api/sync', async (req, res) => {
       sales: db.sales || [],
       expenses: db.expenses || [],
       products: db.products || DEFAULT_PRODUCTS,
+      employees: db.employees || [],
       recycleBin: db.recycleBin || [],
       settings: db.settings,
       pin: db.pin,
@@ -1051,6 +1230,9 @@ app.post('/api/backup/restore', async (req, res) => {
   db.expenses = mergeRecordLists(db.expenses, backupData.expenses, deletedExpenses);
   if (backupData.products && backupData.products.length) {
     db.products = backupData.products;
+  }
+  if (Array.isArray(backupData.employees)) {
+    db.employees = backupData.employees;
   }
   // Only set PIN on restore if the system has no PIN configured yet
   if (backupData.pin && !db.pin) {

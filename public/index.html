@@ -161,6 +161,20 @@
             <span id="recycleBinBadge" class="badge-trash-count" style="display:none;">0</span>
           </button>
 
+          <!-- Current User Role Badge & Switch/Logout -->
+          <div id="currentUserBadge" class="badge-role-pill" title="Logged In Role">
+            <span class="user-role-dot"></span>
+            <span id="currentUserRoleText">👑 Admin</span>
+          </div>
+
+          <button id="btnSwitchUser" class="icon-btn btn-switch" title="Switch User / Logout" aria-label="Switch User">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+
           <button id="btnLockApp" class="icon-btn btn-lock" title="Lock App" aria-label="Lock App">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -257,7 +271,19 @@
           <div class="stat-meta"><span id="kpiExpenseCount">0</span> expenses recorded</div>
         </div>
 
-        <!-- Profit Card -->
+        <!-- Employee Daily Commission Card (Shown only in Employee Portal) -->
+        <div class="stat-card stat-commission" id="employeeCommissionCard" style="display: none;">
+          <div class="stat-header">
+            <span class="stat-label">Daily Commission (<span id="empCommissionRateLabel">0%</span>)</span>
+            <div class="stat-icon-wrap icon-gold">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><line x1="12" y1="18" x2="12" y2="20"></line><line x1="12" y1="4" x2="12" y2="6"></line></svg>
+            </div>
+          </div>
+          <div class="stat-value text-gold"><span class="currency">Rs.</span> <span id="kpiEmployeeCommission">0</span></div>
+          <div class="stat-meta">My Sales Today: Rs. <span id="kpiEmployeeSalesToday">0</span></div>
+        </div>
+
+        <!-- Profit Card (Boss Only) -->
         <div class="stat-card stat-profit" id="kpiProfitCard">
           <div class="stat-header">
             <span class="stat-label">Net Profit</span>
@@ -309,6 +335,9 @@
             <p class="view-subtitle">All sales transactions, customer phones, and assigned accounts</p>
           </div>
           <div class="view-filters">
+            <select id="salesFilterStaff" class="custom-select select-sm">
+              <option value="ALL">👥 All Staff</option>
+            </select>
             <select id="salesFilterProduct" class="custom-select select-sm">
               <option value="ALL">All Products</option>
             </select>
@@ -415,6 +444,22 @@
 
         <!-- Admin Cards Grid -->
         <div class="admin-grid">
+
+          <!-- 0. Staff & Employee Management (Instant Creation & Daily Commission) -->
+          <div class="admin-card" id="adminEmployeesCard">
+            <div class="admin-card-header">
+              <div class="admin-card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                <span>👥 Staff &amp; Employee Management</span>
+              </div>
+              <button id="btnOpenNewEmployeeModal" class="btn btn-gold btn-xs">+ Add New Staff</button>
+            </div>
+            <p class="admin-card-desc">Create employee accounts with 4-6 digit login PINs and daily profit/sales commission rates (%). Each employee gets a fresh dedicated portal immediately.</p>
+
+            <div id="adminEmployeesList" class="admin-catalog-list">
+              <!-- Render employee cards with PIN, Commission %, status, edit & delete -->
+            </div>
+          </div>
 
           <!-- 1. Product Catalog & Prices Management -->
           <div class="admin-card">
@@ -801,6 +846,37 @@
           </div>
         </div>
 
+        <!-- Payment Proof Screenshot & Receiving Account -->
+        <div class="form-group" id="salePaymentProofGroup">
+          <div class="label-with-actions">
+            <label>Payment Proof Screenshot <span id="proofRequiredBadge" class="badge-req" style="display:none;">Mandatory for Paid</span></label>
+            <span class="text-muted" style="font-size: 11px;">(Receipt / TID Slip)</span>
+          </div>
+          <div class="proof-upload-box">
+            <input type="file" id="saleProofFileInput" accept="image/*" class="form-control" style="font-size: 12px;">
+            <input type="hidden" id="saleProofBase64" value="">
+            <div id="saleProofPreviewWrap" class="proof-preview-wrap" style="display: none;">
+              <img id="saleProofPreviewImg" src="" alt="Proof Preview" class="proof-thumbnail">
+              <div class="proof-preview-meta">
+                <span class="text-green font-bold">✓ Screenshot Attached</span>
+                <button type="button" id="btnRemoveProof" class="btn-xs btn-outline text-rose">Remove</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group" id="salePaymentAccountGroup">
+          <label for="salePaymentReceivedInSelect">Payment Received In Account <span class="text-gold">*</span></label>
+          <select id="salePaymentReceivedInSelect" class="form-control">
+            <option value="Boss JazzCash">Boss JazzCash</option>
+            <option value="Boss EasyPaisa">Boss EasyPaisa</option>
+            <option value="Boss Bank Alfalah">Boss Bank Alfalah</option>
+            <option value="Boss Meezan Bank">Boss Meezan Bank</option>
+            <option value="Boss HBL">Boss HBL</option>
+            <option value="Other / Cash">Other / Cash</option>
+          </select>
+        </div>
+
         <!-- Notes (Optional) -->
         <div class="form-group">
           <label for="saleNotesInput">Notes <span class="text-muted">(Optional)</span></label>
@@ -1003,6 +1079,183 @@
       <div id="recycleBinListContainer" class="search-results-container" style="max-height: 60vh; overflow-y: auto;">
         <!-- Deleted items dynamically injected here -->
       </div>
+  <!-- ==================== MODAL: DELETE SALE WITH MANDATORY REASON ==================== -->
+  <div id="deleteSaleReasonModal" class="modal-overlay">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <div class="flex items-center gap-2">
+          <div class="modal-icon-badge" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.35); color: #f87171;">
+            ⚠️
+          </div>
+          <div>
+            <h3 class="modal-title">Delete Sale Record</h3>
+            <p class="modal-subtitle">Reason is required &amp; saved in Admin Recycle Bin</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" data-close-modal="deleteSaleReasonModal">&times;</button>
+      </div>
+
+      <form id="deleteSaleReasonForm" class="modal-form">
+        <input type="hidden" id="deleteSaleTargetId" value="">
+        <div id="deleteSaleTargetSummary" class="delete-summary-box mb-3">
+          <!-- Sale summary injected here -->
+        </div>
+
+        <div class="form-group">
+          <label for="deleteSaleReasonInput">Reason for Deletion <span class="badge-req">Mandatory</span></label>
+          <textarea id="deleteSaleReasonInput" rows="3" class="form-control" placeholder="e.g. Customer cancelled order / Wrong customer phone / Duplicate entry" required></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" data-close-modal="deleteSaleReasonModal">Cancel</button>
+          <button type="submit" id="btnConfirmDeleteSale" class="btn btn-subtle text-rose flex-1" style="border-color: rgba(239, 68, 68, 0.4);">
+            🗑️ Confirm Delete
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: VIEW PAYMENT PROOF SLIP ==================== -->
+  <div id="viewPaymentProofModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <div class="flex items-center gap-2">
+          <div class="modal-icon-badge" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.35); color: #10b981;">
+            📷
+          </div>
+          <div>
+            <h3 class="modal-title">Payment Proof Slip</h3>
+            <p id="viewProofSubtitle" class="modal-subtitle">Verified Transaction Receipt</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" data-close-modal="viewPaymentProofModal">&times;</button>
+      </div>
+
+      <div class="modal-form">
+        <div class="proof-full-view">
+          <img id="viewProofImage" src="" alt="Payment Receipt" class="proof-full-image">
+        </div>
+        <div class="proof-account-badge mt-2">
+          <span>Account:</span> <strong id="viewProofAccountLabel">Boss JazzCash</strong>
+        </div>
+        <div class="modal-actions mt-3">
+          <button type="button" class="btn btn-outline flex-1" data-close-modal="viewPaymentProofModal">Close Preview</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: QUICK MARK PAID WITH PROOF ==================== -->
+  <div id="quickMarkPaidModal" class="modal-overlay">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <div class="flex items-center gap-2">
+          <div class="modal-icon-badge" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.35); color: #10b981;">
+            ✅
+          </div>
+          <div>
+            <h3 class="modal-title">Mark Payment as Paid</h3>
+            <p class="modal-subtitle">Payment screenshot proof is required</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" data-close-modal="quickMarkPaidModal">&times;</button>
+      </div>
+
+      <form id="quickMarkPaidForm" class="modal-form">
+        <input type="hidden" id="quickMarkPaidSaleId" value="">
+        <div id="quickMarkPaidSummary" class="delete-summary-box mb-3">
+          <!-- Sale summary injected here -->
+        </div>
+
+        <div class="form-group">
+          <label>Payment Proof Screenshot <span class="badge-req">Mandatory</span></label>
+          <input type="file" id="quickProofFileInput" accept="image/*" class="form-control" required>
+          <input type="hidden" id="quickProofBase64" value="">
+          <div id="quickProofPreviewWrap" class="proof-preview-wrap mt-2" style="display: none;">
+            <img id="quickProofPreviewImg" src="" alt="Proof Preview" class="proof-thumbnail">
+            <span class="text-green font-bold" style="font-size: 12px;">✓ Screenshot Attached</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="quickPaymentReceivedInSelect">Received In Account <span class="text-gold">*</span></label>
+          <select id="quickPaymentReceivedInSelect" class="form-control">
+            <option value="Boss JazzCash">Boss JazzCash</option>
+            <option value="Boss EasyPaisa">Boss EasyPaisa</option>
+            <option value="Boss Bank Alfalah">Boss Bank Alfalah</option>
+            <option value="Boss Meezan Bank">Boss Meezan Bank</option>
+            <option value="Boss HBL">Boss HBL</option>
+            <option value="Other / Cash">Other / Cash</option>
+          </select>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" data-close-modal="quickMarkPaidModal">Cancel</button>
+          <button type="submit" id="btnConfirmQuickMarkPaid" class="btn btn-gold flex-1">
+            ✓ Confirm Paid
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: ADD / EDIT EMPLOYEE (ADMIN) ==================== -->
+  <div id="employeeModal" class="modal-overlay">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <div class="flex items-center gap-2">
+          <div class="modal-icon-badge" style="background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.35); color: #f59e0b;">
+            👤
+          </div>
+          <div>
+            <h3 id="employeeModalTitle" class="modal-title">Add New Staff Member</h3>
+            <p class="modal-subtitle">Fresh employee portal ready immediately</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" data-close-modal="employeeModal">&times;</button>
+      </div>
+
+      <form id="employeeForm" class="modal-form">
+        <input type="hidden" id="employeeEditId" value="">
+
+        <div class="form-group">
+          <label for="empNameInput">Staff Name <span class="text-gold">*</span></label>
+          <input type="text" id="empNameInput" class="form-control" placeholder="e.g. Ali Ahmed" required>
+        </div>
+
+        <div class="form-group">
+          <label for="empPhoneInput">WhatsApp / Phone <span class="text-muted">(Optional)</span></label>
+          <input type="tel" id="empPhoneInput" class="form-control" placeholder="03001234567">
+        </div>
+
+        <div class="form-group">
+          <label for="empPinInput">Login PIN (4 to 6 Digits) <span class="text-gold">*</span></label>
+          <input type="password" id="empPinInput" inputmode="numeric" maxlength="6" class="form-control font-mono" placeholder="4-6 digit numeric PIN" required>
+          <small class="form-hint">Staff will enter this PIN at login screen to access their portal.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="empRateInput">Daily Commission Rate (%) <span class="text-gold">*</span></label>
+          <input type="number" id="empRateInput" min="0" max="100" step="0.5" class="form-control font-mono font-bold" placeholder="e.g. 15" required>
+          <small class="form-hint">Percentage of employee's daily sales profit calculated automatically.</small>
+        </div>
+
+        <div class="form-group" id="empStatusGroup" style="display: none;">
+          <label for="empStatusSelect">Account Status</label>
+          <select id="empStatusSelect" class="form-control">
+            <option value="active">Active (Can Login)</option>
+            <option value="frozen">Frozen (Login Blocked)</option>
+          </select>
+        </div>
+
+        <div id="employeeFormError" class="pin-error-msg"></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" data-close-modal="employeeModal">Cancel</button>
+          <button type="submit" id="btnSaveEmployee" class="btn btn-gold flex-1">Save Employee</button>
+        </div>
+      </form>
     </div>
   </div>
 

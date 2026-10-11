@@ -11,10 +11,18 @@ const STATE = {
   currentPeriod: 'today', // today, yesterday, week, month, all, custom
   customSelectedDate: '',
   currentView: 'salesView',
+  currentUser: {
+    role: 'admin',
+    name: 'Admin',
+    id: 'admin',
+    commissionRate: 0,
+    phone: ''
+  },
   data: {
     sales: [],
     expenses: [],
     products: [],
+    employees: [],
     recycleBin: [],
     settings: {
       businessName: 'Monkey Tools',
@@ -91,6 +99,11 @@ async function checkPinStatus() {
   if (savedSession === 'true') {
     STATE.unlocked = true;
     STATE.pinSet = true;
+    const savedUser = sessionStorage.getItem('ab_tools_user');
+    if (savedUser) {
+      try { STATE.currentUser = JSON.parse(savedUser); } catch (_) {}
+    }
+    updateUserHeaderBadge();
     document.getElementById('pinGateModal').classList.remove('active');
     loadAppData();
   } else {
@@ -114,6 +127,31 @@ async function checkPinStatus() {
   } catch (err) {
     console.warn('Background sync status check:', err);
   }
+}
+
+function updateUserHeaderBadge() {
+  const badgeEl = document.getElementById('currentUserBadge');
+  const textEl = document.getElementById('currentUserRoleText');
+  if (!badgeEl || !textEl) return;
+  if (STATE.currentUser.role === 'employee') {
+    badgeEl.className = 'badge-role-pill role-employee';
+    textEl.textContent = `👤 ${STATE.currentUser.name} (${STATE.currentUser.commissionRate}% Comm)`;
+  } else {
+    badgeEl.className = 'badge-role-pill';
+    textEl.textContent = `👑 Boss (Admin)`;
+  }
+}
+
+function handleSwitchUser() {
+  sessionStorage.removeItem('ab_tools_unlocked');
+  sessionStorage.removeItem('ab_tools_user');
+  STATE.unlocked = false;
+  STATE.enteredPin = '';
+  STATE.currentUser = { role: 'admin', name: 'Admin', id: 'admin', commissionRate: 0 };
+  updatePinDots();
+  const errEl = document.getElementById('pinUnlockError');
+  if (errEl) errEl.textContent = '';
+  showPinGate();
 }
 
 function showPinGate() {
@@ -239,12 +277,31 @@ async function handleUnlockSubmit() {
 
     if (res.ok) {
       STATE.unlocked = true;
-      localStorage.setItem('ab_tools_pin', STATE.enteredPin);
-      STATE.targetPinLength = STATE.enteredPin.length;
-      renderPinDots();
+      if (result.role === 'employee' && result.employee) {
+        STATE.currentUser = {
+          role: 'employee',
+          name: result.employee.name,
+          id: result.employee.id,
+          commissionRate: Number(result.employee.commissionRate) || 0,
+          phone: result.employee.phone || ''
+        };
+      } else {
+        STATE.currentUser = {
+          role: 'admin',
+          name: 'Admin',
+          id: 'admin',
+          commissionRate: 0,
+          phone: ''
+        };
+        localStorage.setItem('ab_tools_pin', STATE.enteredPin);
+        STATE.targetPinLength = STATE.enteredPin.length;
+        renderPinDots();
+      }
+      sessionStorage.setItem('ab_tools_user', JSON.stringify(STATE.currentUser));
       sessionStorage.setItem('ab_tools_unlocked', 'true');
+      updateUserHeaderBadge();
       document.getElementById('pinGateModal').classList.remove('active');
-      showToast('Welcome back! Dashboard unlocked 🔓');
+      showToast(result.message || 'Welcome back! Dashboard unlocked 🔓');
       loadAppData();
     } else {
       errEl.textContent = result.error || 'Incorrect PIN! Please try again';
@@ -257,7 +314,10 @@ async function handleUnlockSubmit() {
     const localPin = localStorage.getItem('ab_tools_pin');
     if (localPin && STATE.enteredPin === localPin) {
       STATE.unlocked = true;
+      STATE.currentUser = { role: 'admin', name: 'Admin', id: 'admin', commissionRate: 0 };
+      sessionStorage.setItem('ab_tools_user', JSON.stringify(STATE.currentUser));
       sessionStorage.setItem('ab_tools_unlocked', 'true');
+      updateUserHeaderBadge();
       document.getElementById('pinGateModal').classList.remove('active');
       showToast('Welcome back! (Offline Mode) 🔓');
       loadAppData();
@@ -399,6 +459,7 @@ async function performServerSync() {
         sales: STATE.data.sales || [],
         expenses: STATE.data.expenses || [],
         products: STATE.data.products || [],
+        employees: STATE.data.employees || [],
         recycleBin: STATE.data.recycleBin || [],
         settings: STATE.data.settings || {},
         pin: localStorage.getItem('ab_tools_pin')
@@ -441,6 +502,10 @@ async function performServerSync() {
         if (serverResult.products && serverResult.products.length) {
           STATE.data.products = serverResult.products;
         }
+        if (Array.isArray(serverResult.employees)) {
+          STATE.data.employees = serverResult.employees;
+          populateStaffFilterDropdown();
+        }
         if (serverResult.recycleBin) {
           STATE.data.recycleBin = serverResult.recycleBin;
           updateRecycleBinBadge();
@@ -475,6 +540,9 @@ async function performServerSync() {
 
         if (salesChanged || expChanged || prodsChanged) {
           renderApp();
+        }
+        if (STATE.currentView === 'adminView') {
+          renderAdminEmployees();
         }
         updateSyncBadge('synced');
       }
@@ -957,10 +1025,16 @@ function renderApp() {
 
 function renderKPIs() {
   const period = STATE.currentPeriod;
+  const isEmployee = STATE.currentUser.role === 'employee';
   const sales = STATE.data.sales || [];
   const expenses = STATE.data.expenses || [];
 
-  const filteredSales = sales.filter(s => isDateInPeriod(s.date, period));
+  // If employee: scope sales strictly to their own sales
+  const accessibleSales = isEmployee
+    ? sales.filter(s => (s.soldBy === STATE.currentUser.name || s.employeeId === STATE.currentUser.id))
+    : sales;
+
+  const filteredSales = accessibleSales.filter(s => isDateInPeriod(s.date, period));
   const filteredExpenses = expenses.filter(e => isDateInPeriod(e.date, period));
 
   const totalRevenue = filteredSales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
@@ -974,15 +1048,57 @@ function renderKPIs() {
   document.getElementById('kpiExpense').textContent = totalExpense.toLocaleString('en-US');
 
   const profitCard = document.getElementById('kpiProfitCard');
+  const commissionCard = document.getElementById('employeeCommissionCard');
   const profitValEl = document.getElementById('kpiProfit');
-  profitValEl.textContent = netProfit.toLocaleString('en-US');
+  if (profitValEl) profitValEl.textContent = netProfit.toLocaleString('en-US');
 
-  if (netProfit >= 0) {
-    profitCard.classList.remove('profit-negative');
-    profitCard.classList.add('profit-positive');
+  // Multi-role KPI visibility:
+  if (isEmployee) {
+    // Hide Net Profit for staff
+    if (profitCard) profitCard.style.display = 'none';
+    if (commissionCard) commissionCard.style.display = 'block';
+
+    // Calculate Daily Commission (based on today's sales by default or selected period)
+    const todayStr = getLocalTodayDateString();
+    const todayEmpSales = accessibleSales.filter(s => s.date === todayStr);
+    const todaySalesTotal = todayEmpSales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+    const rate = Number(STATE.currentUser.commissionRate) || 0;
+    const todayCommission = Math.round(todaySalesTotal * (rate / 100));
+
+    const rateLabel = document.getElementById('empCommissionRateLabel');
+    if (rateLabel) rateLabel.textContent = `${rate}% Rate`;
+    const commVal = document.getElementById('kpiEmployeeCommission');
+    if (commVal) commVal.textContent = todayCommission.toLocaleString('en-US');
+    const todaySalesVal = document.getElementById('kpiEmployeeSalesToday');
+    if (todaySalesVal) todaySalesVal.textContent = todaySalesTotal.toLocaleString('en-US');
+
+    // Hide expense creation for employee
+    const newExpHeaderBtn = document.getElementById('btnHeaderNewExpense');
+    if (newExpHeaderBtn) newExpHeaderBtn.style.display = 'none';
+    const newExpTopBtn = document.getElementById('btnOpenNewExpenseModal');
+    if (newExpTopBtn) newExpTopBtn.style.display = 'none';
+
+    // Hide Admin tab for employee
+    document.querySelectorAll('[data-view="adminView"]').forEach(el => el.style.display = 'none');
   } else {
-    profitCard.classList.remove('profit-positive');
-    profitCard.classList.add('profit-negative');
+    // Admin / Boss
+    if (profitCard) profitCard.style.display = 'block';
+    if (commissionCard) commissionCard.style.display = 'none';
+    const newExpHeaderBtn = document.getElementById('btnHeaderNewExpense');
+    if (newExpHeaderBtn) newExpHeaderBtn.style.display = 'inline-flex';
+    const newExpTopBtn = document.getElementById('btnOpenNewExpenseModal');
+    if (newExpTopBtn) newExpTopBtn.style.display = 'inline-flex';
+    document.querySelectorAll('[data-view="adminView"]').forEach(el => el.style.display = 'inline-flex');
+  }
+
+  if (profitCard) {
+    if (netProfit >= 0) {
+      profitCard.classList.remove('profit-negative');
+      profitCard.classList.add('profit-positive');
+    } else {
+      profitCard.classList.remove('profit-positive');
+      profitCard.classList.add('profit-negative');
+    }
   }
 
   document.getElementById('kpiSalesCount').textContent = filteredSales.length;
@@ -1013,11 +1129,20 @@ function renderSales() {
   const container = document.getElementById('salesListContainer');
   if (!container) return;
 
+  const isEmployee = STATE.currentUser.role === 'employee';
   const productFilter = document.getElementById('salesFilterProduct')?.value || 'ALL';
   const statusFilter = document.getElementById('salesFilterStatus')?.value || 'ALL';
+  const staffFilter = document.getElementById('salesFilterStaff')?.value || 'ALL';
   const period = STATE.currentPeriod;
 
-  let list = (STATE.data.sales || []).filter(s => isDateInPeriod(s.date, period));
+  let allSales = STATE.data.sales || [];
+  if (isEmployee) {
+    allSales = allSales.filter(s => (s.soldBy === STATE.currentUser.name || s.employeeId === STATE.currentUser.id));
+  } else if (staffFilter !== 'ALL') {
+    allSales = allSales.filter(s => (s.soldBy || 'Admin') === staffFilter);
+  }
+
+  let list = allSales.filter(s => isDateInPeriod(s.date, period));
 
   if (productFilter !== 'ALL') {
     list = list.filter(s => s.product === productFilter);
@@ -1071,6 +1196,7 @@ function renderSaleCardHtml(s) {
   const isExpired = daysLeft !== null && daysLeft < 0;
   const isExpiresToday = daysLeft === 0;
   const isExpiresTomorrow = daysLeft === 1;
+  const soldBy = s.soldBy || 'Admin';
 
   return `
     <div class="item-card ${isExpired ? 'is-expired' : ''}" data-sale-id="${s.id}">
@@ -1078,6 +1204,7 @@ function renderSaleCardHtml(s) {
         <div class="item-user-info">
           <span class="user-phone-badge">${formatPhone(s.customerPhone)}</span>
           ${s.customerName ? `<span class="user-name-tag">${escapeHtml(s.customerName)}</span>` : ''}
+          <span class="badge-staff ${soldBy === 'Admin' ? 'staff-admin' : 'staff-ali'}">👤 ${escapeHtml(soldBy)}</span>
           ${isExpired ? `<span class="badge-expired-header">🔴 Expired</span>` : (isExpiresToday ? `<span class="badge-urgent-pill">⚠️ Expires Today</span>` : '')}
         </div>
         <div class="item-price-tag">
@@ -1115,9 +1242,12 @@ function renderSaleCardHtml(s) {
       <div class="item-actions-bar">
         <div class="badges-group">
           <span class="status-badge ${statusClass}">${s.paymentStatus}</span>
+          ${s.paymentProof ? `
+            <button type="button" class="btn-proof-preview" onclick="openViewPaymentProof('${s.id}')">📷 Proof (${escapeHtml(s.paymentReceivedIn || 'Boss')})</button>
+          ` : ''}
           ${isExpired ? `<span class="status-badge status-expired">❌ Expired</span>` : ''}
           ${s.paymentStatus !== 'Paid' ? `
-            <button class="btn btn-xs btn-gold" onclick="markSalePaid('${s.id}')">✓ Mark Paid</button>
+            <button class="btn btn-xs btn-gold" onclick="openQuickMarkPaid('${s.id}')">✓ Mark Paid</button>
           ` : ''}
         </div>
 
@@ -1126,7 +1256,7 @@ function renderSaleCardHtml(s) {
             <span>💬 WhatsApp</span>
           </button>
           <button class="btn-action-icon" title="Edit Sale" onclick="openEditSale('${s.id}')">✏️</button>
-          <button class="btn-action-icon btn-action-delete" title="Delete Sale" onclick="deleteSale('${s.id}')">🗑️</button>
+          <button class="btn-action-icon btn-action-delete" title="Delete Sale" onclick="openDeleteSaleReasonModal('${s.id}')">🗑️</button>
         </div>
       </div>
     </div>
@@ -1720,9 +1850,65 @@ function setupEventListeners() {
   planSelect?.addEventListener('change', onPlanChange);
   dateInput?.addEventListener('input', updateLiveExpiryPreview);
 
+  // Switch User / Logout Button
+  document.getElementById('btnSwitchUser')?.addEventListener('click', handleSwitchUser);
+
   // Sales filter changes
+  document.getElementById('salesFilterStaff')?.addEventListener('change', renderSales);
   document.getElementById('salesFilterProduct')?.addEventListener('change', renderSales);
   document.getElementById('salesFilterStatus')?.addEventListener('change', renderSales);
+
+  // Sale Modal Payment Proof File Input
+  document.getElementById('saleProofFileInput')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        const compressed = await compressImageFile(file);
+        document.getElementById('saleProofBase64').value = compressed;
+        document.getElementById('saleProofPreviewImg').src = compressed;
+        document.getElementById('saleProofPreviewWrap').style.display = 'flex';
+      } catch (err) {
+        alert('Failed to process screenshot: ' + err.message);
+      }
+    }
+  });
+
+  document.getElementById('btnRemoveProof')?.addEventListener('click', () => {
+    document.getElementById('saleProofFileInput').value = '';
+    document.getElementById('saleProofBase64').value = '';
+    document.getElementById('saleProofPreviewWrap').style.display = 'none';
+  });
+
+  // Toggle proof requirement badge based on selected status
+  document.querySelectorAll('input[name="saleStatus"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const badge = document.getElementById('proofRequiredBadge');
+      if (badge) badge.style.display = e.target.value === 'Paid' ? 'inline-block' : 'none';
+    });
+  });
+
+  // Quick Mark Paid Form and File Input
+  document.getElementById('quickProofFileInput')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        const compressed = await compressImageFile(file);
+        document.getElementById('quickProofBase64').value = compressed;
+        document.getElementById('quickProofPreviewImg').src = compressed;
+        document.getElementById('quickProofPreviewWrap').style.display = 'flex';
+      } catch (err) {
+        alert('Failed to process screenshot: ' + err.message);
+      }
+    }
+  });
+  document.getElementById('quickMarkPaidForm')?.addEventListener('submit', handleConfirmQuickMarkPaid);
+
+  // Delete Sale with Mandatory Reason Form
+  document.getElementById('deleteSaleReasonForm')?.addEventListener('submit', handleConfirmDeleteSale);
+
+  // Employee Management Modal and Form
+  document.getElementById('btnOpenNewEmployeeModal')?.addEventListener('click', openNewEmployeeModal);
+  document.getElementById('employeeForm')?.addEventListener('submit', handleEmployeeSubmit);
 
   // Sale Form Submit
   document.getElementById('saleForm')?.addEventListener('submit', handleSaleSubmit);
@@ -1913,10 +2099,62 @@ function setDefaultDates() {
   }
 }
 
+function compressImageFile(file, maxWidth = 800, maxHeight = 800, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith('image/')) {
+      return reject(new Error('Invalid image file'));
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to lightweight JPEG data URL (~40-70KB)
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 function openSaleModal() {
   document.getElementById('saleEditId').value = '';
   document.getElementById('saleModalTitle').textContent = 'New Sale Entry';
   document.getElementById('saleForm').reset();
+
+  // Reset proof screenshot
+  document.getElementById('saleProofFileInput').value = '';
+  document.getElementById('saleProofBase64').value = '';
+  const previewWrap = document.getElementById('saleProofPreviewWrap');
+  if (previewWrap) previewWrap.style.display = 'none';
+  const reqBadge = document.getElementById('proofRequiredBadge');
+  if (reqBadge) reqBadge.style.display = 'none';
+
+  const accountSelect = document.getElementById('salePaymentReceivedInSelect');
+  if (accountSelect) accountSelect.value = 'Boss JazzCash';
+
   setDefaultDates();
   onProductChange();
   openModal('saleModal');
@@ -1949,6 +2187,22 @@ function openEditSale(id) {
     r.checked = (r.value === sale.paymentStatus);
   });
 
+  // Proof screenshot setup
+  document.getElementById('saleProofFileInput').value = '';
+  document.getElementById('saleProofBase64').value = sale.paymentProof || '';
+  const previewWrap = document.getElementById('saleProofPreviewWrap');
+  if (sale.paymentProof) {
+    document.getElementById('saleProofPreviewImg').src = sale.paymentProof;
+    if (previewWrap) previewWrap.style.display = 'flex';
+  } else {
+    if (previewWrap) previewWrap.style.display = 'none';
+  }
+  const reqBadge = document.getElementById('proofRequiredBadge');
+  if (reqBadge) reqBadge.style.display = sale.paymentStatus === 'Paid' ? 'inline-block' : 'none';
+
+  const accountSelect = document.getElementById('salePaymentReceivedInSelect');
+  if (accountSelect) accountSelect.value = sale.paymentReceivedIn || 'Boss JazzCash';
+
   updateLiveExpiryPreview();
   openModal('saleModal');
 }
@@ -1973,6 +2227,20 @@ async function handleSaleSubmit(e) {
     if (r.checked) paymentStatus = r.value;
   });
 
+  const existingSale = editId ? STATE.data.sales.find(s => s.id === editId) : null;
+  const attachedProof = document.getElementById('saleProofBase64').value.trim() || existingSale?.paymentProof || null;
+  const paymentReceivedIn = document.getElementById('salePaymentReceivedInSelect')?.value || 'Boss JazzCash';
+
+  // MANDATORY Payment Proof Check: Payment cannot be set to 'Paid' without screenshot proof!
+  if (paymentStatus === 'Paid' && !attachedProof) {
+    alert('⚠️ PAYMENT PROOF IS MANDATORY!\n\nJab tak customer ki payment receipt / transaction slip ka screenshot upload nahe hoga, payment "Paid" mark nahe ho sakti taaky verify ho saky kiske account me payment gai.');
+    document.getElementById('saleProofFileInput')?.focus();
+    return;
+  }
+
+  const soldBy = editId ? (existingSale?.soldBy || STATE.currentUser.name) : STATE.currentUser.name;
+  const employeeId = editId ? (existingSale?.employeeId || STATE.currentUser.id) : STATE.currentUser.id;
+
   const payload = {
     date,
     customerPhone,
@@ -1984,6 +2252,10 @@ async function handleSaleSubmit(e) {
     planLabel,
     amount,
     paymentStatus,
+    paymentProof: attachedProof,
+    paymentReceivedIn,
+    soldBy,
+    employeeId,
     notes,
     updatedAt: new Date().toISOString()
   };
@@ -1993,7 +2265,7 @@ async function handleSaleSubmit(e) {
     id: saleId,
     ...payload,
     expiryDate: calculateExpiry(date, planMonths),
-    createdAt: editId ? (STATE.data.sales.find(s => s.id === editId)?.createdAt || new Date().toISOString()) : new Date().toISOString()
+    createdAt: editId ? (existingSale?.createdAt || new Date().toISOString()) : new Date().toISOString()
   };
 
   // Immediate Local Update (Never lost on refresh)
@@ -2016,22 +2288,105 @@ async function handleSaleSubmit(e) {
   triggerAutoSaveSync(true);
 }
 
-async function markSalePaid(id) {
-  const sale = (STATE.data.sales || []).find(s => s.id === id);
-  if (sale) {
-    sale.paymentStatus = 'Paid';
-    sale.updatedAt = new Date().toISOString();
-    saveLocalState();
-    showToast('Marked as Paid! ✓');
-    renderApp();
-    triggerAutoSaveSync(true);
-  }
-}
-
-async function deleteSale(id) {
-  if (!confirm('Are you sure you want to delete this sale record?')) return;
+// Quick Mark Paid with Mandatory Screenshot Proof
+function openQuickMarkPaid(id) {
   const sale = (STATE.data.sales || []).find(s => s.id === id);
   if (!sale) return;
+
+  document.getElementById('quickMarkPaidSaleId').value = id;
+  document.getElementById('quickProofFileInput').value = '';
+  document.getElementById('quickProofBase64').value = '';
+  const previewWrap = document.getElementById('quickProofPreviewWrap');
+  if (previewWrap) previewWrap.style.display = 'none';
+  const accountSelect = document.getElementById('quickPaymentReceivedInSelect');
+  if (accountSelect) accountSelect.value = 'Boss JazzCash';
+
+  document.getElementById('quickMarkPaidSummary').innerHTML = `
+    <div><strong>Customer:</strong> ${formatPhone(sale.customerPhone)} ${sale.customerName ? `(${escapeHtml(sale.customerName)})` : ''}</div>
+    <div><strong>Product:</strong> ${escapeHtml(sale.product)} (${escapeHtml(sale.planLabel || sale.planMonths + ' Mos')}) · <strong>Rs. ${(sale.amount || 0).toLocaleString()}</strong></div>
+    <div><strong>Sold By:</strong> ${escapeHtml(sale.soldBy || 'Admin')}</div>
+  `;
+  openModal('quickMarkPaidModal');
+}
+
+async function handleConfirmQuickMarkPaid(e) {
+  e.preventDefault();
+  const id = document.getElementById('quickMarkPaidSaleId').value;
+  const proof = document.getElementById('quickProofBase64').value.trim();
+  const account = document.getElementById('quickPaymentReceivedInSelect').value;
+
+  if (!proof) {
+    alert('⚠️ PAYMENT PROOF IS MANDATORY!\n\nPlease attach JazzCash / EasyPaisa / Bank transfer screenshot before marking payment as Paid.');
+    return;
+  }
+
+  const sale = (STATE.data.sales || []).find(s => s.id === id);
+  if (!sale) return;
+
+  sale.paymentStatus = 'Paid';
+  sale.paymentProof = proof;
+  sale.paymentReceivedIn = account;
+  sale.updatedAt = new Date().toISOString();
+
+  saveLocalState();
+  closeModal('quickMarkPaidModal');
+  showToast('Payment verified & marked as Paid! ✓');
+  renderApp();
+  triggerAutoSaveSync(true);
+
+  fetch(`/api/sales/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paymentStatus: 'Paid', paymentProof: proof, paymentReceivedIn: account })
+  }).catch(e => console.warn('Quick paid status sync notice:', e));
+}
+
+// View Payment Proof Modal
+function openViewPaymentProof(id) {
+  let item = (STATE.data.sales || []).find(s => s.id === id);
+  if (!item && STATE.data.recycleBin) {
+    const trash = STATE.data.recycleBin.find(t => t.originalId === id || t.id === id);
+    item = trash?.item;
+  }
+  if (!item || !item.paymentProof) {
+    showToast('No payment proof slip attached');
+    return;
+  }
+
+  document.getElementById('viewProofImage').src = item.paymentProof;
+  document.getElementById('viewProofAccountLabel').textContent = item.paymentReceivedIn || 'Boss Account';
+  document.getElementById('viewProofSubtitle').textContent = `${formatPhone(item.customerPhone)} · ${escapeHtml(item.product)} · Rs. ${(item.amount || 0).toLocaleString()} (Sold by: ${escapeHtml(item.soldBy || 'Admin')})`;
+  openModal('viewPaymentProofModal');
+}
+
+// Delete Sale with Mandatory Reason
+function openDeleteSaleReasonModal(id) {
+  const sale = (STATE.data.sales || []).find(s => s.id === id);
+  if (!sale) return;
+
+  document.getElementById('deleteSaleTargetId').value = id;
+  document.getElementById('deleteSaleReasonInput').value = '';
+  document.getElementById('deleteSaleTargetSummary').innerHTML = `
+    <div><strong>Customer:</strong> ${formatPhone(sale.customerPhone)} ${sale.customerName ? `(${escapeHtml(sale.customerName)})` : ''}</div>
+    <div><strong>Product:</strong> ${escapeHtml(sale.product)} (${escapeHtml(sale.planLabel || sale.planMonths + ' Mos')}) · Rs. ${(sale.amount || 0).toLocaleString()}</div>
+    <div><strong>Sold By:</strong> ${escapeHtml(sale.soldBy || 'Admin')}</div>
+  `;
+  openModal('deleteSaleReasonModal');
+}
+
+async function handleConfirmDeleteSale(e) {
+  e.preventDefault();
+  const id = document.getElementById('deleteSaleTargetId').value;
+  const reason = document.getElementById('deleteSaleReasonInput').value.trim();
+  if (!reason) {
+    alert('Please enter a mandatory reason for deleting this sale record');
+    return;
+  }
+
+  const sale = (STATE.data.sales || []).find(s => s.id === id);
+  if (!sale) return;
+
+  const deletedBy = STATE.currentUser.name || 'Admin';
 
   STATE.data.sales = (STATE.data.sales || []).filter(s => s.id !== id);
 
@@ -2039,7 +2394,9 @@ async function deleteSale(id) {
     id: 'trash_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     originalId: id,
     type: 'sale',
-    item: { ...sale },
+    item: { ...sale, deleteReason: reason, deletedBy },
+    deleteReason: reason,
+    deletedBy,
     deletedAt: new Date().toISOString()
   };
   STATE.data.recycleBin = STATE.data.recycleBin || [];
@@ -2056,15 +2413,219 @@ async function deleteSale(id) {
   }
 
   saveLocalState();
+  closeModal('deleteSaleReasonModal');
   renderApp();
   updateRecycleBinBadge();
   triggerAutoSaveSync(true);
 
-  const title = sale.customerPhone ? formatPhone(sale.customerPhone) : (sale.product || 'Sale');
-  showToast(`Sale deleted (${title})`, {
-    undoCallback: () => restoreFromRecycleBin(trashEntry.id),
-    duration: 8000
-  });
+  // Send delete call to server with reason and deletedBy
+  fetch(`/api/sales/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason, deletedBy })
+  }).catch(e => console.warn('Delete server notice:', e));
+
+  showToast(`Sale deleted with reason recorded in Trash! 🗑️`);
+}
+
+// Populate staff filter dropdown in sales view
+function populateStaffFilterDropdown() {
+  const staffSelect = document.getElementById('salesFilterStaff');
+  if (!staffSelect) return;
+
+  if (STATE.currentUser.role === 'employee') {
+    staffSelect.style.display = 'none';
+    return;
+  }
+  staffSelect.style.display = 'inline-block';
+
+  const currentVal = staffSelect.value || 'ALL';
+  const employees = STATE.data.employees || [];
+  const empNames = employees.map(e => e.name).filter(Boolean);
+  const uniqueStaff = ['Admin', ...empNames];
+
+  staffSelect.innerHTML = '<option value="ALL">👥 All Staff</option>' + 
+    uniqueStaff.map(name => `<option value="${escapeHtml(name)}">👤 ${escapeHtml(name)}</option>`).join('');
+
+  if (uniqueStaff.includes(currentVal) || currentVal === 'ALL') {
+    staffSelect.value = currentVal;
+  }
+}
+
+// ==================== EMPLOYEE MANAGEMENT (ADMIN PANEL) ====================
+function renderAdminEmployees() {
+  const container = document.getElementById('adminEmployeesList');
+  if (!container) return;
+
+  const employees = STATE.data.employees || [];
+  if (employees.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 25px 15px;">
+        <div class="empty-state-icon">👥</div>
+        <div class="empty-state-title" style="font-size: 14px;">No staff members added yet</div>
+        <p class="text-muted" style="font-size: 12px; margin-top: 4px;">Click '+ Add New Staff' above to create employee accounts with custom PINs and commission rates.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = employees.map(emp => {
+    const isFrozen = emp.status === 'frozen';
+    const initial = (emp.name || 'E').charAt(0).toUpperCase();
+    return `
+      <div class="emp-card ${isFrozen ? 'is-frozen' : ''}" data-emp-id="${emp.id}">
+        <div class="emp-avatar">${initial}</div>
+        <div class="emp-info">
+          <div class="emp-name-row">
+            <span>${escapeHtml(emp.name)}</span>
+            <span class="badge-role-pill role-employee" style="font-size: 10.5px; padding: 2px 7px;">${emp.commissionRate || 0}% Comm</span>
+            ${isFrozen ? `<span class="status-badge status-unpaid" style="font-size: 10px;">❄️ Frozen</span>` : `<span class="status-badge status-paid" style="font-size: 10px;">Active</span>`}
+          </div>
+          <div class="emp-meta-row">
+            <span>📱 ${emp.phone ? escapeHtml(emp.phone) : 'No phone'}</span>
+            <span>🔑 PIN: <strong class="emp-pin-masked" id="empPinDisplay_${emp.id}">••••</strong> <button type="button" class="btn-xs btn-outline" style="padding: 1px 5px; font-size: 10px;" onclick="toggleShowEmpPin('${emp.id}', '${escapeHtml(emp.pin)}')">👁️</button></span>
+          </div>
+        </div>
+        <div class="item-btn-group">
+          <button class="btn-action-icon" title="${isFrozen ? 'Unfreeze Account' : 'Freeze Account'}" onclick="toggleFreezeEmployee('${emp.id}')">${isFrozen ? '🔓' : '❄️'}</button>
+          <button class="btn-action-icon" title="Edit Employee" onclick="openEditEmployee('${emp.id}')">✏️</button>
+          <button class="btn-action-icon btn-action-delete" title="Delete Employee" onclick="deleteEmployee('${emp.id}')">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleShowEmpPin(empId, pin) {
+  const el = document.getElementById(`empPinDisplay_${empId}`);
+  if (!el) return;
+  if (el.textContent === '••••') {
+    el.textContent = pin;
+  } else {
+    el.textContent = '••••';
+  }
+}
+
+function openNewEmployeeModal() {
+  document.getElementById('employeeEditId').value = '';
+  document.getElementById('employeeModalTitle').textContent = 'Add New Staff Member';
+  document.getElementById('empNameInput').value = '';
+  document.getElementById('empPhoneInput').value = '';
+  document.getElementById('empPinInput').value = '';
+  document.getElementById('empRateInput').value = '15';
+  document.getElementById('empStatusGroup').style.display = 'none';
+  document.getElementById('employeeFormError').textContent = '';
+  openModal('employeeModal');
+}
+
+function openEditEmployee(id) {
+  const emp = (STATE.data.employees || []).find(e => e.id === id);
+  if (!emp) return;
+
+  document.getElementById('employeeEditId').value = id;
+  document.getElementById('employeeModalTitle').textContent = `Edit Staff: ${emp.name}`;
+  document.getElementById('empNameInput').value = emp.name || '';
+  document.getElementById('empPhoneInput').value = emp.phone || '';
+  document.getElementById('empPinInput').value = emp.pin || '';
+  document.getElementById('empRateInput').value = emp.commissionRate || 0;
+  document.getElementById('empStatusGroup').style.display = 'block';
+  document.getElementById('empStatusSelect').value = emp.status || 'active';
+  document.getElementById('employeeFormError').textContent = '';
+  openModal('employeeModal');
+}
+
+async function handleEmployeeSubmit(e) {
+  e.preventDefault();
+  const editId = document.getElementById('employeeEditId').value;
+  const name = document.getElementById('empNameInput').value.trim();
+  const phone = document.getElementById('empPhoneInput').value.trim();
+  const pin = document.getElementById('empPinInput').value.trim();
+  const commissionRate = Number(document.getElementById('empRateInput').value) || 0;
+  const status = document.getElementById('empStatusSelect').value;
+  const errEl = document.getElementById('employeeFormError');
+  errEl.textContent = '';
+
+  if (!name) {
+    errEl.textContent = 'Employee name is required';
+    return;
+  }
+  if (!pin || pin.length < 4 || pin.length > 6 || !/^\d{4,6}$/.test(pin)) {
+    errEl.textContent = 'PIN must be between 4 and 6 numeric digits';
+    return;
+  }
+
+  const endpoint = editId ? `/api/employees/${encodeURIComponent(editId)}` : '/api/employees';
+  const method = editId ? 'PUT' : 'POST';
+
+  try {
+    const res = await fetch(endpoint, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, phone, pin, commissionRate, status })
+    });
+    const result = await res.json();
+    if (res.ok) {
+      if (editId) {
+        const idx = (STATE.data.employees || []).findIndex(e => e.id === editId);
+        if (idx !== -1) STATE.data.employees[idx] = result.employee;
+      } else {
+        STATE.data.employees = STATE.data.employees || [];
+        STATE.data.employees.unshift(result.employee);
+      }
+      saveLocalState();
+      closeModal('employeeModal');
+      showToast(editId ? 'Staff details updated! ✓' : `Staff "${name}" added! Portal is live immediately 🚀`);
+      populateStaffFilterDropdown();
+      renderAdminEmployees();
+      triggerAutoSaveSync(true);
+    } else {
+      errEl.textContent = result.error || 'Failed to save employee';
+    }
+  } catch (err) {
+    errEl.textContent = 'Network error: ' + err.message;
+  }
+}
+
+async function toggleFreezeEmployee(id) {
+  const emp = (STATE.data.employees || []).find(e => e.id === id);
+  if (!emp) return;
+  const newStatus = emp.status === 'frozen' ? 'active' : 'frozen';
+  try {
+    const res = await fetch(`/api/employees/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    });
+    if (res.ok) {
+      emp.status = newStatus;
+      saveLocalState();
+      renderAdminEmployees();
+      showToast(`Account ${newStatus === 'frozen' ? 'frozen ❄️' : 'activated 🟢'}`);
+      triggerAutoSaveSync(true);
+    }
+  } catch (e) {
+    console.error('Freeze error:', e);
+  }
+}
+
+async function deleteEmployee(id) {
+  const emp = (STATE.data.employees || []).find(e => e.id === id);
+  if (!emp) return;
+  if (!confirm(`Are you sure you want to delete staff account for "${emp.name}"?`)) return;
+
+  try {
+    const res = await fetch(`/api/employees/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (res.ok) {
+      STATE.data.employees = (STATE.data.employees || []).filter(e => e.id !== id);
+      saveLocalState();
+      renderAdminEmployees();
+      populateStaffFilterDropdown();
+      showToast(`Employee "${emp.name}" deleted`);
+      triggerAutoSaveSync(true);
+    }
+  } catch (e) {
+    console.error('Delete employee error:', e);
+  }
 }
 
 // ==================== EXPENSE FORM CRUD ====================
@@ -2236,6 +2797,14 @@ function renderRecycleBin(filter = null) {
       subtitle = `${escapeHtml(item.description || item.category)} · <span class="text-rose font-bold">Rs. ${(item.amount || 0).toLocaleString('en-US')}</span>`;
     }
 
+    const deleteReason = entry.deleteReason || item.deleteReason;
+    const deletedBy = entry.deletedBy || item.deletedBy || item.soldBy || 'Admin';
+    const auditHtml = deleteReason ? `
+      <div class="trash-audit-badge">
+        <span>⚠️ Deleted by <strong>${escapeHtml(deletedBy)}</strong>: "${escapeHtml(deleteReason)}"</span>
+      </div>
+    ` : '';
+
     return `
       <div class="trash-item-card" data-trash-id="${entry.id}">
         <div class="trash-item-info">
@@ -2247,6 +2816,12 @@ function renderRecycleBin(filter = null) {
           </div>
           <div class="trash-main-title">${title}</div>
           <div class="trash-sub-detail">${subtitle}</div>
+          ${auditHtml}
+          ${item.paymentProof ? `
+            <div style="margin-top: 5px;">
+              <button type="button" class="btn-proof-preview" onclick="openViewPaymentProof('${item.id}')">📷 View Proof Slip</button>
+            </div>
+          ` : ''}
           <div class="trash-timestamp">🕒 Deleted: ${deletedTimeFormatted}</div>
         </div>
         <div class="trash-item-actions">
