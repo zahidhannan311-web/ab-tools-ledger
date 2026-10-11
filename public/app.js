@@ -50,7 +50,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   setDefaultDates();
   startDailyDateWatcher();
   startRealtimeSync();
+
+  // Smoothly dismiss animated dark splash screen
+  setTimeout(dismissSplashScreen, 750);
 });
+
+function dismissSplashScreen() {
+  const splash = document.getElementById('appSplashScreen');
+  if (splash && !splash.classList.contains('fade-out')) {
+    splash.classList.add('fade-out');
+    setTimeout(() => {
+      splash.remove();
+    }, 550);
+  }
+}
 
 // Auto-adjust focused fields when mobile virtual keyboard opens without sluggish scroll locks
 function setupViewportKeyboardHandling() {
