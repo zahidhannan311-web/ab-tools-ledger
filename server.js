@@ -416,6 +416,7 @@ app.get('/api/status', (req, res) => {
   const creds = getCloudKvCredentials();
   res.json({
     pinSet: !!db.pin,
+    pinLength: db.pin ? String(db.pin).length : 0,
     businessName: sanitizeBusinessName(db.settings?.businessName),
     salesCount: (db.sales || []).length,
     expensesCount: (db.expenses || []).length,
@@ -454,16 +455,17 @@ app.post('/api/cloud-kv/test', async (req, res) => {
 // Setup Initial PIN
 app.post('/api/auth/setup-pin', async (req, res) => {
   const { pin } = req.body;
-  if (!pin || pin.length < 4) {
-    return res.status(400).json({ error: 'PIN must be at least 4 digits' });
+  const cleanPin = String(pin || '').trim();
+  if (!cleanPin || cleanPin.length < 4 || cleanPin.length > 6 || !/^\d{4,6}$/.test(cleanPin)) {
+    return res.status(400).json({ error: 'PIN must be between 4 and 6 numeric digits' });
   }
   const db = readDb();
   if (db.pin) {
     return res.status(400).json({ error: 'PIN is already configured' });
   }
-  db.pin = String(pin).trim();
+  db.pin = cleanPin;
   await writeDb(db);
-  res.json({ success: true, message: 'PIN configured successfully!' });
+  res.json({ success: true, message: 'PIN configured successfully!', pinLength: cleanPin.length });
 });
 
 // Verify PIN
@@ -473,7 +475,8 @@ app.post('/api/auth/verify-pin', (req, res) => {
   if (!db.pin) {
     return res.status(400).json({ error: 'Please set your PIN first' });
   }
-  if (String(pin).trim() === db.pin) {
+  const cleanPin = String(pin || '').trim();
+  if (cleanPin === String(db.pin).trim()) {
     return res.json({ success: true, message: 'Welcome back' });
   }
   return res.status(401).json({ error: 'Incorrect PIN! Please try again' });
@@ -483,13 +486,23 @@ app.post('/api/auth/verify-pin', (req, res) => {
 app.post('/api/auth/change-pin', async (req, res) => {
   const { oldPin, newPin } = req.body;
   const db = readDb();
-  if (!db.pin || String(oldPin).trim() === db.pin) {
-    if (!newPin || newPin.length < 4) {
-      return res.status(400).json({ error: 'New PIN must be at least 4 digits' });
+  const cleanOld = String(oldPin || '').trim();
+  const cleanNew = String(newPin || '').trim();
+
+  if (!db.pin || cleanOld === String(db.pin).trim()) {
+    if (!cleanNew || cleanNew.length < 4 || cleanNew.length > 6 || !/^\d{4,6}$/.test(cleanNew)) {
+      return res.status(400).json({ error: 'New PIN must be between 4 and 6 numeric digits' });
     }
-    db.pin = String(newPin).trim();
+    db.pin = cleanNew;
+    db.settings = db.settings || {};
+    db.settings.lastModified = Date.now();
     await writeDb(db);
-    return res.json({ success: true, message: 'PIN changed successfully!' });
+    return res.json({
+      success: true,
+      message: 'PIN changed successfully!',
+      pin: cleanNew,
+      pinLength: cleanNew.length
+    });
   }
   return res.status(401).json({ error: 'Current PIN is incorrect' });
 });
@@ -963,9 +976,8 @@ app.post('/api/sync', async (req, res) => {
       db.recycleBin = incomingRecycleBin;
     }
 
-    if (incomingPin && String(incomingPin).trim().length >= 4) {
-      db.pin = String(incomingPin).trim();
-    }
+    // NOTE: db.pin is strictly managed by /api/auth/change-pin and /api/auth/setup-pin
+    // Background polling from stale devices must NEVER revert a newly changed PIN.
 
     db.settings = {
       ...db.settings,
@@ -985,7 +997,8 @@ app.post('/api/sync', async (req, res) => {
       products: db.products || DEFAULT_PRODUCTS,
       recycleBin: db.recycleBin || [],
       settings: db.settings,
-      pin: db.pin
+      pin: db.pin,
+      pinLength: db.pin ? String(db.pin).length : 0
     });
   } catch (err) {
     console.error('Realtime sync error:', err);

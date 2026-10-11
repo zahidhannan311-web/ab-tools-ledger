@@ -7,6 +7,7 @@
 const STATE = {
   pinSet: false,
   unlocked: false,
+  targetPinLength: 4,
   currentPeriod: 'today', // today, yesterday, week, month, all, custom
   customSelectedDate: '',
   currentView: 'salesView',
@@ -68,6 +69,11 @@ async function checkPinStatus() {
   const localPin = localStorage.getItem('ab_tools_pin');
   const savedSession = sessionStorage.getItem('ab_tools_unlocked');
 
+  if (localPin && localPin.length >= 4 && localPin.length <= 6) {
+    STATE.targetPinLength = localPin.length;
+  }
+  renderPinDots();
+
   // Instant response: if already unlocked in this browser session, open dashboard immediately (0ms)
   if (savedSession === 'true') {
     STATE.unlocked = true;
@@ -85,6 +91,10 @@ async function checkPinStatus() {
     let res = await fetch('/api/status');
     let data = await res.json();
     STATE.pinSet = data.pinSet;
+    if (data.pinLength && data.pinLength >= 4 && data.pinLength <= 6) {
+      STATE.targetPinLength = data.pinLength;
+      renderPinDots();
+    }
     if (!STATE.unlocked) {
       showPinGate();
     }
@@ -100,6 +110,7 @@ function showPinGate() {
 
   pinGate.classList.add('active');
   STATE.enteredPin = '';
+  renderPinDots();
   updatePinDots();
 
   if (!STATE.pinSet) {
@@ -111,20 +122,50 @@ function showPinGate() {
   }
 }
 
-// ==================== TOUCH NUMPAD & PIN SYSTEM ====================
+// ==================== TOUCH NUMPAD & PIN SYSTEM (4 TO 6 DIGITS) ====================
+function renderPinDots() {
+  const container = document.getElementById('pinDotsDisplay');
+  if (!container) return;
+  const count = (STATE.targetPinLength >= 4 && STATE.targetPinLength <= 6) ? STATE.targetPinLength : 6;
+  container.innerHTML = Array.from({ length: count }, () => '<span class="pin-dot"></span>').join('');
+}
+
+function updatePinDots() {
+  const container = document.getElementById('pinDotsDisplay');
+  if (!container) return;
+  const expectedCount = (STATE.targetPinLength >= 4 && STATE.targetPinLength <= 6) ? STATE.targetPinLength : 6;
+  let dots = container.querySelectorAll('.pin-dot');
+  if (dots.length !== expectedCount) {
+    renderPinDots();
+    dots = container.querySelectorAll('.pin-dot');
+  }
+  dots.forEach((dot, index) => {
+    if (index < STATE.enteredPin.length) {
+      dot.classList.add('filled');
+    } else {
+      dot.classList.remove('filled');
+    }
+  });
+}
+
+function onPinDigitInput(digit) {
+  if (STATE.enteredPin.length < 6) {
+    STATE.enteredPin += digit;
+    updatePinDots();
+    const targetLen = (STATE.targetPinLength >= 4 && STATE.targetPinLength <= 6) ? STATE.targetPinLength : 6;
+    if (STATE.enteredPin.length === targetLen) {
+      setTimeout(handleUnlockSubmit, 180);
+    }
+  }
+}
+
 function setupTouchNumpad() {
   const numpadBtns = document.querySelectorAll('.numpad-btn[data-key]');
   numpadBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       const key = btn.getAttribute('data-key');
-      if (STATE.enteredPin.length < 6) {
-        STATE.enteredPin += key;
-        updatePinDots();
-        if (STATE.enteredPin.length === 4) {
-          setTimeout(handleUnlockSubmit, 180);
-        }
-      }
+      onPinDigitInput(key);
     });
   });
 
@@ -153,30 +194,13 @@ function setupTouchNumpad() {
   window.addEventListener('keydown', (e) => {
     if (!STATE.unlocked && STATE.pinSet) {
       if (e.key >= '0' && e.key <= '9') {
-        if (STATE.enteredPin.length < 6) {
-          STATE.enteredPin += e.key;
-          updatePinDots();
-          if (STATE.enteredPin.length === 4) {
-            setTimeout(handleUnlockSubmit, 180);
-          }
-        }
+        onPinDigitInput(e.key);
       } else if (e.key === 'Backspace') {
         STATE.enteredPin = STATE.enteredPin.slice(0, -1);
         updatePinDots();
       } else if (e.key === 'Enter') {
         handleUnlockSubmit();
       }
-    }
-  });
-}
-
-function updatePinDots() {
-  const dots = document.querySelectorAll('#pinDotsDisplay .pin-dot');
-  dots.forEach((dot, index) => {
-    if (index < STATE.enteredPin.length) {
-      dot.classList.add('filled');
-    } else {
-      dot.classList.remove('filled');
     }
   });
 }
@@ -203,6 +227,8 @@ async function handleUnlockSubmit() {
     if (res.ok) {
       STATE.unlocked = true;
       localStorage.setItem('ab_tools_pin', STATE.enteredPin);
+      STATE.targetPinLength = STATE.enteredPin.length;
+      renderPinDots();
       sessionStorage.setItem('ab_tools_unlocked', 'true');
       document.getElementById('pinGateModal').classList.remove('active');
       showToast('Welcome back! Dashboard unlocked 🔓');
@@ -238,8 +264,8 @@ async function handlePinSetup() {
   const errEl = document.getElementById('pinSetupError');
   errEl.textContent = '';
 
-  if (newPin.length < 4) {
-    errEl.textContent = 'PIN must be at least 4 digits long';
+  if (newPin.length < 4 || newPin.length > 6 || !/^\d{4,6}$/.test(newPin)) {
+    errEl.textContent = 'PIN must be between 4 and 6 numeric digits';
     return;
   }
   if (newPin !== confirmPin) {
@@ -257,12 +283,15 @@ async function handlePinSetup() {
 
     if (res.ok) {
       localStorage.setItem('ab_tools_pin', newPin);
+      STATE.targetPinLength = newPin.length;
+      renderPinDots();
       STATE.pinSet = true;
       STATE.unlocked = true;
       sessionStorage.setItem('ab_tools_unlocked', 'true');
       document.getElementById('pinGateModal').classList.remove('active');
       showToast('Your secret PIN has been configured & auto-saved! 🎉');
-      triggerAutoSaveSync();
+      await pushDirectUpstashPin(newPin);
+      triggerAutoSaveSync(true);
       await loadAppData();
     } else {
       errEl.textContent = result.error || 'Failed to save PIN';
@@ -413,8 +442,10 @@ async function performServerSync() {
 
         if (serverResult.pin && String(serverResult.pin).length >= 4) {
           const currentLocalPin = localStorage.getItem('ab_tools_pin');
-          if (currentLocalPin !== serverResult.pin) {
-            localStorage.setItem('ab_tools_pin', serverResult.pin);
+          if (currentLocalPin !== String(serverResult.pin)) {
+            localStorage.setItem('ab_tools_pin', String(serverResult.pin));
+            STATE.targetPinLength = String(serverResult.pin).length;
+            renderPinDots();
           }
         }
 
@@ -2547,13 +2578,19 @@ function handleJsonRestore(e) {
   reader.readAsText(file);
 }
 
-// ==================== SECURITY: PIN CHANGE ====================
+// ==================== SECURITY: PIN CHANGE (4 TO 6 DIGITS) ====================
 async function handleChangePin(e) {
   e.preventDefault();
   const oldPin = document.getElementById('currentPinInput').value.trim();
   const newPin = document.getElementById('changeNewPinInput').value.trim();
   const msgEl = document.getElementById('changePinMessage');
   msgEl.textContent = '';
+
+  if (!newPin || newPin.length < 4 || newPin.length > 6 || !/^\d{4,6}$/.test(newPin)) {
+    msgEl.className = 'pin-feedback-msg text-rose';
+    msgEl.textContent = 'New PIN must be between 4 and 6 numeric digits';
+    return;
+  }
 
   try {
     const res = await fetch('/api/auth/change-pin', {
@@ -2566,16 +2603,21 @@ async function handleChangePin(e) {
       msgEl.className = 'pin-feedback-msg text-green';
       msgEl.textContent = 'Security PIN updated successfully! ✓';
       localStorage.setItem('ab_tools_pin', newPin);
+      STATE.targetPinLength = newPin.length;
+      renderPinDots();
       document.getElementById('changePinForm').reset();
       showToast('PIN updated & auto-synced across devices! 🔒');
-      triggerAutoSaveSync();
+      
+      // Directly sync new PIN to Upstash Redis database
+      await pushDirectUpstashPin(newPin);
+      triggerAutoSaveSync(true);
     } else {
       msgEl.className = 'pin-feedback-msg text-rose';
       msgEl.textContent = result.error || 'Failed to update PIN';
     }
   } catch (err) {
     msgEl.className = 'pin-feedback-msg text-rose';
-    msgEl.textContent = 'Could not connect to server';
+    msgEl.textContent = 'Could not connect to server: ' + err.message;
   }
 }
 
@@ -2758,6 +2800,16 @@ async function syncDirectUpstashRedis() {
             deletedSaleIds: combinedDelSales,
             deletedExpenseIds: combinedDelExp
           };
+
+          if (parsed.pin && String(parsed.pin).length >= 4) {
+            const currentLocalPin = localStorage.getItem('ab_tools_pin');
+            if (currentLocalPin !== String(parsed.pin)) {
+              localStorage.setItem('ab_tools_pin', String(parsed.pin));
+              STATE.targetPinLength = String(parsed.pin).length;
+              renderPinDots();
+            }
+          }
+
           saveLocalState();
           syncSettingsFormUI();
           if (salesChanged || expChanged) {
@@ -2780,6 +2832,12 @@ async function pushDirectUpstashRedis() {
     STATE.data.settings.businessName = sanitizeBusinessName(STATE.data.settings.businessName);
   }
 
+  const currentPin = localStorage.getItem('ab_tools_pin');
+  const payload = {
+    ...STATE.data,
+    pin: currentPin || undefined
+  };
+
   try {
     await fetch(`${url}/set/ab_tools_db`, {
       method: 'POST',
@@ -2787,10 +2845,47 @@ async function pushDirectUpstashRedis() {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(STATE.data)
+      body: JSON.stringify(payload)
     });
   } catch (err) {
     console.warn('Direct Upstash push notice:', err.message);
+  }
+}
+
+async function pushDirectUpstashPin(newPin) {
+  const url = STATE.data.settings?.kvUrl || localStorage.getItem('ab_tools_kv_url') || DEFAULT_CLIENT_KV_URL;
+  const token = STATE.data.settings?.kvToken || localStorage.getItem('ab_tools_kv_token') || DEFAULT_CLIENT_KV_TOKEN;
+  if (!url || !token || !newPin) return;
+
+  try {
+    const getRes = await fetch(`${url}/get/ab_tools_db`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (getRes.ok) {
+      const data = await getRes.json();
+      let db = data.result;
+      if (typeof db === 'string') {
+        try { db = JSON.parse(db); } catch (_) {}
+      }
+      if (typeof db === 'string') {
+        try { db = JSON.parse(db); } catch (_) {}
+      }
+      if (db && typeof db === 'object') {
+        db.pin = String(newPin).trim();
+        db.settings = db.settings || {};
+        db.settings.lastModified = Date.now();
+        await fetch(`${url}/set/ab_tools_db`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(db)
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Direct Upstash PIN push notice:', err.message);
   }
 }
 

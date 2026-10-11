@@ -34,11 +34,11 @@
         <div class="pin-prompt-box">
           <span class="security-tag">🔐 First-Time Setup</span>
           <h2 class="pin-heading">Create Your Secret PIN</h2>
-          <p class="pin-desc">There is no default PIN. Please choose a 4-digit PIN that only you know.</p>
+          <p class="pin-desc">There is no default PIN. Please choose a 4 to 6 digit PIN that only you know.</p>
         </div>
 
         <div class="pin-input-group">
-          <label>New 4-Digit PIN</label>
+          <label>New PIN (4 to 6 Digits)</label>
           <input type="password" id="newPinInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="off">
         </div>
         <div class="pin-input-group">
@@ -57,7 +57,7 @@
         <div class="pin-prompt-box">
           <span class="security-tag">🔒 Private Business Ledger</span>
           <h2 class="pin-heading">Enter Your Security PIN</h2>
-          <p class="pin-desc">Enter your 4-digit PIN to access your financial records.</p>
+          <p class="pin-desc">Enter your 4 to 6 digit PIN to access your financial records.</p>
         </div>
 
         <div class="pin-dots-display" id="pinDotsDisplay">
@@ -616,16 +616,16 @@
                 <span>Security &amp; PIN Settings</span>
               </div>
             </div>
-            <p class="admin-card-desc">Change your private security PIN to protect customer data and financial numbers.</p>
+            <p class="admin-card-desc">Change your private security PIN (4 to 6 digits) to protect customer data and financial numbers.</p>
 
             <form id="changePinForm" class="admin-pin-form">
               <div class="form-group">
                 <label>Current PIN</label>
-                <input type="password" id="currentPinInput" inputmode="numeric" maxlength="6" class="form-control" placeholder="••••" required>
+                <input type="password" id="currentPinInput" inputmode="numeric" maxlength="6" class="form-control" placeholder="Current PIN" required>
               </div>
               <div class="form-group">
-                <label>New PIN (Minimum 4 digits)</label>
-                <input type="password" id="changeNewPinInput" inputmode="numeric" maxlength="6" class="form-control" placeholder="••••" required>
+                <label>New PIN (4 to 6 Digits)</label>
+                <input type="password" id="changeNewPinInput" inputmode="numeric" maxlength="6" class="form-control" placeholder="New 4-6 digit PIN" required>
               </div>
               <div id="changePinMessage" class="pin-feedback-msg"></div>
               <button type="submit" class="btn btn-gold btn-block">Update Security PIN</button>
