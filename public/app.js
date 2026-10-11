@@ -1,5 +1,5 @@
 /**
- * A&B Tools Business Manager — Client Application Logic
+ * Monkey Tools Business Manager — Client Application Logic
  * Mobile-First Ledger & Admin Panel (English UI)
  */
 
@@ -16,7 +16,7 @@ const STATE = {
     products: [],
     recycleBin: [],
     settings: {
-      businessName: 'A&B Tools Business Manager',
+      businessName: 'Monkey Tools Business Manager',
       currency: 'Rs.'
     }
   },
@@ -450,7 +450,7 @@ function syncSettingsFormUI() {
   const tplPaid = document.getElementById('settingTplPaid');
 
   if (nameInput && document.activeElement !== nameInput) {
-    nameInput.value = settings.businessName || 'A&B Tools Business Manager';
+    nameInput.value = settings.businessName || 'Monkey Tools Business Manager';
   }
   if (currInput && document.activeElement !== currInput) {
     currInput.value = settings.currency || 'Rs.';
@@ -1245,7 +1245,7 @@ function renderReminders() {
 function formatCustomTemplate(template, sale) {
   if (!template) return '';
   const settings = STATE.data.settings || {};
-  const business = settings.businessName || 'A&B Tools Business Manager';
+  const business = settings.businessName || 'Monkey Tools Business Manager';
   const currency = settings.currency || 'Rs.';
   const customer = (sale.customerName && sale.customerName.trim()) ? sale.customerName.trim() : 'Customer';
   const product = sale.product || '';
@@ -1694,7 +1694,7 @@ function setupEventListeners() {
   let settingsDebounceTimer = null;
   function onSettingChange(isTplChange = false) {
     STATE.data.settings = STATE.data.settings || {};
-    if (nameInput) STATE.data.settings.businessName = nameInput.value.trim() || 'A&B Tools Business Manager';
+    if (nameInput) STATE.data.settings.businessName = nameInput.value.trim() || 'Monkey Tools Business Manager';
     if (currInput) STATE.data.settings.currency = currInput.value.trim() || 'Rs.';
     if (tplExpiry) STATE.data.settings.templateExpiry = tplExpiry.value;
     if (tplPending) STATE.data.settings.templatePending = tplPending.value;
@@ -2422,7 +2422,7 @@ async function triggerExcelDownload() {
     showToast('Generating Excel file...');
     const link = document.createElement('a');
     link.href = '/api/export/excel';
-    link.download = `A&B_Tools_Ledger_${new Date().toISOString().split('T')[0]}.xlsx`;
+    link.download = `Monkey_Tools_Ledger_${today}.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -2493,7 +2493,7 @@ async function fallbackClientExcelDownload() {
   const wsProducts = XLSX.utils.json_to_sheet(productRows.length ? productRows : [{ Note: 'Empty' }]);
   XLSX.utils.book_append_sheet(wb, wsProducts, 'Products');
 
-  XLSX.writeFile(wb, `A&B_Tools_Ledger_${new Date().toISOString().split('T')[0]}.xlsx`);
+  XLSX.writeFile(wb, `Monkey_Tools_Ledger_${new Date().toISOString().split('T')[0]}.xlsx`);
   showToast('Excel Sheet downloaded!');
 }
 
@@ -2503,7 +2503,7 @@ function downloadJsonBackup() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `A&B_Tools_Backup_${new Date().toISOString().split('T')[0]}.json`;
+  a.download = `Monkey_Tools_Backup_${new Date().toISOString().split('T')[0]}.json`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('JSON backup file downloaded!');

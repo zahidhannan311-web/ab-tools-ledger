@@ -215,7 +215,7 @@ function getInitialDb() {
     sales: [],
     expenses: [],
     settings: {
-      businessName: 'A&B Tools Business Manager',
+      businessName: 'Monkey Tools Business Manager',
       currency: 'Rs.',
       lastModified: 1,
       deletedSaleIds: ['sale_1790808573942_ktuq', 'sale_1790891345201_z6tu'],
@@ -402,7 +402,7 @@ app.get('/api/status', (req, res) => {
   const creds = getCloudKvCredentials();
   res.json({
     pinSet: !!db.pin,
-    businessName: db.settings?.businessName || 'A&B Tools Business Manager',
+    businessName: db.settings?.businessName || 'Monkey Tools Business Manager',
     salesCount: (db.sales || []).length,
     expensesCount: (db.expenses || []).length,
     cloudKvConfigured: !!(creds.url && creds.token),
@@ -838,7 +838,7 @@ app.get('/api/export/excel', (req, res) => {
     const today = new Date().toISOString().split('T')[0];
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="AB_Tools_Ledger_${today}.xlsx"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Monkey_Tools_Ledger_${today}.xlsx"`);
     res.setHeader('Content-Length', buffer.length);
     return res.end(buffer);
   } catch (err) {
@@ -864,7 +864,7 @@ app.get('/api/backup/download', (req, res) => {
   const db = readDb();
   const today = new Date().toISOString().split('T')[0];
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Content-Disposition', `attachment; filename="AB_Tools_Backup_${today}.json"`);
+  res.setHeader('Content-Disposition', `attachment; filename="Monkey_Tools_Backup_${today}.json"`);
   res.send(JSON.stringify(db, null, 2));
 });
 
@@ -1058,7 +1058,7 @@ app.post('/api/reset-data', async (req, res) => {
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`===============================================`);
-    console.log(`🚀 A&B Tools Business Manager Running at:`);
+    console.log(`🚀 Monkey Tools Business Manager Running at:`);
     console.log(`   http://localhost:${PORT}`);
     console.log(`===============================================`);
     const initialData = readDb();

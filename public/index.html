@@ -3,15 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>A&amp;B Tools Business Manager — Ledger &amp; Admin Panel</title>
-  <meta name="theme-color" content="#0d0f12">
+  <title>Monkey Tools — Business Manager &amp; Ledger</title>
+  <meta name="theme-color" content="#0d0f14">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="monkey-logo.png">
+  <link rel="apple-touch-icon" href="monkey-logo.png">
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.3">
+  <link rel="stylesheet" href="style.css?v=3.0">
 </head>
 <body>
 
@@ -20,12 +23,9 @@
     <div class="pin-gate-card">
       <div class="pin-brand-badge">
         <div class="pin-logo-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
+          <img src="monkey-logo.png" alt="Monkey Tools Mascot" class="mascot-avatar-lock">
         </div>
-        <h1 class="brand-title">A&amp;B Tools</h1>
+        <h1 class="brand-title">Monkey Tools</h1>
         <p class="brand-subtitle">Business Manager &amp; Ledger</p>
       </div>
 
@@ -101,15 +101,17 @@
     <header class="app-header">
       <div class="header-content">
         <div class="header-brand">
-          <div class="logo-mark">A&amp;B</div>
+          <div class="logo-mark mascot-logo-wrap">
+            <img src="monkey-logo.png" alt="Monkey Tools Mascot" class="brand-mascot-img">
+          </div>
           <div>
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-              <h1 class="header-title">A&amp;B Tools Manager</h1>
+              <h1 class="header-title">Monkey Tools</h1>
               <span id="liveSyncBadge" class="sync-status-badge synced" title="All entries auto-save instantly across devices without refresh">
                 <span class="sync-dot success"></span> Saved &amp; Synced
               </span>
             </div>
-            <span class="header-tagline">Sales Ledger &amp; Profit Tracker</span>
+            <span class="header-tagline">Sales Ledger &amp; Business Tracker</span>
           </div>
         </div>
 
@@ -497,7 +499,7 @@
               <div class="form-row">
                 <div class="form-group flex-1">
                   <label>Business / Brand Name</label>
-                  <input type="text" id="settingBusinessNameInput" class="form-control" placeholder="A&B Tools Manager" value="A&B Tools Business Manager">
+                  <input type="text" id="settingBusinessNameInput" class="form-control" placeholder="Monkey Tools" value="Monkey Tools Business Manager">
                 </div>
                 <div class="form-group" style="width: 130px;">
                   <label>Currency Symbol</label>
