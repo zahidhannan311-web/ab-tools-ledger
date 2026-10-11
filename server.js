@@ -208,6 +208,15 @@ const DEFAULT_PRODUCTS = [
   }
 ];
 
+function sanitizeBusinessName(name) {
+  if (!name) return 'Monkey Tools';
+  const s = String(name).trim();
+  if (s === '' || s.includes('A&B') || s.includes('Business Manager')) {
+    return 'Monkey Tools';
+  }
+  return s;
+}
+
 function getInitialDb() {
   return {
     pin: null, // First time user sets custom PIN, no default PIN
@@ -215,7 +224,7 @@ function getInitialDb() {
     sales: [],
     expenses: [],
     settings: {
-      businessName: 'Monkey Tools Business Manager',
+      businessName: 'Monkey Tools',
       currency: 'Rs.',
       lastModified: 1,
       deletedSaleIds: ['sale_1790808573942_ktuq', 'sale_1790891345201_z6tu'],
@@ -229,6 +238,9 @@ let memoryDb = null;
 
 function readDb() {
   if (memoryDb) {
+    if (memoryDb.settings) {
+      memoryDb.settings.businessName = sanitizeBusinessName(memoryDb.settings.businessName);
+    }
     return memoryDb;
   }
   try {
@@ -246,6 +258,7 @@ function readDb() {
         parsed.products = DEFAULT_PRODUCTS;
       }
       parsed.settings = parsed.settings || {};
+      parsed.settings.businessName = sanitizeBusinessName(parsed.settings.businessName);
       parsed.settings.deletedSaleIds = parsed.settings.deletedSaleIds || [];
       ['sale_1790808573942_ktuq', 'sale_1790891345201_z6tu'].forEach(id => {
         if (!parsed.settings.deletedSaleIds.includes(id)) parsed.settings.deletedSaleIds.push(id);
@@ -274,6 +287,7 @@ function readDb() {
 
 async function writeDb(data) {
   data.settings = data.settings || {};
+  data.settings.businessName = sanitizeBusinessName(data.settings.businessName);
   data.settings.lastModified = Date.now();
   data.settings.deletedSaleIds = data.settings.deletedSaleIds || [];
   data.settings.deletedExpenseIds = data.settings.deletedExpenseIds || [];
@@ -402,7 +416,7 @@ app.get('/api/status', (req, res) => {
   const creds = getCloudKvCredentials();
   res.json({
     pinSet: !!db.pin,
-    businessName: db.settings?.businessName || 'Monkey Tools Business Manager',
+    businessName: sanitizeBusinessName(db.settings?.businessName),
     salesCount: (db.sales || []).length,
     expensesCount: (db.expenses || []).length,
     cloudKvConfigured: !!(creds.url && creds.token),
@@ -956,6 +970,7 @@ app.post('/api/sync', async (req, res) => {
     db.settings = {
       ...db.settings,
       ...(incomingSettings || {}),
+      businessName: sanitizeBusinessName(incomingSettings?.businessName || db.settings?.businessName),
       lastModified: Date.now(),
       deletedSaleIds: Array.from(deletedSales),
       deletedExpenseIds: Array.from(deletedExpenses)
@@ -984,7 +999,7 @@ app.post('/api/settings', async (req, res) => {
     const { businessName, currency, whatsappTemplate, templateExpiry, templatePending, templateWelcome, templatePaid, defaultPeriod, kvUrl, kvToken } = req.body;
     const db = readDb();
     db.settings = db.settings || {};
-    if (businessName !== undefined) db.settings.businessName = String(businessName).trim();
+    if (businessName !== undefined) db.settings.businessName = sanitizeBusinessName(businessName);
     if (currency !== undefined) db.settings.currency = String(currency).trim();
     if (whatsappTemplate !== undefined) db.settings.whatsappTemplate = String(whatsappTemplate).trim();
     if (templateExpiry !== undefined) db.settings.templateExpiry = String(templateExpiry).trim();

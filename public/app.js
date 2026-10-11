@@ -16,12 +16,21 @@ const STATE = {
     products: [],
     recycleBin: [],
     settings: {
-      businessName: 'Monkey Tools Business Manager',
+      businessName: 'Monkey Tools',
       currency: 'Rs.'
     }
   },
   enteredPin: ''
 };
+
+function sanitizeBusinessName(name) {
+  if (!name) return 'Monkey Tools';
+  const s = String(name).trim();
+  if (s === '' || s.includes('A&B') || s.includes('Business Manager')) {
+    return 'Monkey Tools';
+  }
+  return s;
+}
 
 // Default WhatsApp Message Templates (Individually customizable)
 const DEFAULT_TEMPLATES = {
@@ -397,6 +406,7 @@ async function performServerSync() {
         STATE.data.settings = {
           ...STATE.data.settings,
           ...(serverResult.settings || {}),
+          businessName: sanitizeBusinessName(serverResult.settings?.businessName || STATE.data.settings?.businessName),
           deletedSaleIds: combinedDeletedSales,
           deletedExpenseIds: combinedDeletedExpenses
         };
@@ -442,6 +452,7 @@ async function performServerSync() {
 
 function syncSettingsFormUI() {
   const settings = STATE.data.settings || {};
+  settings.businessName = sanitizeBusinessName(settings.businessName);
   const nameInput = document.getElementById('settingBusinessNameInput');
   const currInput = document.getElementById('settingCurrencyInput');
   const tplExpiry = document.getElementById('settingTplExpiry');
@@ -450,7 +461,7 @@ function syncSettingsFormUI() {
   const tplPaid = document.getElementById('settingTplPaid');
 
   if (nameInput && document.activeElement !== nameInput) {
-    nameInput.value = settings.businessName || 'Monkey Tools Business Manager';
+    nameInput.value = settings.businessName || 'Monkey Tools';
   }
   if (currInput && document.activeElement !== currInput) {
     currInput.value = settings.currency || 'Rs.';
@@ -495,12 +506,10 @@ function syncSettingsFormUI() {
   }
 
   const brandTitle = document.querySelector('.header-title');
-  if (brandTitle && settings.businessName) {
-    brandTitle.textContent = settings.businessName;
+  if (brandTitle) {
+    brandTitle.textContent = settings.businessName || 'Monkey Tools';
   }
-  if (settings.businessName) {
-    document.title = settings.businessName;
-  }
+  document.title = `${settings.businessName || 'Monkey Tools'} — Business Manager & Ledger`;
 }
 
 // Background cross-device sync loop (Phone <-> Laptop)
@@ -597,6 +606,7 @@ async function loadAppData() {
       const parsed = JSON.parse(cached);
       if (parsed && typeof parsed === 'object') {
         parsed.settings = parsed.settings || {};
+        parsed.settings.businessName = sanitizeBusinessName(parsed.settings.businessName);
         parsed.settings.deletedSaleIds = parsed.settings.deletedSaleIds || [];
         ignoredSaleIds.forEach(id => {
           if (!parsed.settings.deletedSaleIds.includes(id)) parsed.settings.deletedSaleIds.push(id);
@@ -1245,7 +1255,7 @@ function renderReminders() {
 function formatCustomTemplate(template, sale) {
   if (!template) return '';
   const settings = STATE.data.settings || {};
-  const business = settings.businessName || 'Monkey Tools Business Manager';
+  const business = sanitizeBusinessName(settings.businessName);
   const currency = settings.currency || 'Rs.';
   const customer = (sale.customerName && sale.customerName.trim()) ? sale.customerName.trim() : 'Customer';
   const product = sale.product || '';
@@ -1694,7 +1704,7 @@ function setupEventListeners() {
   let settingsDebounceTimer = null;
   function onSettingChange(isTplChange = false) {
     STATE.data.settings = STATE.data.settings || {};
-    if (nameInput) STATE.data.settings.businessName = nameInput.value.trim() || 'Monkey Tools Business Manager';
+    if (nameInput) STATE.data.settings.businessName = sanitizeBusinessName(nameInput.value.trim());
     if (currInput) STATE.data.settings.currency = currInput.value.trim() || 'Rs.';
     if (tplExpiry) STATE.data.settings.templateExpiry = tplExpiry.value;
     if (tplPending) STATE.data.settings.templatePending = tplPending.value;
@@ -2744,10 +2754,12 @@ async function syncDirectUpstashRedis() {
           STATE.data.settings = {
             ...STATE.data.settings,
             ...(parsed.settings || {}),
+            businessName: sanitizeBusinessName(parsed.settings?.businessName || STATE.data.settings?.businessName),
             deletedSaleIds: combinedDelSales,
             deletedExpenseIds: combinedDelExp
           };
           saveLocalState();
+          syncSettingsFormUI();
           if (salesChanged || expChanged) {
             renderApp();
           }
@@ -2763,6 +2775,10 @@ async function pushDirectUpstashRedis() {
   const url = STATE.data.settings?.kvUrl || localStorage.getItem('ab_tools_kv_url') || DEFAULT_CLIENT_KV_URL;
   const token = STATE.data.settings?.kvToken || localStorage.getItem('ab_tools_kv_token') || DEFAULT_CLIENT_KV_TOKEN;
   if (!url || !token) return;
+
+  if (STATE.data.settings) {
+    STATE.data.settings.businessName = sanitizeBusinessName(STATE.data.settings.businessName);
+  }
 
   try {
     await fetch(`${url}/set/ab_tools_db`, {
