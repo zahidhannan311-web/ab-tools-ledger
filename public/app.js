@@ -2463,7 +2463,8 @@ function renderAdminEmployees() {
       <div class="empty-state" style="padding: 25px 15px;">
         <div class="empty-state-icon">👥</div>
         <div class="empty-state-title" style="font-size: 14px;">No staff members added yet</div>
-        <p class="text-muted" style="font-size: 12px; margin-top: 4px;">Click '+ Add New Staff' above to create employee accounts with custom PINs and commission rates.</p>
+        <p class="text-muted" style="font-size: 12px; margin-top: 4px;">Create employee accounts with custom PINs and daily commission rates.</p>
+        <button type="button" class="btn btn-gold btn-xs mt-2" onclick="openNewEmployeeModal()">+ Add New Staff</button>
       </div>
     `;
     return;

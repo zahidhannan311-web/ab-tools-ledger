@@ -452,7 +452,7 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                 <span>👥 Staff &amp; Employee Management</span>
               </div>
-              <button id="btnOpenNewEmployeeModal" class="btn btn-gold btn-xs">+ Add New Staff</button>
+              <button id="btnOpenNewEmployeeModal" class="btn btn-gold btn-xs" onclick="openNewEmployeeModal()">+ Add New Staff</button>
             </div>
             <p class="admin-card-desc">Create employee accounts with 4-6 digit login PINs and daily profit/sales commission rates (%). Each employee gets a fresh dedicated portal immediately.</p>
 
@@ -1079,6 +1079,9 @@
       <div id="recycleBinListContainer" class="search-results-container" style="max-height: 60vh; overflow-y: auto;">
         <!-- Deleted items dynamically injected here -->
       </div>
+    </div>
+  </div>
+
   <!-- ==================== MODAL: DELETE SALE WITH MANDATORY REASON ==================== -->
   <div id="deleteSaleReasonModal" class="modal-overlay">
     <div class="modal-card modal-sm">
@@ -1262,6 +1265,6 @@
   <!-- Notification Toast -->
   <div id="toastNotification" class="toast"></div>
 
-  <script src="app.js?v=2.3"></script>
+  <script src="app.js?v=2.4"></script>
 </body>
 </html>
