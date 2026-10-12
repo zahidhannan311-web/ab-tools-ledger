@@ -732,9 +732,14 @@ app.post('/api/sales', async (req, res) => {
     updatedAt
   } = req.body;
 
-  if (!customerPhone || !product || !accountLogin || !amount) {
+  const isPrivate = String(accountType || '').trim().toLowerCase() === 'private';
+  const prodLower = String(product || '').trim().toLowerCase();
+  const isNordOrSurfshark = prodLower.includes('nord') || prodLower.includes('surfshark');
+  const isAccountMandatory = isNordOrSurfshark ? !isPrivate : !isPrivate;
+
+  if (!customerPhone || !product || (isAccountMandatory && !accountLogin) || amount === undefined || amount === null || amount === '') {
     return res.status(400).json({
-      error: 'Customer Phone, Product, Assigned Account, and Amount are required!'
+      error: 'Customer Phone, Product, and Amount are required' + (isAccountMandatory ? ', and Email/Login is mandatory for Shared plan!' : '!')
     });
   }
 
@@ -751,7 +756,7 @@ app.post('/api/sales', async (req, res) => {
     customerPhone: customerPhone.trim(),
     product: product.trim(),
     accountType: accountType || 'Shared',
-    accountLogin: accountLogin.trim(),
+    accountLogin: accountLogin ? accountLogin.trim() : '',
     planMonths: months,
     planLabel: planLabel || `${months} Month(s)`,
     amount: Number(amount) || 0,

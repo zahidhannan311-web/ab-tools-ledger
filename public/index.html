@@ -948,10 +948,38 @@
         </div>
 
         <!-- Assigned Account (Email/Login) -->
-        <div class="form-group">
-          <label for="saleAccountLogin">Assigned Account — Email/Login <span class="text-gold">*</span></label>
-          <input type="text" id="saleAccountLogin" class="form-control font-mono" placeholder="e.g. Abd114@kuromee.com" required>
-          <small class="form-hint">Useful when customer reports logout to quickly look up assigned credentials</small>
+        <div class="form-group" id="saleAccountGroup">
+          <div class="label-with-actions">
+            <label for="saleAccountLogin" id="saleAccountLabel">
+              Assigned Account — Email/Login
+              <span id="saleEmailMandatoryBadge" class="badge-req" style="display:none;">Mandatory for Shared</span>
+            </label>
+            <button type="button" id="btnToggleEmailManualInput" class="btn-chip" style="display:none; font-size:11px;">
+              ✏️ Type Manually
+            </button>
+          </div>
+
+          <!-- Email Dropdown for Nord & Surfshark -->
+          <div id="saleEmailDropdownWrap" style="display:none; margin-bottom: 8px;">
+            <select id="saleEmailDropdown" class="form-control font-mono">
+              <!-- Dynamically populated: + Add New Email at top, followed by existing emails with newest first -->
+            </select>
+          </div>
+
+          <!-- Email Text Input Wrap -->
+          <div id="saleEmailInputWrap">
+            <div style="display: flex; gap: 6px;">
+              <input type="text" id="saleAccountLogin" class="form-control font-mono flex-1" placeholder="e.g. Abd114@kuromee.com">
+              <button type="button" id="btnSaveNewEmailToList" class="btn btn-gold btn-xs" style="display:none; white-space:nowrap; padding: 0 10px;">
+                + Save to List
+              </button>
+            </div>
+            <div id="saleNewEmailHint" class="form-hint" style="display:none; color:var(--gold-accent); margin-top:4px;">
+              ✨ New email will be placed at the top of the dropdown list.
+            </div>
+          </div>
+
+          <small class="form-hint" id="saleAccountHint">Useful when customer reports logout to quickly look up assigned credentials</small>
         </div>
 
         <!-- Plan & Price (Amount) -->

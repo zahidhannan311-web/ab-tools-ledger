@@ -1121,6 +1121,276 @@ function populateProductDropdowns() {
   }
 }
 
+// ==================== NORD & SURFSHARK EMAIL DROPDOWN SYSTEM ====================
+let saleEmailManualMode = false;
+
+function isNordOrSurfshark(prod) {
+  if (!prod) return false;
+  const p = String(prod).trim().toLowerCase();
+  return p.includes('nord') || p.includes('surfshark');
+}
+
+function getProductEmailList(productName) {
+  if (!productName) return [];
+  const normProd = productName.trim().toLowerCase().includes('nord') ? 'Nord' : 'Surfshark';
+
+  STATE.data.settings = STATE.data.settings || {};
+  STATE.data.settings.productEmails = STATE.data.settings.productEmails || {};
+  let customList = Array.isArray(STATE.data.settings.productEmails[normProd])
+    ? [...STATE.data.settings.productEmails[normProd]]
+    : [];
+
+  // Merge with localStorage cached custom emails
+  try {
+    const localSaved = JSON.parse(localStorage.getItem('ab_tools_product_emails') || '{}');
+    if (Array.isArray(localSaved[normProd])) {
+      localSaved[normProd].forEach(em => {
+        if (!customList.some(c => c.toLowerCase() === em.toLowerCase())) {
+          customList.push(em);
+        }
+      });
+    }
+  } catch (_) {}
+
+  // Gather previously used emails from sales history for this product (newest sales first)
+  const salesEmails = [];
+  const sales = STATE.data.sales || [];
+  for (const s of sales) {
+    if (s.product && s.product.trim().toLowerCase().includes(normProd.toLowerCase())) {
+      const email = (s.accountLogin || '').trim();
+      if (email && email.toLowerCase() !== 'na' && email.toLowerCase() !== 'n/a' && email.toLowerCase() !== 'none' && email !== '-') {
+        salesEmails.push(email);
+      }
+    }
+  }
+
+  // Deduplicate while preserving order: customList (top/newest) first, then salesEmails
+  const result = [];
+  const seen = new Set();
+  [...customList, ...salesEmails].forEach(em => {
+    const clean = em.trim();
+    const key = clean.toLowerCase();
+    if (clean && !seen.has(key)) {
+      seen.add(key);
+      result.push(clean);
+    }
+  });
+
+  return result;
+}
+
+function saveNewProductEmail(productName, email) {
+  if (!email) return;
+  const cleanEmail = email.trim();
+  if (!cleanEmail || cleanEmail.toLowerCase() === 'na' || cleanEmail.toLowerCase() === 'none' || cleanEmail === '-') return;
+  const normProd = productName.trim().toLowerCase().includes('nord') ? 'Nord' : 'Surfshark';
+
+  STATE.data.settings = STATE.data.settings || {};
+  STATE.data.settings.productEmails = STATE.data.settings.productEmails || {};
+  let list = Array.isArray(STATE.data.settings.productEmails[normProd])
+    ? [...STATE.data.settings.productEmails[normProd]]
+    : [];
+
+  // Remove if already present so it moves directly to index 0 (VERY TOP)
+  list = list.filter(e => e.trim().toLowerCase() !== cleanEmail.toLowerCase());
+
+  // Place newly added email at the VERY TOP
+  list.unshift(cleanEmail);
+  STATE.data.settings.productEmails[normProd] = list;
+
+  // Persist locally and in state
+  try {
+    const localSaved = JSON.parse(localStorage.getItem('ab_tools_product_emails') || '{}');
+    localSaved[normProd] = list;
+    localStorage.setItem('ab_tools_product_emails', JSON.stringify(localSaved));
+  } catch (_) {}
+
+  saveLocalState();
+  triggerAutoSaveSync(false);
+}
+
+function updateSaleEmailFieldUI(presetEmail = null) {
+  const prodSelect = document.getElementById('saleProductSelect');
+  const typeSelect = document.getElementById('saleTypeSelect');
+  const emailDropdownWrap = document.getElementById('saleEmailDropdownWrap');
+  const emailDropdown = document.getElementById('saleEmailDropdown');
+  const emailInputWrap = document.getElementById('saleEmailInputWrap');
+  const emailInput = document.getElementById('saleAccountLogin');
+  const badge = document.getElementById('saleEmailMandatoryBadge');
+  const btnToggle = document.getElementById('btnToggleEmailManualInput');
+  const btnSave = document.getElementById('btnSaveNewEmailToList');
+  const hint = document.getElementById('saleNewEmailHint');
+
+  if (!prodSelect || !typeSelect || !emailInput) return;
+
+  const product = prodSelect.value;
+  const accountType = typeSelect.value || 'Shared';
+  const isSpecial = isNordOrSurfshark(product);
+  const isShared = (accountType || '').toLowerCase() === 'shared';
+
+  const currentVal = (presetEmail !== null ? presetEmail : (emailInput.value || '')).trim();
+
+  if (isSpecial) {
+    if (emailDropdownWrap) emailDropdownWrap.style.display = 'block';
+    if (btnToggle) btnToggle.style.display = 'inline-block';
+
+    // Mandatory badge: ONLY mandatory for Shared plan. Private plan is optional!
+    if (badge) {
+      if (isShared) {
+        badge.className = 'badge-req';
+        badge.textContent = 'Mandatory for Shared';
+        badge.style.display = 'inline-block';
+      } else {
+        badge.className = 'text-muted';
+        badge.textContent = '(Optional for Private)';
+        badge.style.display = 'inline-block';
+      }
+    }
+
+    // Populate dropdown options
+    const emailList = getProductEmailList(product);
+    if (emailDropdown) {
+      const topPrompt = isShared ? '-- Select Email (Mandatory) --' : '-- No Email / Optional (Private) --';
+      let html = `<option value="">${topPrompt}</option>`;
+      html += `<option value="__ADD_NEW__">➕ Add New Email / Type Custom...</option>`;
+
+      emailList.forEach(em => {
+        html += `<option value="${escapeHtml(em)}">${escapeHtml(em)}</option>`;
+      });
+
+      emailDropdown.innerHTML = html;
+
+      // Select existing value if applicable
+      if (currentVal && currentVal.toLowerCase() !== 'na' && currentVal.toLowerCase() !== 'none') {
+        const found = emailList.find(e => e.toLowerCase() === currentVal.toLowerCase());
+        if (found) {
+          emailDropdown.value = found;
+          emailInput.value = found;
+        } else {
+          // Dynamic option if custom
+          const opt = document.createElement('option');
+          opt.value = currentVal;
+          opt.textContent = currentVal;
+          emailDropdown.insertBefore(opt, emailDropdown.children[2] || null);
+          emailDropdown.value = currentVal;
+          emailInput.value = currentVal;
+        }
+      } else {
+        emailDropdown.value = '';
+        if (!saleEmailManualMode) {
+          emailInput.value = '';
+        }
+      }
+    }
+
+    // Toggle manual typing input visibility
+    if (saleEmailManualMode || emailDropdown?.value === '__ADD_NEW__') {
+      if (emailInputWrap) emailInputWrap.style.display = 'block';
+      if (btnSave) btnSave.style.display = 'inline-block';
+      if (hint) hint.style.display = 'block';
+      if (btnToggle) btnToggle.textContent = '📋 Choose from List';
+    } else {
+      if (emailInputWrap) emailInputWrap.style.display = 'none';
+      if (btnSave) btnSave.style.display = 'none';
+      if (hint) hint.style.display = 'none';
+      if (btnToggle) btnToggle.textContent = '✏️ Type Manually';
+    }
+  } else {
+    // Normal tools (CapCut, Gemini Pro, etc.)
+    if (emailDropdownWrap) emailDropdownWrap.style.display = 'none';
+    if (btnToggle) btnToggle.style.display = 'none';
+    if (btnSave) btnSave.style.display = 'none';
+    if (hint) hint.style.display = 'none';
+    if (emailInputWrap) emailInputWrap.style.display = 'block';
+
+    if (badge) {
+      if (isShared) {
+        badge.className = 'badge-req';
+        badge.textContent = 'Mandatory';
+        badge.style.display = 'inline-block';
+      } else {
+        badge.className = 'text-muted';
+        badge.textContent = '(Optional for Private)';
+        badge.style.display = 'inline-block';
+      }
+    }
+  }
+}
+
+function onSaleEmailDropdownChange() {
+  const dropdown = document.getElementById('saleEmailDropdown');
+  const input = document.getElementById('saleAccountLogin');
+  const inputWrap = document.getElementById('saleEmailInputWrap');
+  const btnSave = document.getElementById('btnSaveNewEmailToList');
+  const hint = document.getElementById('saleNewEmailHint');
+  const btnToggle = document.getElementById('btnToggleEmailManualInput');
+
+  if (!dropdown || !input) return;
+
+  if (dropdown.value === '__ADD_NEW__') {
+    saleEmailManualMode = true;
+    if (inputWrap) inputWrap.style.display = 'block';
+    if (btnSave) btnSave.style.display = 'inline-block';
+    if (hint) hint.style.display = 'block';
+    if (btnToggle) btnToggle.textContent = '📋 Choose from List';
+    input.value = '';
+    setTimeout(() => input.focus(), 50);
+  } else {
+    saleEmailManualMode = false;
+    input.value = dropdown.value;
+    if (inputWrap) inputWrap.style.display = 'none';
+    if (btnSave) btnSave.style.display = 'none';
+    if (hint) hint.style.display = 'none';
+    if (btnToggle) btnToggle.textContent = '✏️ Type Manually';
+  }
+}
+
+function toggleSaleEmailManualMode() {
+  const inputWrap = document.getElementById('saleEmailInputWrap');
+  const btnSave = document.getElementById('btnSaveNewEmailToList');
+  const hint = document.getElementById('saleNewEmailHint');
+  const btnToggle = document.getElementById('btnToggleEmailManualInput');
+  const input = document.getElementById('saleAccountLogin');
+  const dropdown = document.getElementById('saleEmailDropdown');
+
+  saleEmailManualMode = !saleEmailManualMode;
+
+  if (saleEmailManualMode) {
+    if (inputWrap) inputWrap.style.display = 'block';
+    if (btnSave) btnSave.style.display = 'inline-block';
+    if (hint) hint.style.display = 'block';
+    if (btnToggle) btnToggle.textContent = '📋 Choose from List';
+    if (dropdown) dropdown.value = '__ADD_NEW__';
+    setTimeout(() => input?.focus(), 50);
+  } else {
+    if (inputWrap) inputWrap.style.display = 'none';
+    if (btnSave) btnSave.style.display = 'none';
+    if (hint) hint.style.display = 'none';
+    if (btnToggle) btnToggle.textContent = '✏️ Type Manually';
+    if (dropdown) dropdown.value = input?.value || '';
+  }
+}
+
+function handleSaveNewEmailButton() {
+  const prodSelect = document.getElementById('saleProductSelect');
+  const input = document.getElementById('saleAccountLogin');
+  if (!prodSelect || !input) return;
+
+  const product = prodSelect.value;
+  const newEmail = input.value.trim();
+
+  if (!newEmail) {
+    alert('Please enter an email address first.');
+    input.focus();
+    return;
+  }
+
+  saveNewProductEmail(product, newEmail);
+  saleEmailManualMode = false;
+  updateSaleEmailFieldUI(newEmail);
+  showToast(`Added ${newEmail} to top of ${product} list! 📧`);
+}
+
 function onProductChange() {
   const productSelect = document.getElementById('saleProductSelect');
   const typeSelect = document.getElementById('saleTypeSelect');
@@ -1141,10 +1411,12 @@ function onProductChange() {
   }
 
   updatePlansForProductAndType();
+  updateSaleEmailFieldUI();
 }
 
 function onProductOrTypeChange() {
   updatePlansForProductAndType();
+  updateSaleEmailFieldUI();
 }
 
 function updatePlansForProductAndType() {
@@ -1577,8 +1849,8 @@ function renderSaleCardHtml(s) {
         <div class="detail-item">
           <span class="detail-label">Assigned Account</span>
           <span class="detail-value account-email">
-            ${escapeHtml(s.accountLogin)}
-            <button class="btn-xs btn-outline ml-1" title="Copy Login" onclick="copyText('${escapeHtml(s.accountLogin)}')">📋 Copy</button>
+            ${s.accountLogin ? escapeHtml(s.accountLogin) : '<span class="text-muted">None / Private Plan</span>'}
+            ${s.accountLogin ? `<button class="btn-xs btn-outline ml-1" title="Copy Login" onclick="copyText('${escapeHtml(s.accountLogin)}')">📋 Copy</button>` : ''}
           </span>
         </div>
         <div class="detail-item">
@@ -2365,6 +2637,11 @@ function setupEventListeners() {
   planSelect?.addEventListener('change', onPlanChange);
   dateInput?.addEventListener('input', updateLiveExpiryPreview);
 
+  // Email Dropdown & Manual Input Events for Nord & Surfshark
+  document.getElementById('saleEmailDropdown')?.addEventListener('change', onSaleEmailDropdownChange);
+  document.getElementById('btnToggleEmailManualInput')?.addEventListener('click', toggleSaleEmailManualMode);
+  document.getElementById('btnSaveNewEmailToList')?.addEventListener('click', handleSaveNewEmailButton);
+
   // Switch User / Logout Button & Header Role Badge
   document.getElementById('btnSwitchUser')?.addEventListener('click', handleSwitchUser);
   const userBadgeEl = document.getElementById('currentUserBadge');
@@ -2686,6 +2963,9 @@ function openSaleModal() {
   document.getElementById('saleModalTitle').textContent = 'New Sale Entry';
   document.getElementById('saleForm').reset();
 
+  saleEmailManualMode = false;
+  document.getElementById('saleAccountLogin').value = '';
+
   // Reset proof screenshot
   document.getElementById('saleProofFileInput').value = '';
   document.getElementById('saleProofBase64').value = '';
@@ -2698,6 +2978,7 @@ function openSaleModal() {
 
   setDefaultDates();
   onProductChange();
+  updateSaleEmailFieldUI('');
   openModal('saleModal');
   setTimeout(() => {
     document.getElementById('salePhoneInput')?.focus({ preventScroll: true });
@@ -2718,7 +2999,11 @@ function openEditSale(id) {
 
   onProductOrTypeChange();
 
-  document.getElementById('saleAccountLogin').value = sale.accountLogin || '';
+  saleEmailManualMode = false;
+  const login = sale.accountLogin || '';
+  document.getElementById('saleAccountLogin').value = login;
+  updateSaleEmailFieldUI(login);
+
   document.getElementById('salePlanSelect').value = String(sale.planMonths);
   document.getElementById('saleAmountInput').value = sale.amount;
   document.getElementById('saleNotesInput').value = sale.notes || '';
@@ -2755,7 +3040,36 @@ async function handleSaleSubmit(e) {
   const customerName = document.getElementById('saleNameInput').value.trim();
   const product = document.getElementById('saleProductSelect').value;
   const accountType = document.getElementById('saleTypeSelect').value;
-  const accountLogin = document.getElementById('saleAccountLogin').value.trim();
+  let accountLogin = document.getElementById('saleAccountLogin').value.trim();
+
+  const isSpecial = isNordOrSurfshark(product);
+  const isShared = (accountType || '').toLowerCase() === 'shared';
+  const emailDropdown = document.getElementById('saleEmailDropdown');
+  const emailDropdownWrap = document.getElementById('saleEmailDropdownWrap');
+
+  // If Nord or Surfshark and using dropdown selection
+  if (isSpecial && emailDropdownWrap && emailDropdownWrap.style.display !== 'none' && !saleEmailManualMode) {
+    if (emailDropdown && emailDropdown.value && emailDropdown.value !== '__ADD_NEW__') {
+      accountLogin = emailDropdown.value.trim();
+    }
+  }
+
+  // MANDATORY EMAIL CHECK: Nord and Surfshark me Email mandatory only Shared plan me, Private me lazmi nahi!
+  if (isSpecial && isShared && !accountLogin) {
+    alert(`⚠️ EMAIL IS MANDATORY FOR SHARED PLAN!\n\n${product} Shared plan ke liye Email/Login lazmi hai. Meherbani karke dropdown se email select karein ya new email add karein.`);
+    if (emailDropdownWrap && emailDropdownWrap.style.display !== 'none' && !saleEmailManualMode) {
+      emailDropdown?.focus();
+    } else {
+      document.getElementById('saleAccountLogin')?.focus();
+    }
+    return;
+  }
+
+  // If email was entered/added for Nord or Surfshark, auto-save to the VERY TOP of the list
+  if (isSpecial && accountLogin && accountLogin.toLowerCase() !== 'na' && accountLogin.toLowerCase() !== 'none') {
+    saveNewProductEmail(product, accountLogin);
+  }
+
   const planSelect = document.getElementById('salePlanSelect');
   const planMonths = Number(planSelect.value) || 1;
   const planLabel = planSelect.options[planSelect.selectedIndex]?.getAttribute('data-label') || `${planMonths} Month(s)`;
