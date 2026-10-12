@@ -837,34 +837,37 @@ app.patch('/api/sales/:id/status', async (req, res) => {
 // Delete Sale (Moves to Recycle Bin with Mandatory Reason)
 app.delete('/api/sales/:id', async (req, res) => {
   const { id } = req.params;
-  const { reason, deletedBy } = req.body || {};
+  const { reason, deletedBy, deleterId, deleterRole, item: clientItem } = req.body || {};
   const db = readDb();
-  const sale = db.sales.find(s => s.id === id);
-
-  if (!sale) {
-    return res.status(404).json({ error: 'Sale record not found' });
-  }
+  const sale = db.sales.find(s => s.id === id) || clientItem;
 
   db.sales = db.sales.filter(s => s.id !== id);
 
   const deleteReason = String(reason || 'No reason specified').trim();
-  const deleterName = String(deletedBy || sale.soldBy || 'Admin').trim();
+  const deleterName = String(deletedBy || sale?.soldBy || 'Admin').trim();
 
   db.recycleBin = db.recycleBin || [];
-  db.recycleBin.unshift({
-    id: 'trash_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-    originalId: id,
-    type: 'sale',
-    item: {
-      ...sale,
+  // Avoid duplicate trash entries for the same original item
+  if (!db.recycleBin.some(t => t.originalId === id)) {
+    db.recycleBin.unshift({
+      id: 'trash_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      originalId: id,
+      type: 'sale',
+      item: {
+        ...(sale || {}),
+        deleteReason,
+        deletedBy: deleterName,
+        deleterRole: deleterRole || (deleterName === 'Admin' ? 'admin' : 'employee'),
+        deleterId: deleterId || (deleterName === 'Admin' ? 'admin' : undefined)
+      },
       deleteReason,
-      deletedBy: deleterName
-    },
-    deleteReason,
-    deletedBy: deleterName,
-    deletedAt: new Date().toISOString()
-  });
-  if (db.recycleBin.length > 200) db.recycleBin.pop();
+      deletedBy: deleterName,
+      deleterRole: deleterRole || (deleterName === 'Admin' ? 'admin' : 'employee'),
+      deleterId: deleterId || (deleterName === 'Admin' ? 'admin' : undefined),
+      deletedAt: new Date().toISOString()
+    });
+    if (db.recycleBin.length > 200) db.recycleBin.pop();
+  }
 
   db.settings = db.settings || {};
   db.settings.deletedSaleIds = db.settings.deletedSaleIds || [];
@@ -942,24 +945,36 @@ app.put('/api/expenses/:id', async (req, res) => {
 // Delete Expense (Moves to Recycle Bin)
 app.delete('/api/expenses/:id', async (req, res) => {
   const { id } = req.params;
+  const { reason, deletedBy, deleterId, deleterRole, item: clientItem } = req.body || {};
   const db = readDb();
-  const expense = db.expenses.find(e => e.id === id);
-
-  if (!expense) {
-    return res.status(404).json({ error: 'Expense record not found' });
-  }
+  const expense = db.expenses.find(e => e.id === id) || clientItem;
 
   db.expenses = db.expenses.filter(e => e.id !== id);
 
+  const deleteReason = String(reason || 'Expense deleted').trim();
+  const deleterName = String(deletedBy || expense?.assignedToName || 'Admin').trim();
+
   db.recycleBin = db.recycleBin || [];
-  db.recycleBin.unshift({
-    id: 'trash_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-    originalId: id,
-    type: 'expense',
-    item: expense,
-    deletedAt: new Date().toISOString()
-  });
-  if (db.recycleBin.length > 200) db.recycleBin.pop();
+  if (!db.recycleBin.some(t => t.originalId === id)) {
+    db.recycleBin.unshift({
+      id: 'trash_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      originalId: id,
+      type: 'expense',
+      item: {
+        ...(expense || {}),
+        deleteReason,
+        deletedBy: deleterName,
+        deleterRole: deleterRole || (deleterName === 'Admin' ? 'admin' : 'employee'),
+        deleterId: deleterId || (deleterName === 'Admin' ? 'admin' : undefined)
+      },
+      deleteReason,
+      deletedBy: deleterName,
+      deleterRole: deleterRole || (deleterName === 'Admin' ? 'admin' : 'employee'),
+      deleterId: deleterId || (deleterName === 'Admin' ? 'admin' : undefined),
+      deletedAt: new Date().toISOString()
+    });
+    if (db.recycleBin.length > 200) db.recycleBin.pop();
+  }
 
   db.settings = db.settings || {};
   db.settings.deletedExpenseIds = db.settings.deletedExpenseIds || [];
@@ -994,19 +1009,26 @@ app.post('/api/recycle-bin/restore/:id', async (req, res) => {
   const trashEntry = db.recycleBin[index];
   db.recycleBin.splice(index, 1);
 
+  db.settings = db.settings || {};
   if (trashEntry.type === 'sale') {
     db.sales = db.sales || [];
-    const exists = db.sales.some(s => s.id === trashEntry.item.id);
-    if (!exists) db.sales.unshift(trashEntry.item);
+    const exists = db.sales.some(s => s.id === trashEntry.item?.id);
+    if (!exists && trashEntry.item) db.sales.unshift(trashEntry.item);
+    db.settings.restoredSaleIds = db.settings.restoredSaleIds || [];
+    const sId = trashEntry.item?.id || trashEntry.originalId;
+    if (sId && !db.settings.restoredSaleIds.includes(sId)) db.settings.restoredSaleIds.push(sId);
     if (db.settings?.deletedSaleIds) {
-      db.settings.deletedSaleIds = db.settings.deletedSaleIds.filter(sid => sid !== trashEntry.originalId && sid !== trashEntry.item.id);
+      db.settings.deletedSaleIds = db.settings.deletedSaleIds.filter(sid => sid !== trashEntry.originalId && sid !== trashEntry.item?.id);
     }
   } else if (trashEntry.type === 'expense') {
     db.expenses = db.expenses || [];
-    const exists = db.expenses.some(e => e.id === trashEntry.item.id);
-    if (!exists) db.expenses.unshift(trashEntry.item);
+    const exists = db.expenses.some(e => e.id === trashEntry.item?.id);
+    if (!exists && trashEntry.item) db.expenses.unshift(trashEntry.item);
+    db.settings.restoredExpenseIds = db.settings.restoredExpenseIds || [];
+    const eId = trashEntry.item?.id || trashEntry.originalId;
+    if (eId && !db.settings.restoredExpenseIds.includes(eId)) db.settings.restoredExpenseIds.push(eId);
     if (db.settings?.deletedExpenseIds) {
-      db.settings.deletedExpenseIds = db.settings.deletedExpenseIds.filter(eid => eid !== trashEntry.originalId && eid !== trashEntry.item.id);
+      db.settings.deletedExpenseIds = db.settings.deletedExpenseIds.filter(eid => eid !== trashEntry.originalId && eid !== trashEntry.item?.id);
     }
   }
 
@@ -1019,6 +1041,12 @@ app.delete('/api/recycle-bin/:id', async (req, res) => {
   const { id } = req.params;
   const db = readDb();
   db.recycleBin = (db.recycleBin || []).filter(t => t.id !== id && t.originalId !== id);
+  db.settings = db.settings || {};
+  db.settings.purgedTrashIds = db.settings.purgedTrashIds || [];
+  if (!db.settings.purgedTrashIds.includes(id)) {
+    db.settings.purgedTrashIds.push(id);
+    if (db.settings.purgedTrashIds.length > 500) db.settings.purgedTrashIds.shift();
+  }
   await writeDb(db);
   res.json({ success: true, message: 'Item permanently deleted' });
 });
@@ -1026,6 +1054,15 @@ app.delete('/api/recycle-bin/:id', async (req, res) => {
 // Empty Entire Recycle Bin
 app.delete('/api/recycle-bin', async (req, res) => {
   const db = readDb();
+  db.settings = db.settings || {};
+  db.settings.purgedTrashIds = db.settings.purgedTrashIds || [];
+  (db.recycleBin || []).forEach(t => {
+    if (t.id && !db.settings.purgedTrashIds.includes(t.id)) db.settings.purgedTrashIds.push(t.id);
+    if (t.originalId && !db.settings.purgedTrashIds.includes(t.originalId)) db.settings.purgedTrashIds.push(t.originalId);
+  });
+  if (db.settings.purgedTrashIds.length > 500) {
+    db.settings.purgedTrashIds = db.settings.purgedTrashIds.slice(-500);
+  }
   db.recycleBin = [];
   await writeDb(db);
   res.json({ success: true, message: 'Recycle Bin emptied successfully' });
@@ -1212,9 +1249,45 @@ app.post('/api/sync', async (req, res) => {
       db.employees = Array.from(empMap.values());
     }
 
+    // NON-DESTRUCTIVE RECYCLE BIN MERGE (Never wipe deleted entries on multi-device sync)
+    const purgedTrash = new Set([
+      ...(db.settings?.purgedTrashIds || []),
+      ...(incomingSettings?.purgedTrashIds || [])
+    ]);
+
+    const trashMap = new Map();
+    // 1. Existing server items
+    (db.recycleBin || []).forEach(item => {
+      if (!item) return;
+      const key = item.id || item.originalId;
+      if (key && !purgedTrash.has(key) && !purgedTrash.has(item.originalId) && !restoredSales.has(item.originalId) && !restoredExpenses.has(item.originalId)) {
+        trashMap.set(key, item);
+      }
+    });
+
+    // 2. Incoming client items
     if (Array.isArray(incomingRecycleBin)) {
-      db.recycleBin = incomingRecycleBin;
+      incomingRecycleBin.forEach(item => {
+        if (!item) return;
+        const key = item.id || item.originalId;
+        if (key && !purgedTrash.has(key) && !purgedTrash.has(item.originalId) && !restoredSales.has(item.originalId) && !restoredExpenses.has(item.originalId)) {
+          if (!trashMap.has(key)) {
+            trashMap.set(key, item);
+          } else {
+            const existing = trashMap.get(key);
+            const inTime = new Date(item.deletedAt || 0).getTime();
+            const exTime = new Date(existing.deletedAt || 0).getTime();
+            if (inTime >= exTime) {
+              trashMap.set(key, item);
+            }
+          }
+        }
+      });
     }
+
+    db.recycleBin = Array.from(trashMap.values())
+      .sort((a, b) => new Date(b.deletedAt || 0).getTime() - new Date(a.deletedAt || 0).getTime())
+      .slice(0, 200);
 
     // NOTE: db.pin is strictly managed by /api/auth/change-pin and /api/auth/setup-pin
     // Background polling from stale devices must NEVER revert a newly changed PIN.
@@ -1225,7 +1298,10 @@ app.post('/api/sync', async (req, res) => {
       businessName: sanitizeBusinessName(incomingSettings?.businessName || db.settings?.businessName),
       lastModified: Date.now(),
       deletedSaleIds: Array.from(deletedSales),
-      deletedExpenseIds: Array.from(deletedExpenses)
+      deletedExpenseIds: Array.from(deletedExpenses),
+      restoredSaleIds: Array.from(restoredSales).slice(-500),
+      restoredExpenseIds: Array.from(restoredExpenses).slice(-500),
+      purgedTrashIds: Array.from(purgedTrash).slice(-500)
     };
 
     await writeDb(db);

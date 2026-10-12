@@ -169,7 +169,7 @@ function openSideDrawer() {
 
   // Update badge counts in drawer
   const trashBadge = document.getElementById('drawerTrashBadge');
-  const trashCount = (STATE.data.recycleBin || []).length;
+  const trashCount = (STATE.data.recycleBin || []).filter(isTrashItemVisibleToCurrentUser).length;
   if (trashBadge) {
     trashBadge.textContent = trashCount;
     trashBadge.style.display = trashCount > 0 ? 'inline-block' : 'none';
@@ -739,8 +739,27 @@ async function performServerSync() {
           STATE.data.employees = serverResult.employees;
           populateStaffFilterDropdown();
         }
-        if (serverResult.recycleBin) {
-          STATE.data.recycleBin = serverResult.recycleBin;
+        const combinedPurgedTrash = Array.from(new Set([
+          ...(STATE.data.settings?.purgedTrashIds || []),
+          ...(serverResult.settings?.purgedTrashIds || [])
+        ])).slice(-500);
+        const combinedRestoredSales = Array.from(new Set([
+          ...(STATE.data.settings?.restoredSaleIds || []),
+          ...(serverResult.settings?.restoredSaleIds || [])
+        ])).slice(-500);
+        const combinedRestoredExpenses = Array.from(new Set([
+          ...(STATE.data.settings?.restoredExpenseIds || []),
+          ...(serverResult.settings?.restoredExpenseIds || [])
+        ])).slice(-500);
+
+        if (Array.isArray(serverResult.recycleBin)) {
+          STATE.data.recycleBin = mergeRecycleBinRecords(
+            STATE.data.recycleBin || [],
+            serverResult.recycleBin,
+            combinedPurgedTrash,
+            combinedRestoredSales,
+            combinedRestoredExpenses
+          );
           updateRecycleBinBadge();
         }
         STATE.data.settings = {
@@ -748,7 +767,10 @@ async function performServerSync() {
           ...(serverResult.settings || {}),
           businessName: sanitizeBusinessName(serverResult.settings?.businessName || STATE.data.settings?.businessName),
           deletedSaleIds: combinedDeletedSales,
-          deletedExpenseIds: combinedDeletedExpenses
+          deletedExpenseIds: combinedDeletedExpenses,
+          restoredSaleIds: combinedRestoredSales,
+          restoredExpenseIds: combinedRestoredExpenses,
+          purgedTrashIds: combinedPurgedTrash
         };
 
         if (serverResult.pin && String(serverResult.pin).length >= 4) {
@@ -938,6 +960,92 @@ function mergeClientRecords(localList = [], serverList = [], deletedIds = []) {
     return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
   });
   return list;
+}
+
+// Smart non-destructive Recycle Bin merge helper
+function mergeRecycleBinRecords(localBin = [], incomingBin = [], purgedIds = [], restoredSaleIds = [], restoredExpenseIds = []) {
+  const purgedSet = new Set(purgedIds || []);
+  const restSalesSet = new Set(restoredSaleIds || []);
+  const restExpSet = new Set(restoredExpenseIds || []);
+  const trashMap = new Map();
+
+  const isExcluded = (item) => {
+    if (!item) return true;
+    const key = item.id || item.originalId;
+    if (!key) return true;
+    if (purgedSet.has(key) || (item.originalId && purgedSet.has(item.originalId))) return true;
+    if (item.type === 'sale' && (restSalesSet.has(item.originalId) || restSalesSet.has(item.item?.id))) return true;
+    if (item.type === 'expense' && (restExpSet.has(item.originalId) || restExpSet.has(item.item?.id))) return true;
+    return false;
+  };
+
+  (incomingBin || []).forEach(item => {
+    if (isExcluded(item)) return;
+    const key = item.id || item.originalId;
+    trashMap.set(key, item);
+  });
+
+  (localBin || []).forEach(item => {
+    if (isExcluded(item)) return;
+    const key = item.id || item.originalId;
+    if (!trashMap.has(key)) {
+      trashMap.set(key, item);
+    } else {
+      const incItem = trashMap.get(key);
+      const locTime = new Date(item.deletedAt || 0).getTime();
+      const incTime = new Date(incItem.deletedAt || 0).getTime();
+      if (locTime >= incTime) {
+        trashMap.set(key, item);
+      }
+    }
+  });
+
+  return Array.from(trashMap.values())
+    .sort((a, b) => new Date(b.deletedAt || 0).getTime() - new Date(a.deletedAt || 0).getTime())
+    .slice(0, 200);
+}
+
+// Helper: Check if a deleted entry is visible to the currently logged in user
+function isTrashItemVisibleToCurrentUser(entry) {
+  if (!entry) return false;
+  // Admin/Boss sees ALL deleted items across the entire company
+  if (!STATE.currentUser || STATE.currentUser.role === 'admin') {
+    return true;
+  }
+
+  // Employee only sees items created by them or deleted by them
+  const cUser = STATE.currentUser;
+  const cName = (cUser.name || '').trim().toLowerCase();
+  const cId = cUser.id;
+  const item = entry.item || {};
+
+  // Check who deleted it
+  const delBy = (entry.deletedBy || item.deletedBy || '').trim().toLowerCase();
+  if (delBy && delBy === cName) return true;
+  if (entry.deleterId && entry.deleterId === cId) return true;
+  if (item.deleterId && item.deleterId === cId) return true;
+
+  // Check sales ownership
+  if (entry.type === 'sale') {
+    const soldBy = (item.soldBy || '').trim().toLowerCase();
+    if (soldBy && soldBy === cName) return true;
+    if (item.employeeId && item.employeeId === cId) return true;
+  }
+
+  // Check expense ownership
+  if (entry.type === 'expense') {
+    const assignedName = (item.assignedToName || '').trim().toLowerCase();
+    if (assignedName && assignedName === cName) return true;
+    if (item.assignedTo && item.assignedTo === cId) return true;
+  }
+
+  return false;
+}
+
+function getEmployeeName(empId) {
+  if (!empId || empId === 'admin') return 'Boss (Admin)';
+  const emp = (STATE.data.employees || []).find(e => e.id === empId);
+  return emp ? emp.name : empId;
 }
 
 // ==================== LOAD & SYNC DATA (Instant Stale-While-Revalidate + Non-Destructive Merge) ====================
@@ -2843,7 +2951,9 @@ async function handleConfirmDeleteSale(e) {
   const sale = (STATE.data.sales || []).find(s => s.id === id);
   if (!sale) return;
 
-  const deletedBy = STATE.currentUser.name || 'Admin';
+  const deletedBy = STATE.currentUser?.name || 'Admin';
+  const deleterRole = STATE.currentUser?.role || 'admin';
+  const deleterId = STATE.currentUser?.id || 'admin';
 
   STATE.data.sales = (STATE.data.sales || []).filter(s => s.id !== id);
 
@@ -2851,9 +2961,11 @@ async function handleConfirmDeleteSale(e) {
     id: 'trash_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     originalId: id,
     type: 'sale',
-    item: { ...sale, deleteReason: reason, deletedBy },
+    item: { ...sale, deleteReason: reason, deletedBy, deleterRole, deleterId },
     deleteReason: reason,
     deletedBy,
+    deleterRole,
+    deleterId,
     deletedAt: new Date().toISOString()
   };
   STATE.data.recycleBin = STATE.data.recycleBin || [];
@@ -2875,11 +2987,11 @@ async function handleConfirmDeleteSale(e) {
   updateRecycleBinBadge();
   triggerAutoSaveSync(true);
 
-  // Send delete call to server with reason and deletedBy
+  // Send delete call to server with reason, deletedBy, and sale item
   fetch(`/api/sales/${encodeURIComponent(id)}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ reason, deletedBy })
+    body: JSON.stringify({ reason, deletedBy, deleterId, deleterRole, item: sale })
   }).catch(e => console.warn('Delete server notice:', e));
 
   showToast(`Sale deleted with reason recorded in Trash! 🗑️`);
@@ -3222,13 +3334,26 @@ async function deleteExpense(id) {
   const expense = (STATE.data.expenses || []).find(e => e.id === id);
   if (!expense) return;
 
+  const deletedBy = STATE.currentUser?.name || 'Admin';
+  const deleterRole = STATE.currentUser?.role || 'admin';
+  const deleterId = STATE.currentUser?.id || 'admin';
+
   STATE.data.expenses = (STATE.data.expenses || []).filter(e => e.id !== id);
 
   const trashEntry = {
     id: 'trash_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     originalId: id,
     type: 'expense',
-    item: { ...expense },
+    item: {
+      ...expense,
+      deletedBy,
+      deleterRole,
+      deleterId
+    },
+    deleteReason: 'Expense record deleted',
+    deletedBy,
+    deleterRole,
+    deleterId,
     deletedAt: new Date().toISOString()
   };
   STATE.data.recycleBin = STATE.data.recycleBin || [];
@@ -3249,6 +3374,13 @@ async function deleteExpense(id) {
   updateRecycleBinBadge();
   triggerAutoSaveSync(true);
 
+  // Send DELETE to server with item details
+  fetch(`/api/expenses/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason: 'Expense deleted', deletedBy, deleterId, deleterRole, item: expense })
+  }).catch(e => console.warn('Delete expense server notice:', e));
+
   const title = expense.category || 'Expense';
   showToast(`Expense deleted (${title})`, {
     undoCallback: () => restoreFromRecycleBin(trashEntry.id),
@@ -3260,12 +3392,20 @@ async function deleteExpense(id) {
 let currentTrashFilter = 'all';
 
 function updateRecycleBinBadge() {
-  const bin = STATE.data.recycleBin || [];
+  const allBin = STATE.data.recycleBin || [];
+  const bin = allBin.filter(isTrashItemVisibleToCurrentUser);
   const count = bin.length;
+
   const badge = document.getElementById('recycleBinBadge');
   if (badge) {
     badge.textContent = count;
     badge.style.display = count > 0 ? 'inline-block' : 'none';
+  }
+
+  const drawerBadge = document.getElementById('drawerTrashBadge');
+  if (drawerBadge) {
+    drawerBadge.textContent = count;
+    drawerBadge.style.display = count > 0 ? 'inline-block' : 'none';
   }
 
   const salesCount = bin.filter(t => t.type === 'sale').length;
@@ -3286,7 +3426,19 @@ function renderRecycleBin(filter = null) {
 
   updateRecycleBinBadge();
 
-  let bin = STATE.data.recycleBin || [];
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+  const subtitleEl = document.getElementById('recycleBinSubtitle');
+  if (subtitleEl) {
+    if (isEmployee) {
+      subtitleEl.innerHTML = `👤 <strong>${escapeHtml(STATE.currentUser.name)}'s Trash</strong> — Only items deleted by or belonging to you are visible.`;
+    } else {
+      subtitleEl.innerHTML = `👑 <strong>Admin Master Trash</strong> — All deleted items across all staff with employee names and reasons.`;
+    }
+  }
+
+  const allBin = STATE.data.recycleBin || [];
+  let bin = allBin.filter(isTrashItemVisibleToCurrentUser);
+
   if (currentTrashFilter === 'sale') {
     bin = bin.filter(t => t.type === 'sale');
   } else if (currentTrashFilter === 'expense') {
@@ -3297,8 +3449,8 @@ function renderRecycleBin(filter = null) {
     container.innerHTML = `
       <div class="empty-state" style="padding: 35px 15px;">
         <div class="empty-state-icon">🌿</div>
-        <div class="empty-state-title">Recycle Bin is empty</div>
-        <p class="text-muted mt-2">No deleted records in trash. All your data is safe!</p>
+        <div class="empty-state-title">${isEmployee ? 'Your Recycle Bin is empty' : 'Recycle Bin is empty'}</div>
+        <p class="text-muted mt-2">${isEmployee ? 'You have no deleted records in trash.' : 'No deleted records found. All business data is active and safe!'}</p>
       </div>
     `;
     return;
@@ -3323,13 +3475,47 @@ function renderRecycleBin(filter = null) {
       subtitle = `${escapeHtml(item.description || item.category)} · <span class="text-rose font-bold">Rs. ${(item.amount || 0).toLocaleString('en-US')}</span>`;
     }
 
+    // Determine Employee/Creator & Deleter info
+    let staffOwnerLabel = '';
+    let isStaff = false;
+    if (isSale) {
+      const soldBy = item.soldBy || entry.soldBy || (item.employeeId ? getEmployeeName(item.employeeId) : 'Admin');
+      if (soldBy && soldBy !== 'Admin' && soldBy !== 'Boss') {
+        staffOwnerLabel = `👤 Staff Sold: ${soldBy}`;
+        isStaff = true;
+      } else {
+        staffOwnerLabel = `🏢 Boss Sale`;
+      }
+    } else {
+      const assigned = item.assignedToName || (item.assignedTo === 'admin' ? 'Boss (Admin)' : (getEmployeeName(item.assignedTo) || 'Boss'));
+      if (assigned && assigned !== 'Boss (Admin)' && item.assignedTo !== 'admin') {
+        staffOwnerLabel = `👤 Staff Expense: ${assigned}`;
+        isStaff = true;
+      } else {
+        staffOwnerLabel = `🏢 Boss Expense`;
+      }
+    }
+
+    const deletedBy = entry.deletedBy || item.deletedBy || (isSale ? (item.soldBy || 'Admin') : 'Admin') || 'Admin';
     const deleteReason = entry.deleteReason || item.deleteReason;
-    const deletedBy = entry.deletedBy || item.deletedBy || item.soldBy || 'Admin';
-    const auditHtml = deleteReason ? `
-      <div class="trash-audit-badge">
-        <span>⚠️ Deleted by <strong>${escapeHtml(deletedBy)}</strong>: "${escapeHtml(deleteReason)}"</span>
+
+    const staffAuditHtml = `
+      <div class="trash-staff-audit-box">
+        <div class="trash-staff-pill-row">
+          <span class="trash-staff-pill ${isStaff ? 'pill-staff' : 'pill-admin'}">
+            ${escapeHtml(staffOwnerLabel)}
+          </span>
+          <span class="trash-deleter-pill">
+            🗑️ Deleted By: <strong>${escapeHtml(deletedBy)}</strong>
+          </span>
+        </div>
+        ${deleteReason ? `
+          <div class="trash-audit-reason">
+            ⚠️ <em>"${escapeHtml(deleteReason)}"</em>
+          </div>
+        ` : ''}
       </div>
-    ` : '';
+    `;
 
     return `
       <div class="trash-item-card" data-trash-id="${entry.id}">
@@ -3342,7 +3528,7 @@ function renderRecycleBin(filter = null) {
           </div>
           <div class="trash-main-title">${title}</div>
           <div class="trash-sub-detail">${subtitle}</div>
-          ${auditHtml}
+          ${staffAuditHtml}
           ${item.paymentProof ? `
             <div style="margin-top: 5px;">
               <button type="button" class="btn-proof-preview" onclick="openViewPaymentProof('${item.id}')">📷 View Proof Slip</button>
@@ -3394,7 +3580,7 @@ function restoreFromRecycleBin(trashId) {
       STATE.data.settings.restoredSaleIds.push(saleId);
     }
     if (STATE.data.settings?.deletedSaleIds) {
-      STATE.data.settings.deletedSaleIds = STATE.data.settings.deletedSaleIds.filter(id => id !== entry.originalId && id !== entry.item.id);
+      STATE.data.settings.deletedSaleIds = STATE.data.settings.deletedSaleIds.filter(id => id !== entry.originalId && id !== entry.item?.id);
     }
   } else if (entry.type === 'expense') {
     STATE.data.expenses = STATE.data.expenses || [];
@@ -3408,7 +3594,7 @@ function restoreFromRecycleBin(trashId) {
       STATE.data.settings.restoredExpenseIds.push(expId);
     }
     if (STATE.data.settings?.deletedExpenseIds) {
-      STATE.data.settings.deletedExpenseIds = STATE.data.settings.deletedExpenseIds.filter(id => id !== entry.originalId && id !== entry.item.id);
+      STATE.data.settings.deletedExpenseIds = STATE.data.settings.deletedExpenseIds.filter(id => id !== entry.originalId && id !== entry.item?.id);
     }
   }
 
@@ -3418,32 +3604,85 @@ function restoreFromRecycleBin(trashId) {
   renderRecycleBin();
   triggerAutoSaveSync(true);
 
+  // Notify server to restore
+  fetch(`/api/recycle-bin/restore/${encodeURIComponent(trashId)}`, { method: 'POST' }).catch(() => {});
+
   const title = entry.type === 'sale' ? (entry.item.customerPhone ? formatPhone(entry.item.customerPhone) : entry.item.product) : entry.item.category;
   showToast(`Restored: ${title}! ✨`);
 }
 
 function permanentlyDeleteFromTrash(trashId) {
   if (!confirm('Are you sure you want to permanently delete this item? It cannot be recovered.')) return;
-  STATE.data.recycleBin = (STATE.data.recycleBin || []).filter(t => t.id !== trashId);
+  const item = (STATE.data.recycleBin || []).find(t => t.id === trashId || t.originalId === trashId);
+  STATE.data.recycleBin = (STATE.data.recycleBin || []).filter(t => t.id !== trashId && t.originalId !== trashId);
+
+  STATE.data.settings = STATE.data.settings || {};
+  STATE.data.settings.purgedTrashIds = STATE.data.settings.purgedTrashIds || [];
+  if (trashId && !STATE.data.settings.purgedTrashIds.includes(trashId)) {
+    STATE.data.settings.purgedTrashIds.push(trashId);
+  }
+  if (item?.originalId && !STATE.data.settings.purgedTrashIds.includes(item.originalId)) {
+    STATE.data.settings.purgedTrashIds.push(item.originalId);
+  }
+  if (STATE.data.settings.purgedTrashIds.length > 500) {
+    STATE.data.settings.purgedTrashIds = STATE.data.settings.purgedTrashIds.slice(-500);
+  }
+
   saveLocalState();
   updateRecycleBinBadge();
   renderRecycleBin();
   triggerAutoSaveSync(true);
+
+  // Notify server
+  fetch(`/api/recycle-bin/${encodeURIComponent(trashId)}`, { method: 'DELETE' }).catch(() => {});
   showToast('Item permanently deleted');
 }
 
 function emptyRecycleBin() {
-  const count = (STATE.data.recycleBin || []).length;
-  if (count === 0) {
-    showToast('Recycle Bin is already empty');
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+  const allBin = STATE.data.recycleBin || [];
+  const visibleBin = allBin.filter(isTrashItemVisibleToCurrentUser);
+
+  if (visibleBin.length === 0) {
+    showToast(isEmployee ? 'Your Recycle Bin is already empty' : 'Recycle Bin is already empty');
     return;
   }
-  if (!confirm(`Are you sure you want to permanently delete all ${count} item(s) from the Recycle Bin?`)) return;
-  STATE.data.recycleBin = [];
+
+  const confirmMsg = isEmployee
+    ? `Are you sure you want to permanently delete your ${visibleBin.length} deleted record(s)?`
+    : `Are you sure you want to permanently delete all ${visibleBin.length} record(s) from the business Recycle Bin?`;
+
+  if (!confirm(confirmMsg)) return;
+
+  const visibleIds = new Set(visibleBin.map(t => t.id));
+  const purgedIds = [];
+  visibleBin.forEach(t => {
+    if (t.id) purgedIds.push(t.id);
+    if (t.originalId) purgedIds.push(t.originalId);
+  });
+
+  // Filter out ONLY the visible items (keeps other employees' items safe)
+  STATE.data.recycleBin = allBin.filter(t => !visibleIds.has(t.id));
+
+  STATE.data.settings = STATE.data.settings || {};
+  STATE.data.settings.purgedTrashIds = Array.from(new Set([
+    ...(STATE.data.settings.purgedTrashIds || []),
+    ...purgedIds
+  ])).slice(-500);
+
   saveLocalState();
   updateRecycleBinBadge();
   renderRecycleBin();
   triggerAutoSaveSync(true);
+
+  if (!isEmployee) {
+    fetch('/api/recycle-bin', { method: 'DELETE' }).catch(() => {});
+  } else {
+    purgedIds.forEach(pid => {
+      fetch(`/api/recycle-bin/${encodeURIComponent(pid)}`, { method: 'DELETE' }).catch(() => {});
+    });
+  }
+
   showToast('Recycle Bin emptied! 🗑️');
 }
 
@@ -3905,14 +4144,39 @@ async function syncDirectUpstashRedis() {
           STATE.data.sales = mergedSales;
           STATE.data.expenses = mergedExpenses;
           if (parsed.products && parsed.products.length) STATE.data.products = parsed.products;
-          if (parsed.recycleBin) STATE.data.recycleBin = parsed.recycleBin;
+          const combinedPurgedTrash = Array.from(new Set([
+            ...(STATE.data.settings?.purgedTrashIds || []),
+            ...(parsed.settings?.purgedTrashIds || [])
+          ])).slice(-500);
+          const combinedRestoredSales = Array.from(new Set([
+            ...(STATE.data.settings?.restoredSaleIds || []),
+            ...(parsed.settings?.restoredSaleIds || [])
+          ])).slice(-500);
+          const combinedRestoredExpenses = Array.from(new Set([
+            ...(STATE.data.settings?.restoredExpenseIds || []),
+            ...(parsed.settings?.restoredExpenseIds || [])
+          ])).slice(-500);
+
+          if (Array.isArray(parsed.recycleBin)) {
+            STATE.data.recycleBin = mergeRecycleBinRecords(
+              STATE.data.recycleBin || [],
+              parsed.recycleBin,
+              combinedPurgedTrash,
+              combinedRestoredSales,
+              combinedRestoredExpenses
+            );
+            updateRecycleBinBadge();
+          }
 
           STATE.data.settings = {
             ...STATE.data.settings,
             ...(parsed.settings || {}),
             businessName: sanitizeBusinessName(parsed.settings?.businessName || STATE.data.settings?.businessName),
             deletedSaleIds: combinedDelSales,
-            deletedExpenseIds: combinedDelExp
+            deletedExpenseIds: combinedDelExp,
+            restoredSaleIds: combinedRestoredSales,
+            restoredExpenseIds: combinedRestoredExpenses,
+            purgedTrashIds: combinedPurgedTrash
           };
 
           if (parsed.pin && String(parsed.pin).length >= 4) {
