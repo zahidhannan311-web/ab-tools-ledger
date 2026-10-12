@@ -466,6 +466,18 @@ function setupTouchNumpad() {
       }
     }
   });
+
+  // Prevent any password manager or stray input from popping up virtual keyboard on PIN screen
+  document.addEventListener('focusin', (e) => {
+    if (!STATE.unlocked && STATE.pinSet) {
+      const pinPadSec = document.getElementById('loginPinPadSection');
+      if (pinPadSec && pinPadSec.style.display !== 'none') {
+        if (e.target && typeof e.target.blur === 'function') {
+          e.target.blur();
+        }
+      }
+    }
+  });
 }
 
 async function handleUnlockSubmit() {
