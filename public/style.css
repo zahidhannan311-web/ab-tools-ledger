@@ -620,11 +620,23 @@ body {
   object-fit: cover;
   transform: scale(1.08);
 }
+.header-brand-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.header-brand-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
 .header-title {
   font-size: 17px;
   font-weight: 700;
   color: #fff;
   letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 .header-tagline {
   display: block;
@@ -1987,15 +1999,155 @@ body {
 }
 
 @media (max-width: 600px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
+  /* ===== Header Mobile Optimization ===== */
   .header-content {
-    padding: 10px 14px;
+    padding: 8px 10px;
+    gap: 6px;
   }
+  .header-brand {
+    gap: 8px;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+  .logo-mark {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+  }
+  .header-brand-top {
+    gap: 5px;
+    flex-wrap: nowrap;
+  }
+  .header-title {
+    font-size: 14px;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+  .header-tagline {
+    display: none; /* Hide tagline on mobile to keep header clean and prevent vertical bloat */
+  }
+  .sync-status-badge {
+    font-size: 9.5px;
+    padding: 2px 6px;
+    white-space: nowrap !important;
+    flex-shrink: 0;
+  }
+  .header-actions {
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .header-actions .icon-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+  }
+  .header-actions .icon-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+  .badge-role-pill {
+    padding: 3px 6px;
+    font-size: 10px;
+    max-width: 78px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ===== Action Quick Bar (Horizontal Scrollable) ===== */
+  .action-quick-bar {
+    padding: 4px 10px 8px;
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .action-quick-bar::-webkit-scrollbar { display: none; }
+  .action-quick-bar .btn {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+    border-radius: 8px;
+  }
+
+  /* ===== Period Filter Pills (Horizontal Scrollable) ===== */
+  .period-tabs-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .period-tabs-wrapper::-webkit-scrollbar { display: none; }
+  .period-tabs {
+    padding: 6px 10px;
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .period-tab {
+    flex-shrink: 0;
+    padding: 5px 12px;
+    font-size: 11.5px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+
+  /* ===== 3-Column Compact KPI Stat Cards ===== */
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+    margin-bottom: 12px !important;
+  }
+  .stat-card {
+    padding: 8px 6px !important;
+    border-radius: 10px !important;
+    min-height: auto !important;
+  }
+  .stat-header {
+    margin-bottom: 2px !important;
+  }
+  .stat-title {
+    font-size: 8.5px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.2px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .stat-icon {
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 10px !important;
+    border-radius: 4px !important;
+  }
+  .stat-value {
+    font-size: 13.5px !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+    margin: 2px 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .stat-sub {
+    font-size: 8.5px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  /* ===== Body Content & Safe Padding for Fixed Bottom Nav ===== */
   .app-body {
-    padding: 14px 12px;
+    padding: 10px 10px 92px !important;
   }
+
+  /* ===== Navigation & Form Rows ===== */
   .mobile-bottom-nav {
     display: flex;
   }
@@ -2007,10 +2159,18 @@ body {
   }
   .form-row {
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
   }
   .status-radio-group {
     grid-template-columns: 1fr;
+  }
+  .modal-container {
+    padding: 16px 14px;
+    max-height: 90vh;
+    border-radius: 14px;
+  }
+  .modal-actions {
+    gap: 8px;
   }
 }
 

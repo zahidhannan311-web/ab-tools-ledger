@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.2">
+  <link rel="stylesheet" href="style.css?v=3.3">
 </head>
 <body>
 
@@ -159,11 +159,11 @@
           <div class="logo-mark mascot-logo-wrap">
             <img src="monkey-logo.png" alt="Monkey Tools Mascot" class="brand-mascot-img">
           </div>
-          <div>
-            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <div class="header-brand-info">
+            <div class="header-brand-top">
               <h1 class="header-title">Monkey Tools</h1>
               <span id="liveSyncBadge" class="sync-status-badge synced" title="All entries auto-save instantly across devices without refresh">
-                <span class="sync-dot success"></span> Saved &amp; Synced
+                <span class="sync-dot success"></span> <span class="sync-text">Synced</span>
               </span>
             </div>
             <span class="header-tagline">Sales Ledger &amp; Business Tracker</span>
@@ -1205,8 +1205,8 @@
         </div>
 
         <div class="form-group">
-          <label>Payment Proof Screenshot <span class="badge-req">Mandatory</span></label>
-          <input type="file" id="quickProofFileInput" accept="image/*" class="form-control" required>
+          <label>Payment Proof Screenshot <span id="quickProofBadge" class="badge-req">* Mandatory for Staff</span></label>
+          <input type="file" id="quickProofFileInput" accept="image/*" class="form-control">
           <input type="hidden" id="quickProofBase64" value="">
           <div id="quickProofPreviewWrap" class="proof-preview-wrap mt-2" style="display: none;">
             <img id="quickProofPreviewImg" src="" alt="Proof Preview" class="proof-thumbnail">
@@ -1295,6 +1295,6 @@
   <!-- Notification Toast -->
   <div id="toastNotification" class="toast"></div>
 
-  <script src="app.js?v=2.7"></script>
+  <script src="app.js?v=2.8"></script>
 </body>
 </html>

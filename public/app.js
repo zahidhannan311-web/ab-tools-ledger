@@ -2066,11 +2066,29 @@ function setupEventListeners() {
     document.getElementById('saleProofPreviewWrap').style.display = 'none';
   });
 
+function updateSaleProofBadge(isPaid) {
+  const badge = document.getElementById('proofRequiredBadge');
+  if (!badge) return;
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+  if (!isPaid) {
+    badge.style.display = 'none';
+  } else if (isEmployee) {
+    badge.style.display = 'inline-block';
+    badge.className = 'badge-req';
+    badge.textContent = '* Mandatory for Staff';
+    badge.style.color = '#ef4444';
+  } else {
+    badge.style.display = 'inline-block';
+    badge.className = 'badge-opt';
+    badge.textContent = '(Optional for Boss)';
+    badge.style.color = 'var(--text-muted)';
+  }
+}
+
   // Toggle proof requirement badge based on selected status
   document.querySelectorAll('input[name="saleStatus"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
-      const badge = document.getElementById('proofRequiredBadge');
-      if (badge) badge.style.display = e.target.value === 'Paid' ? 'inline-block' : 'none';
+      updateSaleProofBadge(e.target.value === 'Paid');
     });
   });
 
@@ -2336,8 +2354,7 @@ function openSaleModal() {
   document.getElementById('saleProofBase64').value = '';
   const previewWrap = document.getElementById('saleProofPreviewWrap');
   if (previewWrap) previewWrap.style.display = 'none';
-  const reqBadge = document.getElementById('proofRequiredBadge');
-  if (reqBadge) reqBadge.style.display = 'none';
+  updateSaleProofBadge(false);
 
   const accountSelect = document.getElementById('salePaymentReceivedInSelect');
   if (accountSelect) accountSelect.value = 'Boss JazzCash';
@@ -2384,8 +2401,7 @@ function openEditSale(id) {
   } else {
     if (previewWrap) previewWrap.style.display = 'none';
   }
-  const reqBadge = document.getElementById('proofRequiredBadge');
-  if (reqBadge) reqBadge.style.display = sale.paymentStatus === 'Paid' ? 'inline-block' : 'none';
+  updateSaleProofBadge(sale.paymentStatus === 'Paid');
 
   const accountSelect = document.getElementById('salePaymentReceivedInSelect');
   if (accountSelect) accountSelect.value = sale.paymentReceivedIn || 'Boss JazzCash';
@@ -2418,9 +2434,11 @@ async function handleSaleSubmit(e) {
   const attachedProof = document.getElementById('saleProofBase64').value.trim() || existingSale?.paymentProof || null;
   const paymentReceivedIn = document.getElementById('salePaymentReceivedInSelect')?.value || 'Boss JazzCash';
 
-  // MANDATORY Payment Proof Check: Payment cannot be set to 'Paid' without screenshot proof!
-  if (paymentStatus === 'Paid' && !attachedProof) {
-    alert('⚠️ PAYMENT PROOF IS MANDATORY!\n\nJab tak customer ki payment receipt / transaction slip ka screenshot upload nahe hoga, payment "Paid" mark nahe ho sakti taaky verify ho saky kiske account me payment gai.');
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+
+  // MANDATORY Payment Proof Check: ONLY mandatory for Staff/Employees. Optional for Boss/Admin!
+  if (isEmployee && paymentStatus === 'Paid' && !attachedProof) {
+    alert('⚠️ PAYMENT PROOF IS MANDATORY FOR STAFF!\n\nStaff members must attach customer payment receipt / transaction slip screenshot before marking payment as Paid.');
     document.getElementById('saleProofFileInput')?.focus();
     return;
   }
@@ -2488,6 +2506,28 @@ function openQuickMarkPaid(id) {
   const accountSelect = document.getElementById('quickPaymentReceivedInSelect');
   if (accountSelect) accountSelect.value = 'Boss JazzCash';
 
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+  const quickBadge = document.getElementById('quickProofBadge');
+  const quickInput = document.getElementById('quickProofFileInput');
+  if (quickBadge) {
+    if (isEmployee) {
+      quickBadge.textContent = '* Mandatory for Staff';
+      quickBadge.className = 'badge-req';
+      quickBadge.style.color = '#ef4444';
+    } else {
+      quickBadge.textContent = '(Optional for Boss)';
+      quickBadge.className = 'badge-opt';
+      quickBadge.style.color = 'var(--text-muted)';
+    }
+  }
+  if (quickInput) {
+    if (isEmployee) {
+      quickInput.setAttribute('required', 'required');
+    } else {
+      quickInput.removeAttribute('required');
+    }
+  }
+
   document.getElementById('quickMarkPaidSummary').innerHTML = `
     <div><strong>Customer:</strong> ${formatPhone(sale.customerPhone)} ${sale.customerName ? `(${escapeHtml(sale.customerName)})` : ''}</div>
     <div><strong>Product:</strong> ${escapeHtml(sale.product)} (${escapeHtml(sale.planLabel || sale.planMonths + ' Mos')}) · <strong>Rs. ${(sale.amount || 0).toLocaleString()}</strong></div>
@@ -2502,8 +2542,9 @@ async function handleConfirmQuickMarkPaid(e) {
   const proof = document.getElementById('quickProofBase64').value.trim();
   const account = document.getElementById('quickPaymentReceivedInSelect').value;
 
-  if (!proof) {
-    alert('⚠️ PAYMENT PROOF IS MANDATORY!\n\nPlease attach JazzCash / EasyPaisa / Bank transfer screenshot before marking payment as Paid.');
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+  if (isEmployee && !proof) {
+    alert('⚠️ PAYMENT PROOF IS MANDATORY FOR STAFF!\n\nPlease attach JazzCash / EasyPaisa / Bank transfer screenshot before marking payment as Paid.');
     return;
   }
 
