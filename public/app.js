@@ -329,6 +329,11 @@ function selectLoginProfile(profileId) {
   const profile = (STATE.loginProfiles || []).find(p => p.id === profileId);
   if (!profile) return;
 
+  // Dismiss phone keyboard if any input (such as profile search) was previously focused
+  if (document.activeElement && typeof document.activeElement.blur === 'function') {
+    document.activeElement.blur();
+  }
+
   STATE.selectedLoginProfile = profile;
   STATE.enteredPin = '';
   updatePinDots();
@@ -350,15 +355,12 @@ function selectLoginProfile(profileId) {
   if (nameEl) nameEl.textContent = profile.name;
   if (headingEl) headingEl.textContent = `${profile.name} PIN`;
   if (descEl) descEl.textContent = `Enter 4 to 6 digit security PIN for ${profile.name}.`;
-
-  const inputEl = document.getElementById('unlockPinInput');
-  if (inputEl) {
-    inputEl.value = '';
-    setTimeout(() => inputEl.focus(), 100);
-  }
 }
 
 function backToProfileSelect() {
+  if (document.activeElement && typeof document.activeElement.blur === 'function') {
+    document.activeElement.blur();
+  }
   STATE.selectedLoginProfile = null;
   STATE.enteredPin = '';
   updatePinDots();
@@ -445,14 +447,14 @@ function setupTouchNumpad() {
     });
   }
 
-  // Keyboard navigation support
+  // Keyboard navigation support (Desktop/Physical keyboard)
   window.addEventListener('keydown', (e) => {
     if (!STATE.unlocked && STATE.pinSet) {
       // Do not capture digits if still on profile selection screen
       if (!STATE.selectedLoginProfile) return;
       // Do not capture if user is typing in another input/textarea
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
-        if (e.target.id !== 'unlockPinInput') return;
+        return;
       }
       if (e.key >= '0' && e.key <= '9') {
         onPinDigitInput(e.key);
