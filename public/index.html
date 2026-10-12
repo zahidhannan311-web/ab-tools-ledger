@@ -222,11 +222,11 @@
 
       <!-- Quick Action Buttons Bar -->
       <div class="action-quick-bar">
-        <button id="btnOpenNewSaleModal" class="btn btn-gold btn-sm">
+        <button id="btnOpenNewSaleModal" class="btn btn-gold btn-sm" onclick="openSaleModal()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
           <span>New Sale</span>
         </button>
-        <button id="btnOpenNewExpenseModal" class="btn btn-subtle btn-sm">
+        <button id="btnOpenNewExpenseModal" class="btn btn-subtle btn-sm" onclick="openExpenseModal()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
           <span>New Expense</span>
         </button>
@@ -762,7 +762,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
         <span>Expenses</span>
       </button>
-      <button class="mobile-nav-btn" id="mobileBtnNewSale">
+      <button class="mobile-nav-btn" id="mobileBtnNewSale" onclick="openSaleModal()">
         <div class="mobile-fab-center">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         </div>
@@ -1295,6 +1295,6 @@
   <!-- Notification Toast -->
   <div id="toastNotification" class="toast"></div>
 
-  <script src="app.js?v=2.8"></script>
+  <script src="app.js?v=2.9"></script>
 </body>
 </html>

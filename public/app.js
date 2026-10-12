@@ -2066,25 +2066,6 @@ function setupEventListeners() {
     document.getElementById('saleProofPreviewWrap').style.display = 'none';
   });
 
-function updateSaleProofBadge(isPaid) {
-  const badge = document.getElementById('proofRequiredBadge');
-  if (!badge) return;
-  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
-  if (!isPaid) {
-    badge.style.display = 'none';
-  } else if (isEmployee) {
-    badge.style.display = 'inline-block';
-    badge.className = 'badge-req';
-    badge.textContent = '* Mandatory for Staff';
-    badge.style.color = '#ef4444';
-  } else {
-    badge.style.display = 'inline-block';
-    badge.className = 'badge-opt';
-    badge.textContent = '(Optional for Boss)';
-    badge.style.color = 'var(--text-muted)';
-  }
-}
-
   // Toggle proof requirement badge based on selected status
   document.querySelectorAll('input[name="saleStatus"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
@@ -2343,6 +2324,27 @@ function compressImageFile(file, maxWidth = 800, maxHeight = 800, quality = 0.75
     reader.readAsDataURL(file);
   });
 }
+
+function updateSaleProofBadge(isPaid) {
+  const badge = document.getElementById('proofRequiredBadge');
+  if (!badge) return;
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+  if (!isPaid) {
+    badge.style.display = 'none';
+  } else if (isEmployee) {
+    badge.style.display = 'inline-block';
+    badge.className = 'badge-req';
+    badge.textContent = '* Mandatory for Staff';
+    badge.style.color = '#ef4444';
+  } else {
+    badge.style.display = 'inline-block';
+    badge.className = 'badge-opt';
+    badge.textContent = '(Optional for Boss)';
+    badge.style.color = 'var(--text-muted)';
+  }
+}
+window.updateSaleProofBadge = updateSaleProofBadge;
+window.openSaleModal = openSaleModal;
 
 function openSaleModal() {
   document.getElementById('saleEditId').value = '';
@@ -2858,6 +2860,7 @@ async function deleteEmployee(id) {
 }
 
 // ==================== EXPENSE FORM CRUD ====================
+window.openExpenseModal = openExpenseModal;
 function openExpenseModal() {
   document.getElementById('expenseEditId').value = '';
   document.getElementById('expenseModalTitle').textContent = 'New Expense Entry';
