@@ -1955,6 +1955,10 @@ function renderSearchResults(query) {
 
 // ==================== ADMIN PRODUCTS MANAGEMENT ====================
 function renderAdminCatalog() {
+  // Always render Staff List and Settings/Templates when Admin Panel is viewed
+  renderAdminEmployees();
+  syncSettingsFormUI();
+
   const container = document.getElementById('adminProductsCatalog');
   if (!container) return;
 
@@ -2103,11 +2107,37 @@ function setupEventListeners() {
   });
   document.getElementById('drawerBtnStaff')?.addEventListener('click', () => {
     closeSideDrawer();
-    openEmployeeModal();
+    switchView('adminView');
+    setTimeout(() => {
+      const el = document.getElementById('adminEmployeesCard');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.style.transition = 'box-shadow 0.4s ease, border-color 0.4s ease';
+        el.style.borderColor = 'var(--gold-accent)';
+        el.style.boxShadow = '0 0 20px var(--gold-glow)';
+        setTimeout(() => {
+          el.style.borderColor = '';
+          el.style.boxShadow = '';
+        }, 1600);
+      }
+    }, 120);
   });
   document.getElementById('drawerBtnSettings')?.addEventListener('click', () => {
     closeSideDrawer();
-    openSettingsModal();
+    switchView('adminView');
+    setTimeout(() => {
+      const el = document.getElementById('adminSettingsCard') || document.getElementById('adminTemplatesCard') || document.getElementById('businessSettingsForm');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.style.transition = 'box-shadow 0.4s ease, border-color 0.4s ease';
+        el.style.borderColor = 'var(--gold-accent)';
+        el.style.boxShadow = '0 0 20px var(--gold-glow)';
+        setTimeout(() => {
+          el.style.borderColor = '';
+          el.style.boxShadow = '';
+        }, 1600);
+      }
+    }, 120);
   });
   document.getElementById('drawerBtnLock')?.addEventListener('click', () => {
     closeSideDrawer();
