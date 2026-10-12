@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.5">
+  <link rel="stylesheet" href="style.css?v=3.7">
 </head>
 <body>
 
@@ -507,9 +507,15 @@
         <div class="view-header">
           <div>
             <h2 class="view-title">Business Expenses</h2>
-            <p class="view-subtitle">Meta Ads, Vendor Purchasing, and operating costs</p>
+            <p class="view-subtitle" id="expensesSubtitleText">Meta Ads, Vendor Purchasing, and operating costs</p>
           </div>
-          <button id="btnHeaderNewExpense" class="btn btn-subtle btn-sm">+ New Expense</button>
+          <div class="view-filters">
+            <select id="expensesFilterTarget" class="custom-select select-sm">
+              <option value="ALL">👥 All Expenses</option>
+              <option value="admin">🏢 Boss / Business Only</option>
+            </select>
+            <button id="btnHeaderNewExpense" class="btn btn-subtle btn-sm">+ New Expense</button>
+          </div>
         </div>
 
         <div id="expensesListContainer" class="cards-list">
@@ -1044,6 +1050,17 @@
       <form id="expenseForm" class="modal-form">
         <input type="hidden" id="expenseEditId" value="">
 
+        <!-- Expense Target / Ownership Selection (Requested by user) -->
+        <div class="form-group" id="expenseTargetGroup">
+          <label for="expenseTargetSelect">Expense For (Kiske Liye Hai?) <span class="text-gold">*</span></label>
+          <select id="expenseTargetSelect" class="form-control" required>
+            <option value="admin">🏢 Business / Boss (Admin Only)</option>
+          </select>
+          <small class="form-hint" id="expenseTargetHint" style="display:block; margin-top:4px; font-size:11px; color:var(--text-muted);">
+            💡 Agar "Boss" select hoga to kisi employee ko nazar nahi aayega. Agar employee select hoga to sirf us employee ke panel me show hoga.
+          </small>
+        </div>
+
         <div class="form-group">
           <div class="label-with-actions">
             <label for="expenseDateInput">Date <span class="text-gold">*</span></label>
@@ -1061,6 +1078,10 @@
             <option value="Meta Ads">Meta Ads (Facebook/Instagram Ads)</option>
             <option value="Vendor Purchasing">Vendor Purchasing (Wholesale Tool Purchases)</option>
             <option value="Mobile/Easypaisa Charges">Mobile / Easypaisa Charges</option>
+            <option value="Salary Advance">Salary Advance / Loan</option>
+            <option value="Staff Allowance">Staff Allowance / Food / Travel</option>
+            <option value="Internet / Package">Internet / SIM Package</option>
+            <option value="Commission Deduction">Commission Deduction / Penalty</option>
             <option value="Other">Other Expenses</option>
           </select>
         </div>
@@ -1404,6 +1425,6 @@
   <!-- Notification Toast -->
   <div id="toastNotification" class="toast"></div>
 
-  <script src="app.js?v=3.6"></script>
+  <script src="app.js?v=3.7"></script>
 </body>
 </html>

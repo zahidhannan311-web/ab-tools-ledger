@@ -1317,6 +1317,26 @@ body {
   color: var(--text-muted);
 }
 
+.badge-staff {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.badge-staff.staff-admin {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+.badge-staff.staff-ali, .badge-staff.staff-emp {
+  background: rgba(59, 130, 246, 0.14);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
 /* ==================== REMINDERS SECTION ==================== */
 .reminder-box {
   background: var(--bg-card);

@@ -1267,8 +1267,13 @@ function renderKPIs() {
     ? sales.filter(s => (s.soldBy === STATE.currentUser.name || s.employeeId === STATE.currentUser.id))
     : sales;
 
+  // If employee: scope expenses STRICTLY to their own assigned expenses (Never show Admin business expenses!)
+  const accessibleExpenses = isEmployee
+    ? expenses.filter(e => e.assignedTo === STATE.currentUser.id || e.assignedToName === STATE.currentUser.name)
+    : expenses;
+
   const filteredSales = accessibleSales.filter(s => isDateInPeriod(s.date, period));
-  const filteredExpenses = expenses.filter(e => isDateInPeriod(e.date, period));
+  const filteredExpenses = accessibleExpenses.filter(e => isDateInPeriod(e.date, period));
 
   const totalRevenue = filteredSales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
   const totalExpense = filteredExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
@@ -1298,12 +1303,22 @@ function renderKPIs() {
     const rate = Number(STATE.currentUser.commissionRate) || 0;
     const todayCommission = Math.round(todaySalesTotal * (rate / 100));
 
+    // Also calculate today's expenses/deductions for employee
+    const todayEmpExpenses = accessibleExpenses.filter(e => e.date === todayStr);
+    const todayExpTotal = todayEmpExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
     const rateLabel = document.getElementById('empCommissionRateLabel');
     if (rateLabel) rateLabel.textContent = `${rate}% Rate`;
     const commVal = document.getElementById('kpiEmployeeCommission');
     if (commVal) commVal.textContent = todayCommission.toLocaleString('en-US');
     const todaySalesVal = document.getElementById('kpiEmployeeSalesToday');
-    if (todaySalesVal) todaySalesVal.textContent = todaySalesTotal.toLocaleString('en-US');
+    if (todaySalesVal) {
+      if (todayExpTotal > 0) {
+        todaySalesVal.textContent = `${todaySalesTotal.toLocaleString('en-US')} (Deductions: -Rs. ${todayExpTotal.toLocaleString('en-US')})`;
+      } else {
+        todaySalesVal.textContent = todaySalesTotal.toLocaleString('en-US');
+      }
+    }
 
     // Hide expense creation for employee
     const newExpHeaderBtn = document.getElementById('btnHeaderNewExpense');
@@ -1501,38 +1516,77 @@ function renderExpenses() {
   const container = document.getElementById('expensesListContainer');
   if (!container) return;
 
+  populateExpensesFilterDropdown();
+
   const period = STATE.currentPeriod;
-  const list = (STATE.data.expenses || []).filter(e => isDateInPeriod(e.date, period));
+  const isEmployee = STATE.currentUser.role === 'employee';
+  const filterTarget = document.getElementById('expensesFilterTarget')?.value || 'ALL';
+
+  let list = (STATE.data.expenses || []).filter(e => isDateInPeriod(e.date, period));
+
+  if (isEmployee) {
+    // EMPLOYEE: Strictly only expenses assigned to this employee!
+    // Boss / Business expenses (assignedTo === 'admin' or null) MUST NEVER BE SHOWN!
+    list = list.filter(e => e.assignedTo === STATE.currentUser.id || e.assignedToName === STATE.currentUser.name);
+  } else {
+    // ADMIN: Can view all, or filter by Boss only, or filter by specific staff
+    if (filterTarget === 'admin') {
+      list = list.filter(e => !e.assignedTo || e.assignedTo === 'admin');
+    } else if (filterTarget !== 'ALL') {
+      list = list.filter(e => e.assignedTo === filterTarget);
+    }
+  }
+
+  const subtitleEl = document.getElementById('expensesSubtitleText');
+  if (subtitleEl) {
+    if (isEmployee) {
+      subtitleEl.textContent = 'My assigned expenses, salary deductions, and allowances';
+    } else {
+      subtitleEl.textContent = 'Meta Ads, Vendor Purchasing, and Staff-assigned expenses';
+    }
+  }
 
   if (list.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">💸</div>
-        <div class="empty-state-title">No expenses recorded for this period</div>
-        <p class="text-muted mt-2">Click '+ New Expense' to log an expense</p>
+        <div class="empty-state-title">${isEmployee ? 'No expenses or deductions recorded for you' : 'No expenses recorded for this period'}</div>
+        <p class="text-muted mt-2">${isEmployee ? 'You have 0 expense deductions for this period.' : 'Click \'+ New Expense\' to log an expense'}</p>
       </div>
     `;
     return;
   }
 
-  container.innerHTML = list.map(e => `
-    <div class="item-card">
-      <div class="expense-card-main">
-        <div>
-          <span class="expense-category-pill">${escapeHtml(e.category)}</span>
-          <div class="expense-desc-text">${escapeHtml(e.description || e.category)}</div>
-          <div class="expense-meta-text mt-1">Date: ${formatDateDisplay(e.date)}</div>
-        </div>
-        <div class="text-right">
-          <div class="amount-text text-rose">- Rs. ${(e.amount || 0).toLocaleString('en-US')}</div>
-          <div class="item-btn-group mt-2 justify-end">
-            <button class="btn-action-icon" title="Edit Expense" onclick="openEditExpense('${e.id}')">✏️</button>
-            <button class="btn-action-icon btn-action-delete" title="Delete Expense" onclick="deleteExpense('${e.id}')">🗑️</button>
+  container.innerHTML = list.map(e => {
+    const isBossExp = !e.assignedTo || e.assignedTo === 'admin';
+    const targetBadge = isBossExp
+      ? `<span class="badge-staff staff-admin">🏢 Boss (Business)</span>`
+      : `<span class="badge-staff staff-ali">👤 Staff: ${escapeHtml(e.assignedToName || 'Employee')}</span>`;
+
+    return `
+      <div class="item-card">
+        <div class="expense-card-main">
+          <div>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px;">
+              <span class="expense-category-pill">${escapeHtml(e.category)}</span>
+              ${!isEmployee ? targetBadge : ''}
+            </div>
+            <div class="expense-desc-text">${escapeHtml(e.description || e.category)}</div>
+            <div class="expense-meta-text mt-1">Date: ${formatDateDisplay(e.date)}</div>
+          </div>
+          <div class="text-right">
+            <div class="amount-text text-rose">- Rs. ${(e.amount || 0).toLocaleString('en-US')}</div>
+            ${!isEmployee ? `
+              <div class="item-btn-group mt-2 justify-end">
+                <button class="btn-action-icon" title="Edit Expense" onclick="openEditExpense('${e.id}')">✏️</button>
+                <button class="btn-action-icon btn-action-delete" title="Delete Expense" onclick="deleteExpense('${e.id}')">🗑️</button>
+              </div>
+            ` : ''}
           </div>
         </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 // ==================== RENDER PENDING PAYMENTS ====================
@@ -2167,10 +2221,11 @@ function setupEventListeners() {
   // Switch User / Logout Button
   document.getElementById('btnSwitchUser')?.addEventListener('click', handleSwitchUser);
 
-  // Sales filter changes
+  // Sales & Expense filter changes
   document.getElementById('salesFilterStaff')?.addEventListener('change', renderSales);
   document.getElementById('salesFilterProduct')?.addEventListener('change', renderSales);
   document.getElementById('salesFilterStatus')?.addEventListener('change', renderSales);
+  document.getElementById('expensesFilterTarget')?.addEventListener('change', renderExpenses);
 
   // Sale Modal Payment Proof File Input
   document.getElementById('saleProofFileInput')?.addEventListener('change', async (e) => {
@@ -2807,6 +2862,48 @@ function populateStaffFilterDropdown() {
   if (uniqueStaff.includes(currentVal) || currentVal === 'ALL') {
     staffSelect.value = currentVal;
   }
+
+  // Also update expenses filter dropdown
+  populateExpensesFilterDropdown();
+}
+
+// Populate expenses filter dropdown for Boss/Admin
+function populateExpensesFilterDropdown() {
+  const select = document.getElementById('expensesFilterTarget');
+  if (!select) return;
+
+  const isEmployee = STATE.currentUser.role === 'employee';
+  if (isEmployee) {
+    select.style.display = 'none';
+    return;
+  }
+  select.style.display = 'inline-block';
+
+  const currentVal = select.value || 'ALL';
+  const employees = (STATE.data.employees || []).filter(e => e && e.status !== 'frozen');
+  let html = `
+    <option value="ALL">👥 All Expenses</option>
+    <option value="admin">🏢 Boss / Business Only</option>
+  `;
+  employees.forEach(emp => {
+    html += `<option value="${escapeHtml(emp.id)}">👤 Staff: ${escapeHtml(emp.name)}</option>`;
+  });
+  select.innerHTML = html;
+  select.value = currentVal;
+}
+
+// Populate target dropdown in the Expense Entry Modal
+function populateExpenseTargetDropdown(selectedVal = 'admin') {
+  const select = document.getElementById('expenseTargetSelect');
+  if (!select) return;
+
+  const employees = (STATE.data.employees || []).filter(e => e && e.status !== 'frozen');
+  let html = `<option value="admin">🏢 Business / Boss (Admin Only)</option>`;
+  employees.forEach(emp => {
+    html += `<option value="${escapeHtml(emp.id)}">👤 Employee: ${escapeHtml(emp.name)}</option>`;
+  });
+  select.innerHTML = html;
+  select.value = selectedVal || 'admin';
 }
 
 // ==================== EMPLOYEE MANAGEMENT (ADMIN PANEL) ====================
@@ -2830,6 +2927,9 @@ function renderAdminEmployees() {
   container.innerHTML = employees.map(emp => {
     const isFrozen = emp.status === 'frozen';
     const initial = (emp.name || 'E').charAt(0).toUpperCase();
+    const empExpenses = (STATE.data.expenses || []).filter(e => e.assignedTo === emp.id || e.assignedToName === emp.name);
+    const empExpTotal = empExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
     return `
       <div class="emp-card ${isFrozen ? 'is-frozen' : ''}" data-emp-id="${emp.id}">
         <div class="emp-avatar">${initial}</div>
@@ -2837,6 +2937,7 @@ function renderAdminEmployees() {
           <div class="emp-name-row">
             <span>${escapeHtml(emp.name)}</span>
             <span class="badge-role-pill role-employee" style="font-size: 10.5px; padding: 2px 7px;">${emp.commissionRate || 0}% Comm</span>
+            ${empExpTotal > 0 ? `<span class="badge-role-pill" style="font-size: 10.5px; padding: 2px 7px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">💸 Rs. ${empExpTotal.toLocaleString()} Exp</span>` : ''}
             ${isFrozen ? `<span class="status-badge status-unpaid" style="font-size: 10px;">❄️ Frozen</span>` : `<span class="status-badge status-paid" style="font-size: 10px;">Active</span>`}
           </div>
           <div class="emp-meta-row">
@@ -2845,6 +2946,7 @@ function renderAdminEmployees() {
           </div>
         </div>
         <div class="item-btn-group">
+          <button class="btn-action-icon" style="color: var(--gold-accent);" title="Add Expense for ${escapeHtml(emp.name)}" onclick="openExpenseModalForEmployee('${emp.id}')">💸</button>
           <button class="btn-action-icon" title="${isFrozen ? 'Unfreeze Account' : 'Freeze Account'}" onclick="toggleFreezeEmployee('${emp.id}')">${isFrozen ? '🔓' : '❄️'}</button>
           <button class="btn-action-icon" title="Edit Employee" onclick="openEditEmployee('${emp.id}')">✏️</button>
           <button class="btn-action-icon btn-action-delete" title="Delete Employee" onclick="deleteEmployee('${emp.id}')">🗑️</button>
@@ -2988,13 +3090,20 @@ async function deleteEmployee(id) {
 
 // ==================== EXPENSE FORM CRUD ====================
 window.openExpenseModal = openExpenseModal;
-function openExpenseModal() {
+function openExpenseModal(preselectedTarget = 'admin') {
   document.getElementById('expenseEditId').value = '';
   document.getElementById('expenseModalTitle').textContent = 'New Expense Entry';
   document.getElementById('expenseForm').reset();
   setDefaultDates();
+
+  populateExpenseTargetDropdown(preselectedTarget);
+
   openModal('expenseModal');
 }
+
+window.openExpenseModalForEmployee = function(empId) {
+  openExpenseModal(empId);
+};
 
 function openEditExpense(id) {
   const expense = (STATE.data.expenses || []).find(e => e.id === id);
@@ -3006,6 +3115,9 @@ function openEditExpense(id) {
   document.getElementById('expenseCategorySelect').value = expense.category;
   document.getElementById('expenseDescInput').value = expense.description || '';
   document.getElementById('expenseAmountInput').value = expense.amount;
+
+  populateExpenseTargetDropdown(expense.assignedTo || 'admin');
+
   openModal('expenseModal');
 }
 
@@ -3017,11 +3129,21 @@ async function handleExpenseSubmit(e) {
   const description = document.getElementById('expenseDescInput').value.trim();
   const amount = Number(document.getElementById('expenseAmountInput').value) || 0;
 
+  const targetSelect = document.getElementById('expenseTargetSelect');
+  const assignedTo = targetSelect ? targetSelect.value : 'admin';
+  let assignedToName = 'Boss (Admin)';
+  if (assignedTo !== 'admin') {
+    const emp = (STATE.data.employees || []).find(emp => emp.id === assignedTo);
+    if (emp) assignedToName = emp.name;
+  }
+
   const payload = {
     date,
     category,
     description,
     amount,
+    assignedTo,
+    assignedToName,
     updatedAt: new Date().toISOString()
   };
 
@@ -3043,7 +3165,7 @@ async function handleExpenseSubmit(e) {
 
   saveLocalState();
   closeModal('expenseModal');
-  showToast(editId ? 'Expense updated! 💾' : 'Expense recorded & auto-saved! 💸');
+  showToast(editId ? 'Expense updated! 💾' : (assignedTo === 'admin' ? 'Business expense recorded! 💸' : `Expense recorded for ${assignedToName}! 💸`));
   renderApp();
 
   // Instant Cloud Auto-Save (NO REFRESH NEEDED)

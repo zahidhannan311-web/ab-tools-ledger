@@ -376,6 +376,7 @@ function buildExcelWorkbook(data) {
   const expensesRows = (data.expenses || []).map(e => ({
     'Expense ID': e.id || '',
     'Date': e.date || '',
+    'Expense For': e.assignedToName || (e.assignedTo === 'admin' ? 'Boss (Admin)' : (e.assignedTo ? e.assignedTo : 'Boss (Admin)')),
     'Category': e.category || '',
     'Description': e.description || e.category || '',
     'Amount (Rs.)': e.amount || 0,
@@ -880,7 +881,7 @@ app.delete('/api/sales/:id', async (req, res) => {
 
 // Add or Upsert Expense
 app.post('/api/expenses', async (req, res) => {
-  const { id, date, category, description, amount, createdAt, updatedAt } = req.body;
+  const { id, date, category, description, amount, assignedTo, assignedToName, createdAt, updatedAt } = req.body;
   if (!category || !amount) {
     return res.status(400).json({ error: 'Category and Amount are required!' });
   }
@@ -894,6 +895,8 @@ app.post('/api/expenses', async (req, res) => {
     category: category.trim(),
     description: (description && description.trim()) ? description.trim() : category.trim(),
     amount: Number(amount) || 0,
+    assignedTo: assignedTo || 'admin',
+    assignedToName: assignedToName || 'Boss (Admin)',
     createdAt: createdAt || new Date().toISOString(),
     updatedAt: updatedAt || new Date().toISOString()
   };
@@ -919,7 +922,7 @@ app.put('/api/expenses/:id', async (req, res) => {
   }
 
   const existing = db.expenses[index];
-  const { date, category, description, amount } = req.body;
+  const { date, category, description, amount, assignedTo, assignedToName } = req.body;
 
   db.expenses[index] = {
     ...existing,
@@ -927,6 +930,8 @@ app.put('/api/expenses/:id', async (req, res) => {
     category: category ? category.trim() : existing.category,
     description: (description && description.trim()) ? description.trim() : (category || existing.category),
     amount: Number(amount !== undefined ? amount : existing.amount),
+    assignedTo: assignedTo !== undefined ? assignedTo : (existing.assignedTo || 'admin'),
+    assignedToName: assignedToName !== undefined ? assignedToName : (existing.assignedToName || 'Boss (Admin)'),
     updatedAt: new Date().toISOString()
   };
 
