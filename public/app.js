@@ -891,7 +891,7 @@ function startRealtimeSync() {
   });
 
   // Tap-to-sync: user can tap the sync badge to force an immediate cloud sync
-  const badge = document.getElementById('syncStatusBadge');
+  const badge = document.getElementById('liveSyncBadge') || document.getElementById('syncStatusBadge');
   if (badge) {
     badge.style.cursor = 'pointer';
     badge.setAttribute('title', 'Tap to sync immediately with Cloud');
@@ -2237,6 +2237,15 @@ function setupEventListeners() {
     });
   });
 
+  // Modal backdrop click to close
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        closeModal(overlay.id);
+      }
+    });
+  });
+
   // Sale Modal Events
   const prodSelect = document.getElementById('saleProductSelect');
   const typeSelect = document.getElementById('saleTypeSelect');
@@ -2248,8 +2257,14 @@ function setupEventListeners() {
   planSelect?.addEventListener('change', onPlanChange);
   dateInput?.addEventListener('input', updateLiveExpiryPreview);
 
-  // Switch User / Logout Button
+  // Switch User / Logout Button & Header Role Badge
   document.getElementById('btnSwitchUser')?.addEventListener('click', handleSwitchUser);
+  const userBadgeEl = document.getElementById('currentUserBadge');
+  if (userBadgeEl) {
+    userBadgeEl.style.cursor = 'pointer';
+    userBadgeEl.setAttribute('title', 'Click to switch user or logout');
+    userBadgeEl.addEventListener('click', handleSwitchUser);
+  }
 
   // Sales & Expense filter changes
   document.getElementById('salesFilterStaff')?.addEventListener('change', renderSales);
