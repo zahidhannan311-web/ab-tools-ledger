@@ -134,15 +134,78 @@ async function checkPinStatus() {
 function updateUserHeaderBadge() {
   const badgeEl = document.getElementById('currentUserBadge');
   const textEl = document.getElementById('currentUserRoleText');
-  if (!badgeEl || !textEl) return;
-  if (STATE.currentUser.role === 'employee') {
-    badgeEl.className = 'badge-role-pill role-employee';
-    textEl.textContent = `👤 ${STATE.currentUser.name} (${STATE.currentUser.commissionRate}% Comm)`;
-  } else {
-    badgeEl.className = 'badge-role-pill';
-    textEl.textContent = `👑 Boss (Admin)`;
+  const drawerAvatar = document.getElementById('drawerUserAvatar');
+  const drawerName = document.getElementById('drawerUserName');
+  const drawerRole = document.getElementById('drawerUserRole');
+
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+
+  if (badgeEl && textEl) {
+    if (isEmployee) {
+      badgeEl.className = 'badge-role-pill role-employee';
+      textEl.textContent = `👤 ${STATE.currentUser.name}`;
+    } else {
+      badgeEl.className = 'badge-role-pill';
+      textEl.textContent = `👑 Boss (Admin)`;
+    }
   }
+
+  if (drawerAvatar) drawerAvatar.textContent = isEmployee ? '👤' : '👑';
+  if (drawerName) drawerName.textContent = isEmployee ? STATE.currentUser.name : 'Admin (Boss)';
+  if (drawerRole) drawerRole.textContent = isEmployee ? `Staff Member (${STATE.currentUser.commissionRate || 0}% Comm)` : 'Boss Admin 👑';
+
+  // Toggle admin features in side drawer
+  document.querySelectorAll('#appSideDrawer .admin-only-feature').forEach(el => {
+    el.style.display = isEmployee ? 'none' : 'flex';
+  });
 }
+
+function openSideDrawer() {
+  const drawer = document.getElementById('appSideDrawer');
+  const backdrop = document.getElementById('sideDrawerBackdrop');
+  if (!drawer || !backdrop) return;
+
+  updateUserHeaderBadge();
+
+  // Update badge counts in drawer
+  const trashBadge = document.getElementById('drawerTrashBadge');
+  const trashCount = (STATE.data.recycleBin || []).length;
+  if (trashBadge) {
+    trashBadge.textContent = trashCount;
+    trashBadge.style.display = trashCount > 0 ? 'inline-block' : 'none';
+  }
+
+  const remindersBadge = document.getElementById('drawerRemindersBadge');
+  const remCount = document.getElementById('remindersCountBadge')?.textContent || '0';
+  if (remindersBadge) {
+    remindersBadge.textContent = remCount;
+    remindersBadge.style.display = Number(remCount) > 0 ? 'inline-block' : 'none';
+  }
+
+  backdrop.style.display = 'block';
+  requestAnimationFrame(() => {
+    backdrop.classList.add('active');
+    drawer.classList.add('active');
+    drawer.setAttribute('aria-hidden', 'false');
+  });
+}
+
+function closeSideDrawer() {
+  const drawer = document.getElementById('appSideDrawer');
+  const backdrop = document.getElementById('sideDrawerBackdrop');
+  if (!drawer || !backdrop) return;
+
+  drawer.classList.remove('active');
+  backdrop.classList.remove('active');
+  drawer.setAttribute('aria-hidden', 'true');
+  setTimeout(() => {
+    if (!drawer.classList.contains('active')) {
+      backdrop.style.display = 'none';
+    }
+  }, 280);
+}
+window.openSideDrawer = openSideDrawer;
+window.closeSideDrawer = closeSideDrawer;
 
 function handleSwitchUser() {
   sessionStorage.removeItem('ab_tools_unlocked');
@@ -1937,6 +2000,56 @@ function setupEventListeners() {
   document.getElementById('btnRefreshReminders')?.addEventListener('click', () => {
     renderReminders();
     showToast('Reminders refreshed!');
+  });
+
+  // Side Drawer Toggle, Close & Backdrop
+  document.getElementById('btnToggleSideMenu')?.addEventListener('click', openSideDrawer);
+  document.getElementById('btnCloseSideDrawer')?.addEventListener('click', closeSideDrawer);
+  document.getElementById('sideDrawerBackdrop')?.addEventListener('click', closeSideDrawer);
+
+  // Drawer Search Bar (User Requirement: "search bar Top me rkhna")
+  const drawerSearch = document.getElementById('drawerSearchInput');
+  drawerSearch?.addEventListener('input', (e) => {
+    STATE.searchQuery = e.target.value.trim();
+    renderApp();
+  });
+  drawerSearch?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      closeSideDrawer();
+    }
+  });
+
+  // Drawer Action Items
+  document.getElementById('drawerBtnExcel')?.addEventListener('click', () => {
+    closeSideDrawer();
+    triggerExcelDownload();
+  });
+  document.getElementById('drawerBtnTrash')?.addEventListener('click', () => {
+    closeSideDrawer();
+    openModal('recycleBinModal');
+    renderRecycleBin('all');
+  });
+  document.getElementById('drawerBtnReminders')?.addEventListener('click', () => {
+    closeSideDrawer();
+    switchView('remindersView');
+  });
+  document.getElementById('drawerBtnStaff')?.addEventListener('click', () => {
+    closeSideDrawer();
+    openEmployeeModal();
+  });
+  document.getElementById('drawerBtnSettings')?.addEventListener('click', () => {
+    closeSideDrawer();
+    openSettingsModal();
+  });
+  document.getElementById('drawerBtnLock')?.addEventListener('click', () => {
+    closeSideDrawer();
+    STATE.unlocked = false;
+    sessionStorage.removeItem('ab_tools_unlocked');
+    showPinGate();
+  });
+  document.getElementById('drawerBtnLogout')?.addEventListener('click', () => {
+    closeSideDrawer();
+    handleSwitchUser();
   });
 
   // Top Bar Search Button

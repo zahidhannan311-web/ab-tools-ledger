@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.3">
+  <link rel="stylesheet" href="style.css?v=3.4">
 </head>
 <body>
 
@@ -155,7 +155,17 @@
     <!-- Top Sticky Header -->
     <header class="app-header">
       <div class="header-content">
-        <div class="header-brand">
+        <!-- Left Corner: 3 Lines Hamburger Menu Button -->
+        <button type="button" id="btnToggleSideMenu" class="icon-btn btn-hamburger" aria-label="Open Side Menu" title="Open Navigation Menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+
+        <!-- Center: Logo and Monkey Tools Title -->
+        <div class="header-brand-center">
           <div class="logo-mark mascot-logo-wrap">
             <img src="monkey-logo.png" alt="Monkey Tools Mascot" class="brand-mascot-img">
           </div>
@@ -170,16 +180,16 @@
           </div>
         </div>
 
-        <!-- Header Actions -->
+        <!-- Right: Role Pill & Quick Lock -->
         <div class="header-actions">
-          <button id="btnQuickSearch" class="icon-btn" title="Search Phone / Customer / Account" aria-label="Search">
+          <button id="btnQuickSearch" class="icon-btn header-desktop-only" title="Search Phone / Customer / Account" aria-label="Search">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
             <span class="btn-text-desktop">Search (🔍)</span>
           </button>
           
-          <button id="btnDownloadExcel" class="icon-btn btn-excel" title="Download Excel (.xlsx)" aria-label="Download Excel">
+          <button id="btnDownloadExcel" class="icon-btn btn-excel header-desktop-only" title="Download Excel (.xlsx)" aria-label="Download Excel">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
@@ -188,7 +198,7 @@
             <span class="btn-text-desktop">Excel Sheet</span>
           </button>
 
-          <button id="btnOpenRecycleBin" class="icon-btn btn-trash" title="Recycle Bin / Undo Deleted Items" aria-label="Recycle Bin">
+          <button id="btnOpenRecycleBin" class="icon-btn btn-trash header-desktop-only" title="Recycle Bin / Undo Deleted Items" aria-label="Recycle Bin">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -197,20 +207,13 @@
             <span id="recycleBinBadge" class="badge-trash-count" style="display:none;">0</span>
           </button>
 
-          <!-- Current User Role Badge & Switch/Logout -->
+          <!-- Current User Role Badge -->
           <div id="currentUserBadge" class="badge-role-pill" title="Logged In Role">
             <span class="user-role-dot"></span>
             <span id="currentUserRoleText">👑 Admin</span>
           </div>
 
-          <button id="btnSwitchUser" class="icon-btn btn-switch" title="Switch User / Logout" aria-label="Switch User">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
-          </button>
-
+          <!-- Quick Lock App Button -->
           <button id="btnLockApp" class="icon-btn btn-lock" title="Lock App" aria-label="Lock App">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -219,6 +222,114 @@
           </button>
         </div>
       </div>
+    </header>
+
+    <!-- ==================== SIDE DRAWER NAVIGATION MENU ==================== -->
+    <div id="sideDrawerBackdrop" class="drawer-backdrop" style="display:none;"></div>
+    <aside id="appSideDrawer" class="side-drawer" aria-hidden="true">
+      <div class="drawer-header">
+        <div class="drawer-brand">
+          <div class="logo-mark mascot-logo-wrap" style="width:34px;height:34px;border-radius:8px;">
+            <img src="monkey-logo.png" alt="Monkey Tools Mascot" class="brand-mascot-img">
+          </div>
+          <div>
+            <h2 class="drawer-title">Monkey Tools</h2>
+            <span class="drawer-tagline">Sales &amp; Business Tracker</span>
+          </div>
+        </div>
+        <button type="button" id="btnCloseSideDrawer" class="btn-close-drawer" aria-label="Close Menu">&times;</button>
+      </div>
+
+      <!-- Top Search Bar in Side Drawer (User Request: "search bar Top me rkhna") -->
+      <div class="drawer-search-section">
+        <div class="drawer-search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="search" id="drawerSearchInput" class="drawer-search-input" placeholder="Search phone, customer, account..." autocomplete="off">
+        </div>
+      </div>
+
+      <!-- Logged-in Profile Card -->
+      <div class="drawer-user-card" id="drawerUserCard">
+        <div class="drawer-user-avatar" id="drawerUserAvatar">👑</div>
+        <div class="drawer-user-info">
+          <div class="drawer-user-name" id="drawerUserName">Admin (Boss)</div>
+          <div class="drawer-user-status"><span class="sync-dot success"></span> <span id="drawerUserRole">Boss Admin</span></div>
+        </div>
+      </div>
+
+      <!-- Scrollable Navigation Options -->
+      <div class="drawer-menu-links">
+        <button type="button" class="drawer-nav-item" id="drawerBtnExcel">
+          <div class="drawer-icon-wrap" style="color:#10b981; background:rgba(16,185,129,0.12);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          </div>
+          <div class="drawer-nav-text">
+            <span class="drawer-nav-label">Download Excel Sheet</span>
+            <span class="drawer-nav-sub">Export all ledger records (.xlsx)</span>
+          </div>
+        </button>
+
+        <button type="button" class="drawer-nav-item" id="drawerBtnTrash">
+          <div class="drawer-icon-wrap" style="color:#f59e0b; background:rgba(245,158,11,0.12);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </div>
+          <div class="drawer-nav-text">
+            <span class="drawer-nav-label">Recycle Bin (Deleted Items)</span>
+            <span class="drawer-nav-sub">Restore deleted sales &amp; expenses</span>
+          </div>
+          <span id="drawerTrashBadge" class="drawer-pill-badge" style="display:none;">0</span>
+        </button>
+
+        <button type="button" class="drawer-nav-item" id="drawerBtnReminders">
+          <div class="drawer-icon-wrap" style="color:#ef4444; background:rgba(239,68,68,0.12);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          </div>
+          <div class="drawer-nav-text">
+            <span class="drawer-nav-label">Reminders &amp; Expiries</span>
+            <span class="drawer-nav-sub">Renewals &amp; pending customer payments</span>
+          </div>
+          <span id="drawerRemindersBadge" class="drawer-pill-badge" style="display:none;">0</span>
+        </button>
+
+        <button type="button" class="drawer-nav-item admin-only-feature" id="drawerBtnStaff">
+          <div class="drawer-icon-wrap" style="color:#8b5cf6; background:rgba(139,92,246,0.12);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          </div>
+          <div class="drawer-nav-text">
+            <span class="drawer-nav-label">Staff &amp; Roles Management</span>
+            <span class="drawer-nav-sub">Add staff, commission &amp; PINs</span>
+          </div>
+        </button>
+
+        <button type="button" class="drawer-nav-item admin-only-feature" id="drawerBtnSettings">
+          <div class="drawer-icon-wrap" style="color:#3b82f6; background:rgba(59,130,246,0.12);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </div>
+          <div class="drawer-nav-text">
+            <span class="drawer-nav-label">Settings &amp; Templates</span>
+            <span class="drawer-nav-sub">WhatsApp templates &amp; data backup</span>
+          </div>
+        </button>
+
+        <button type="button" class="drawer-nav-item" id="drawerBtnLock">
+          <div class="drawer-icon-wrap" style="color:var(--gold-accent); background:rgba(245,158,11,0.12);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          </div>
+          <div class="drawer-nav-text">
+            <span class="drawer-nav-label">Lock App / Security PIN</span>
+            <span class="drawer-nav-sub">Lock ledger screen instantly</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Logout / Switch User at END of Side Drawer (User Request: "or logout end me") -->
+      <div class="drawer-footer">
+        <button type="button" class="drawer-btn-logout" id="drawerBtnLogout">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          <span>Switch User / Logout</span>
+        </button>
+      </div>
+    </aside>
 
       <!-- Quick Action Buttons Bar -->
       <div class="action-quick-bar">
@@ -1295,6 +1406,6 @@
   <!-- Notification Toast -->
   <div id="toastNotification" class="toast"></div>
 
-  <script src="app.js?v=2.9"></script>
+  <script src="app.js?v=3.0"></script>
 </body>
 </html>
