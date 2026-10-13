@@ -14,9 +14,9 @@ const STATE = {
   selectedLoginProfile: null,
   loginProfiles: [],
   currentUser: {
-    role: 'admin',
-    name: 'Admin',
-    id: 'admin',
+    role: 'guest',
+    name: 'Guest',
+    id: '',
     commissionRate: 0,
     phone: ''
   },
@@ -101,7 +101,7 @@ async function checkPinStatus() {
   if (savedSession === 'true') {
     STATE.unlocked = true;
     STATE.pinSet = true;
-    const savedUser = sessionStorage.getItem('ab_tools_user');
+    const savedUser = sessionStorage.getItem('ab_tools_user') || localStorage.getItem('ab_tools_user');
     if (savedUser) {
       try { STATE.currentUser = JSON.parse(savedUser); } catch (_) {}
     }
@@ -154,10 +154,26 @@ function updateUserHeaderBadge() {
   if (drawerName) drawerName.textContent = isEmployee ? STATE.currentUser.name : 'Admin (Boss)';
   if (drawerRole) drawerRole.textContent = isEmployee ? `Staff Member (${STATE.currentUser.commissionRate || 0}% Comm)` : 'Boss Admin 👑';
 
-  // Toggle admin features in side drawer
-  document.querySelectorAll('#appSideDrawer .admin-only-feature').forEach(el => {
-    el.style.display = isEmployee ? 'none' : 'flex';
+  // Toggle admin features across the entire app (drawer and top header)
+  document.querySelectorAll('.admin-only-feature').forEach(el => {
+    if (isEmployee) {
+      el.style.display = 'none';
+    } else {
+      if (el.classList.contains('drawer-nav-item')) {
+        el.style.display = 'flex';
+      } else if (el.classList.contains('header-desktop-only')) {
+        el.style.display = 'inline-flex';
+      } else {
+        el.style.display = '';
+      }
+    }
   });
+
+  // Anti-Fraud: Hide Empty Trash button from staff members
+  const emptyTrashBtn = document.getElementById('btnEmptyTrash');
+  if (emptyTrashBtn) {
+    emptyTrashBtn.style.display = isEmployee ? 'none' : 'inline-flex';
+  }
 }
 
 function openSideDrawer() {
@@ -210,9 +226,10 @@ window.closeSideDrawer = closeSideDrawer;
 function handleSwitchUser() {
   sessionStorage.removeItem('ab_tools_unlocked');
   sessionStorage.removeItem('ab_tools_user');
+  localStorage.removeItem('ab_tools_user');
   STATE.unlocked = false;
   STATE.enteredPin = '';
-  STATE.currentUser = { role: 'admin', name: 'Admin', id: 'admin', commissionRate: 0 };
+  STATE.currentUser = { role: 'guest', name: 'Guest', id: '', commissionRate: 0, phone: '' };
   updatePinDots();
   const errEl = document.getElementById('pinUnlockError');
   if (errEl) errEl.textContent = '';
@@ -527,6 +544,7 @@ async function handleUnlockSubmit() {
         renderPinDots();
       }
       sessionStorage.setItem('ab_tools_user', JSON.stringify(STATE.currentUser));
+      localStorage.setItem('ab_tools_user', JSON.stringify(STATE.currentUser));
       sessionStorage.setItem('ab_tools_unlocked', 'true');
       updateUserHeaderBadge();
       document.getElementById('pinGateModal').classList.remove('active');
@@ -549,6 +567,7 @@ async function handleUnlockSubmit() {
         STATE.currentUser = { role: 'admin', name: 'Admin', id: 'admin', commissionRate: 0 };
       }
       sessionStorage.setItem('ab_tools_user', JSON.stringify(STATE.currentUser));
+      localStorage.setItem('ab_tools_user', JSON.stringify(STATE.currentUser));
       sessionStorage.setItem('ab_tools_unlocked', 'true');
       updateUserHeaderBadge();
       document.getElementById('pinGateModal').classList.remove('active');
@@ -685,7 +704,9 @@ async function performServerSync() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache'
+        'Cache-Control': 'no-cache',
+        'x-user-role': STATE.currentUser?.role || 'admin',
+        'x-user-id': STATE.currentUser?.id || 'admin'
       },
       signal: controller.signal,
       body: JSON.stringify({
@@ -695,7 +716,8 @@ async function performServerSync() {
         employees: STATE.data.employees || [],
         recycleBin: STATE.data.recycleBin || [],
         settings: STATE.data.settings || {},
-        pin: localStorage.getItem('ab_tools_pin')
+        pin: localStorage.getItem('ab_tools_pin'),
+        currentUser: STATE.currentUser
       })
     });
 
@@ -1819,6 +1841,7 @@ function renderSales() {
 }
 
 function renderSaleCardHtml(s) {
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
   const statusClass = s.paymentStatus === 'Paid' ? 'status-paid' : (s.paymentStatus === 'Pending' ? 'status-pending' : 'status-unpaid');
   const daysLeft = calculateDaysRemaining(s.expiryDate);
   const isExpired = daysLeft !== null && daysLeft < 0;
@@ -1884,7 +1907,9 @@ function renderSaleCardHtml(s) {
             <span>💬 WhatsApp</span>
           </button>
           <button class="btn-action-icon" title="Edit Sale" onclick="openEditSale('${s.id}')">✏️</button>
-          <button class="btn-action-icon btn-action-delete" title="Delete Sale" onclick="openDeleteSaleReasonModal('${s.id}')">🗑️</button>
+          ${!isEmployee ? `
+            <button class="btn-action-icon btn-action-delete" title="Delete Sale (Admin Only)" onclick="openDeleteSaleReasonModal('${s.id}')">🗑️</button>
+          ` : ''}
         </div>
       </div>
     </div>
@@ -2478,6 +2503,10 @@ function setupEventListeners() {
   });
   document.getElementById('drawerBtnTrash')?.addEventListener('click', () => {
     closeSideDrawer();
+    if (STATE.currentUser && STATE.currentUser.role === 'employee') {
+      showToast('🚫 Access Denied: Recycle Bin is restricted to Admin (Boss) only!');
+      return;
+    }
     openModal('recycleBinModal');
     renderRecycleBin('all');
   });
@@ -2545,6 +2574,10 @@ function setupEventListeners() {
 
   // Recycle Bin Modal Button & Listeners
   document.getElementById('btnOpenRecycleBin')?.addEventListener('click', () => {
+    if (STATE.currentUser && STATE.currentUser.role === 'employee') {
+      showToast('🚫 Access Denied: Recycle Bin is restricted to Admin (Boss) only!');
+      return;
+    }
     openModal('recycleBinModal');
     renderRecycleBin('all');
   });
@@ -3238,8 +3271,13 @@ function openViewPaymentProof(id) {
   openModal('viewPaymentProofModal');
 }
 
-// Delete Sale with Mandatory Reason
+// Delete Sale with Mandatory Reason (Admin Only)
 function openDeleteSaleReasonModal(id) {
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+  if (isEmployee) {
+    showToast('🚫 Access Denied: Only Admin (Boss) can delete sales records! Anti-fraud security active.', { duration: 6000 });
+    return;
+  }
   const sale = (STATE.data.sales || []).find(s => s.id === id);
   if (!sale) return;
 
@@ -3255,6 +3293,12 @@ function openDeleteSaleReasonModal(id) {
 
 async function handleConfirmDeleteSale(e) {
   e.preventDefault();
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+  if (isEmployee) {
+    closeModal('deleteSaleReasonModal');
+    showToast('🚫 Access Denied: Only Admin (Boss) can delete sales records! Anti-fraud security active.', { duration: 6000 });
+    return;
+  }
   const id = document.getElementById('deleteSaleTargetId').value;
   const reason = document.getElementById('deleteSaleReasonInput').value.trim();
   if (!reason) {
@@ -3644,6 +3688,11 @@ async function handleExpenseSubmit(e) {
 }
 
 async function deleteExpense(id) {
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+  if (isEmployee) {
+    showToast('🚫 Access Denied: Only Admin (Boss) can delete expense records! Anti-fraud security active.', { duration: 6000 });
+    return;
+  }
   if (!confirm('Are you sure you want to delete this expense record?')) return;
   const expense = (STATE.data.expenses || []).find(e => e.id === id);
   if (!expense) return;
@@ -3734,20 +3783,27 @@ function updateRecycleBinBadge() {
 }
 
 function renderRecycleBin(filter = null) {
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+  if (isEmployee) {
+    closeModal('recycleBinModal');
+    showToast('🚫 Access Denied: Recycle Bin is restricted to Admin (Boss) only! Anti-fraud security active.', { duration: 6000 });
+    return;
+  }
   if (filter) currentTrashFilter = filter;
   const container = document.getElementById('recycleBinListContainer');
   if (!container) return;
 
   updateRecycleBinBadge();
 
-  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
   const subtitleEl = document.getElementById('recycleBinSubtitle');
   if (subtitleEl) {
-    if (isEmployee) {
-      subtitleEl.innerHTML = `👤 <strong>${escapeHtml(STATE.currentUser.name)}'s Trash</strong> — Only items deleted by or belonging to you are visible.`;
-    } else {
-      subtitleEl.innerHTML = `👑 <strong>Admin Master Trash</strong> — All deleted items across all staff with employee names and reasons.`;
-    }
+    subtitleEl.innerHTML = `👑 <strong>Admin Master Trash</strong> — All deleted items across all staff with employee names and reasons. Full restore & permanent purge controls.`;
+  }
+
+  // Admin Master Toolbar
+  const emptyTrashBtn = document.getElementById('btnEmptyTrash');
+  if (emptyTrashBtn) {
+    emptyTrashBtn.style.display = 'inline-flex';
   }
 
   const allBin = STATE.data.recycleBin || [];
@@ -3854,9 +3910,11 @@ function renderRecycleBin(filter = null) {
           <button type="button" class="btn-restore" title="Restore to ledger" onclick="restoreFromRecycleBin('${entry.id}')">
             <span>🔄 Restore</span>
           </button>
-          <button type="button" class="btn-purge" title="Delete permanently" onclick="permanentlyDeleteFromTrash('${entry.id}')">
-            <span>❌</span>
-          </button>
+          ${!isEmployee ? `
+            <button type="button" class="btn-purge" title="Permanently delete from database (Admin Only)" onclick="permanentlyDeleteFromTrash('${entry.id}')">
+              <span>❌ Purge</span>
+            </button>
+          ` : ''}
         </div>
       </div>
     `;
@@ -3918,14 +3976,26 @@ function restoreFromRecycleBin(trashId) {
   renderRecycleBin();
   triggerAutoSaveSync(true);
 
-  // Notify server to restore
-  fetch(`/api/recycle-bin/restore/${encodeURIComponent(trashId)}`, { method: 'POST' }).catch(() => {});
+  // Notify server to restore with role header
+  fetch(`/api/recycle-bin/restore/${encodeURIComponent(trashId)}`, {
+    method: 'POST',
+    headers: {
+      'x-user-role': STATE.currentUser?.role || 'admin',
+      'x-user-id': STATE.currentUser?.id || 'admin'
+    }
+  }).catch(() => {});
 
   const title = entry.type === 'sale' ? (entry.item.customerPhone ? formatPhone(entry.item.customerPhone) : entry.item.product) : entry.item.category;
   showToast(`Restored: ${title}! ✨`);
 }
 
 function permanentlyDeleteFromTrash(trashId) {
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+  if (isEmployee) {
+    showToast('🚫 Access Denied: Only Admin (Boss) can permanently delete records from Recycle Bin! Anti-fraud security active.', { duration: 6000 });
+    return;
+  }
+
   if (!confirm('Are you sure you want to permanently delete this item? It cannot be recovered.')) return;
   const item = (STATE.data.recycleBin || []).find(t => t.id === trashId || t.originalId === trashId);
   STATE.data.recycleBin = (STATE.data.recycleBin || []).filter(t => t.id !== trashId && t.originalId !== trashId);
@@ -3948,24 +4018,32 @@ function permanentlyDeleteFromTrash(trashId) {
   triggerAutoSaveSync(true);
 
   // Notify server
-  fetch(`/api/recycle-bin/${encodeURIComponent(trashId)}`, { method: 'DELETE' }).catch(() => {});
-  showToast('Item permanently deleted');
+  fetch(`/api/recycle-bin/${encodeURIComponent(trashId)}`, {
+    method: 'DELETE',
+    headers: {
+      'x-user-role': STATE.currentUser?.role || 'admin',
+      'x-user-id': STATE.currentUser?.id || 'admin'
+    }
+  }).catch(() => {});
+  showToast('Item permanently deleted by Admin');
 }
 
 function emptyRecycleBin() {
   const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+  if (isEmployee) {
+    showToast('🚫 Access Denied: Only Admin (Boss) can empty the Recycle Bin! Anti-fraud security active.', { duration: 6000 });
+    return;
+  }
+
   const allBin = STATE.data.recycleBin || [];
   const visibleBin = allBin.filter(isTrashItemVisibleToCurrentUser);
 
   if (visibleBin.length === 0) {
-    showToast(isEmployee ? 'Your Recycle Bin is already empty' : 'Recycle Bin is already empty');
+    showToast('Recycle Bin is already empty');
     return;
   }
 
-  const confirmMsg = isEmployee
-    ? `Are you sure you want to permanently delete your ${visibleBin.length} deleted record(s)?`
-    : `Are you sure you want to permanently delete all ${visibleBin.length} record(s) from the business Recycle Bin?`;
-
+  const confirmMsg = `Are you sure you want to permanently delete all ${visibleBin.length} record(s) from the business Recycle Bin? This action cannot be undone.`;
   if (!confirm(confirmMsg)) return;
 
   const visibleIds = new Set(visibleBin.map(t => t.id));
@@ -3975,7 +4053,7 @@ function emptyRecycleBin() {
     if (t.originalId) purgedIds.push(t.originalId);
   });
 
-  // Filter out ONLY the visible items (keeps other employees' items safe)
+  // Filter out the visible items
   STATE.data.recycleBin = allBin.filter(t => !visibleIds.has(t.id));
 
   STATE.data.settings = STATE.data.settings || {};
@@ -3989,15 +4067,15 @@ function emptyRecycleBin() {
   renderRecycleBin();
   triggerAutoSaveSync(true);
 
-  if (!isEmployee) {
-    fetch('/api/recycle-bin', { method: 'DELETE' }).catch(() => {});
-  } else {
-    purgedIds.forEach(pid => {
-      fetch(`/api/recycle-bin/${encodeURIComponent(pid)}`, { method: 'DELETE' }).catch(() => {});
-    });
-  }
+  fetch('/api/recycle-bin', {
+    method: 'DELETE',
+    headers: {
+      'x-user-role': STATE.currentUser?.role || 'guest',
+      'x-user-id': STATE.currentUser?.id || 'admin'
+    }
+  }).catch(() => {});
 
-  showToast('Recycle Bin emptied! 🗑️');
+  showToast('Recycle Bin emptied by Admin! 🗑️');
 }
 
 window.restoreFromRecycleBin = restoreFromRecycleBin;
@@ -4516,6 +4594,10 @@ async function syncDirectUpstashRedis() {
 }
 
 async function pushDirectUpstashRedis() {
+  // Anti-fraud security: Staff members must NEVER directly push to Cloud KV bypassing server validations
+  if (STATE.currentUser && STATE.currentUser.role === 'employee') {
+    return;
+  }
   const url = STATE.data.settings?.kvUrl || localStorage.getItem('ab_tools_kv_url') || DEFAULT_CLIENT_KV_URL;
   const token = STATE.data.settings?.kvToken || localStorage.getItem('ab_tools_kv_token') || DEFAULT_CLIENT_KV_TOKEN;
   if (!url || !token) return;

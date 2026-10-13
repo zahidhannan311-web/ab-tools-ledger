@@ -839,8 +839,12 @@ app.patch('/api/sales/:id/status', async (req, res) => {
   res.json({ success: true, sale });
 });
 
-// Delete Sale (Moves to Recycle Bin with Mandatory Reason)
+// Delete Sale (Moves to Recycle Bin with Mandatory Reason - Admin Only)
 app.delete('/api/sales/:id', async (req, res) => {
+  const reqRole = req.headers['x-user-role'] || req.body?.deleterRole || req.query?.role;
+  if (reqRole === 'employee') {
+    return res.status(403).json({ error: 'Access Denied: Only Admin (Boss) can delete sales records!' });
+  }
   const { id } = req.params;
   const { reason, deletedBy, deleterId, deleterRole, item: clientItem } = req.body || {};
   const db = readDb();
@@ -947,8 +951,12 @@ app.put('/api/expenses/:id', async (req, res) => {
   res.json({ success: true, expense: db.expenses[index] });
 });
 
-// Delete Expense (Moves to Recycle Bin)
+// Delete Expense (Moves to Recycle Bin - Admin Only)
 app.delete('/api/expenses/:id', async (req, res) => {
+  const reqRole = req.headers['x-user-role'] || req.body?.deleterRole || req.query?.role;
+  if (reqRole === 'employee') {
+    return res.status(403).json({ error: 'Access Denied: Only Admin (Boss) can delete expense records!' });
+  }
   const { id } = req.params;
   const { reason, deletedBy, deleterId, deleterRole, item: clientItem } = req.body || {};
   const db = readDb();
@@ -1041,8 +1049,12 @@ app.post('/api/recycle-bin/restore/:id', async (req, res) => {
   res.json({ success: true, message: 'Item restored successfully', item: trashEntry.item, type: trashEntry.type });
 });
 
-// Permanently Delete Item from Recycle Bin
+// Permanently Delete Item from Recycle Bin (Admin Only - Anti-Fraud Protection)
 app.delete('/api/recycle-bin/:id', async (req, res) => {
+  const role = req.headers['x-user-role'] || req.query.role || req.body?.role;
+  if (role !== 'admin') {
+    return res.status(403).json({ error: 'Access Denied: Only Admin (Boss) can permanently delete records from Recycle Bin!' });
+  }
   const { id } = req.params;
   const db = readDb();
   db.recycleBin = (db.recycleBin || []).filter(t => t.id !== id && t.originalId !== id);
@@ -1056,8 +1068,12 @@ app.delete('/api/recycle-bin/:id', async (req, res) => {
   res.json({ success: true, message: 'Item permanently deleted' });
 });
 
-// Empty Entire Recycle Bin
+// Empty Entire Recycle Bin (Admin Only - Anti-Fraud Protection)
 app.delete('/api/recycle-bin', async (req, res) => {
+  const role = req.headers['x-user-role'] || req.query.role || req.body?.role;
+  if (role !== 'admin') {
+    return res.status(403).json({ error: 'Access Denied: Only Admin (Boss) can empty Recycle Bin!' });
+  }
   const db = readDb();
   db.settings = db.settings || {};
   db.settings.purgedTrashIds = db.settings.purgedTrashIds || [];
@@ -1192,23 +1208,27 @@ app.post('/api/sync', async (req, res) => {
       employees: incomingEmployees,
       settings: incomingSettings,
       recycleBin: incomingRecycleBin,
-      pin: incomingPin
+      pin: incomingPin,
+      currentUser
     } = req.body;
+    const reqRole = req.headers['x-user-role'] || currentUser?.role;
+    const isEmployee = reqRole === 'employee';
     const db = readDb();
 
     // Only explicitly restored items can be un-deleted
     const restoredSales = new Set(incomingSettings?.restoredSaleIds || []);
     const restoredExpenses = new Set(incomingSettings?.restoredExpenseIds || []);
 
+    // ANTI-FRAUD SECURITY: Employees can NEVER introduce new sale or expense deletions!
     const deletedSales = new Set([
       ...(db.settings?.deletedSaleIds || []),
-      ...(incomingSettings?.deletedSaleIds || [])
+      ...(!isEmployee ? (incomingSettings?.deletedSaleIds || []) : [])
     ]);
     restoredSales.forEach(id => deletedSales.delete(id));
 
     const deletedExpenses = new Set([
       ...(db.settings?.deletedExpenseIds || []),
-      ...(incomingSettings?.deletedExpenseIds || [])
+      ...(!isEmployee ? (incomingSettings?.deletedExpenseIds || []) : [])
     ]);
     restoredExpenses.forEach(id => deletedExpenses.delete(id));
 
@@ -1254,28 +1274,34 @@ app.post('/api/sync', async (req, res) => {
       db.employees = Array.from(empMap.values());
     }
 
-    // NON-DESTRUCTIVE RECYCLE BIN MERGE (Never wipe deleted entries on multi-device sync)
+    // NON-DESTRUCTIVE RECYCLE BIN MERGE (Anti-Fraud Security)
+    // EMPLOYEES CAN NEVER PURGE ITEMS: Only Admin can introduce purgedTrashIds!
     const purgedTrash = new Set([
       ...(db.settings?.purgedTrashIds || []),
-      ...(incomingSettings?.purgedTrashIds || [])
+      ...(!isEmployee ? (incomingSettings?.purgedTrashIds || []) : [])
     ]);
 
     const trashMap = new Map();
-    // 1. Existing server items
+    // 1. Existing server items:
+    // If incoming sync is from employee, ALWAYS keep existing server recycle bin items intact!
     (db.recycleBin || []).forEach(item => {
       if (!item) return;
       const key = item.id || item.originalId;
-      if (key && !purgedTrash.has(key) && !purgedTrash.has(item.originalId) && !restoredSales.has(item.originalId) && !restoredExpenses.has(item.originalId)) {
+      const isPurged = purgedTrash.has(key) || purgedTrash.has(item.originalId);
+      const isRestored = restoredSales.has(item.originalId) || restoredExpenses.has(item.originalId);
+      if (key && (!isPurged || isEmployee) && !isRestored) {
         trashMap.set(key, item);
       }
     });
 
-    // 2. Incoming client items
-    if (Array.isArray(incomingRecycleBin)) {
+    // 2. Incoming client items (newly deleted records): Only Admin can delete items to Recycle Bin
+    if (!isEmployee && Array.isArray(incomingRecycleBin)) {
       incomingRecycleBin.forEach(item => {
         if (!item) return;
         const key = item.id || item.originalId;
-        if (key && !purgedTrash.has(key) && !purgedTrash.has(item.originalId) && !restoredSales.has(item.originalId) && !restoredExpenses.has(item.originalId)) {
+        const isPurged = purgedTrash.has(key) || purgedTrash.has(item.originalId);
+        const isRestored = restoredSales.has(item.originalId) || restoredExpenses.has(item.originalId);
+        if (key && !isPurged && !isRestored) {
           if (!trashMap.has(key)) {
             trashMap.set(key, item);
           } else {
@@ -1299,8 +1325,8 @@ app.post('/api/sync', async (req, res) => {
 
     db.settings = {
       ...db.settings,
-      ...(incomingSettings || {}),
-      businessName: sanitizeBusinessName(incomingSettings?.businessName || db.settings?.businessName),
+      ...(!isEmployee ? (incomingSettings || {}) : {}),
+      businessName: sanitizeBusinessName((!isEmployee ? incomingSettings?.businessName : null) || db.settings?.businessName),
       lastModified: Date.now(),
       deletedSaleIds: Array.from(deletedSales),
       deletedExpenseIds: Array.from(deletedExpenses),
