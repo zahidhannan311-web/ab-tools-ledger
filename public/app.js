@@ -2503,10 +2503,6 @@ function setupEventListeners() {
   });
   document.getElementById('drawerBtnTrash')?.addEventListener('click', () => {
     closeSideDrawer();
-    if (STATE.currentUser && STATE.currentUser.role === 'employee') {
-      showToast('🚫 Access Denied: Recycle Bin is restricted to Admin (Boss) only!');
-      return;
-    }
     openModal('recycleBinModal');
     renderRecycleBin('all');
   });
@@ -2574,10 +2570,6 @@ function setupEventListeners() {
 
   // Recycle Bin Modal Button & Listeners
   document.getElementById('btnOpenRecycleBin')?.addEventListener('click', () => {
-    if (STATE.currentUser && STATE.currentUser.role === 'employee') {
-      showToast('🚫 Access Denied: Recycle Bin is restricted to Admin (Boss) only!');
-      return;
-    }
     openModal('recycleBinModal');
     renderRecycleBin('all');
   });
@@ -3784,11 +3776,6 @@ function updateRecycleBinBadge() {
 
 function renderRecycleBin(filter = null) {
   const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
-  if (isEmployee) {
-    closeModal('recycleBinModal');
-    showToast('🚫 Access Denied: Recycle Bin is restricted to Admin (Boss) only! Anti-fraud security active.', { duration: 6000 });
-    return;
-  }
   if (filter) currentTrashFilter = filter;
   const container = document.getElementById('recycleBinListContainer');
   if (!container) return;
@@ -3797,13 +3784,17 @@ function renderRecycleBin(filter = null) {
 
   const subtitleEl = document.getElementById('recycleBinSubtitle');
   if (subtitleEl) {
-    subtitleEl.innerHTML = `👑 <strong>Admin Master Trash</strong> — All deleted items across all staff with employee names and reasons. Full restore & permanent purge controls.`;
+    if (isEmployee) {
+      subtitleEl.innerHTML = `👤 <strong>${escapeHtml(STATE.currentUser.name)}'s Trash</strong> — Only items deleted by you are shown. You can <strong>Restore</strong> records. Permanent delete is locked to Admin (Boss).`;
+    } else {
+      subtitleEl.innerHTML = `👑 <strong>Admin Master Trash</strong> — All deleted items across all staff with employee names and reasons. Full restore & permanent purge controls.`;
+    }
   }
 
-  // Admin Master Toolbar
+  // Anti-Fraud: Hide Empty Trash button from staff, only show for Admin
   const emptyTrashBtn = document.getElementById('btnEmptyTrash');
   if (emptyTrashBtn) {
-    emptyTrashBtn.style.display = 'inline-flex';
+    emptyTrashBtn.style.display = isEmployee ? 'none' : 'inline-flex';
   }
 
   const allBin = STATE.data.recycleBin || [];

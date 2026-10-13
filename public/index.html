@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=5.0">
+  <link rel="stylesheet" href="style.css?v=5.1">
 </head>
 <body>
 
@@ -196,7 +196,7 @@
             <span class="btn-text-desktop">Excel Sheet</span>
           </button>
 
-          <button id="btnOpenRecycleBin" class="icon-btn btn-trash header-desktop-only admin-only-feature" title="Recycle Bin (Admin Only)" aria-label="Recycle Bin">
+          <button id="btnOpenRecycleBin" class="icon-btn btn-trash header-desktop-only" title="Recycle Bin / Restore Deleted Items" aria-label="Recycle Bin">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -267,12 +267,12 @@
           </div>
         </button>
 
-        <button type="button" class="drawer-nav-item admin-only-feature" id="drawerBtnTrash">
+        <button type="button" class="drawer-nav-item" id="drawerBtnTrash">
           <div class="drawer-icon-wrap" style="color:#f59e0b; background:rgba(245,158,11,0.12);">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
           </div>
           <div class="drawer-nav-text">
-            <span class="drawer-nav-label">Recycle Bin (Admin Only)</span>
+            <span class="drawer-nav-label">Recycle Bin (Deleted Items)</span>
             <span class="drawer-nav-sub">Restore deleted sales &amp; expenses</span>
           </div>
           <span id="drawerTrashBadge" class="drawer-pill-badge" style="display:none;">0</span>
@@ -1453,6 +1453,6 @@
   <!-- Notification Toast -->
   <div id="toastNotification" class="toast"></div>
 
-  <script src="app.js?v=5.0"></script>
+  <script src="app.js?v=5.1"></script>
 </body>
 </html>
