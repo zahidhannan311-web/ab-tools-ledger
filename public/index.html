@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=6.0">
+  <link rel="stylesheet" href="style.css?v=6.1">
 </head>
 <body>
 
@@ -153,43 +153,44 @@
     <!-- Top Sticky Header -->
     <header class="app-header">
       <div class="header-content">
-        <!-- Left Corner: 3 Lines Hamburger Menu Button -->
-        <button type="button" id="btnToggleSideMenu" class="icon-btn btn-hamburger" aria-label="Open Side Menu" title="Open Navigation Menu">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round">
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
-        </button>
+        <!-- Left: Hamburger Menu + Mascot + Brand Title -->
+        <div class="header-left">
+          <button type="button" id="btnToggleSideMenu" class="icon-btn btn-hamburger" aria-label="Open Side Menu" title="Open Navigation Menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
 
-        <!-- Center: Logo and Monkey Tools Title -->
-        <div class="header-brand-center">
-          <div class="logo-mark mascot-logo-wrap">
-            <img src="monkey-logo.png" alt="Monkey Tools Mascot" class="brand-mascot-img">
-          </div>
-          <div class="header-brand-info">
-            <div class="header-brand-top">
-              <h1 class="header-title">Monkey Tools</h1>
-              <span id="liveSyncBadge" class="sync-status-badge synced" title="All entries auto-save instantly across devices without refresh">
-                <span class="sync-dot success"></span> <span class="sync-text">Synced</span>
-              </span>
+          <div class="header-brand-wrap">
+            <div class="logo-mark mascot-logo-wrap">
+              <img src="monkey-logo.png" alt="Monkey Tools Mascot" class="brand-mascot-img">
             </div>
-            <span class="header-tagline">Sales Ledger &amp; Business Tracker</span>
+            <div class="header-brand-info">
+              <div class="header-brand-top">
+                <h1 class="header-title">Monkey Tools</h1>
+                <span id="liveSyncBadge" class="sync-status-badge synced" title="All entries auto-save instantly across devices without refresh">
+                  <span class="sync-dot success"></span> <span class="sync-text">Synced</span>
+                </span>
+              </div>
+              <span class="header-tagline">Sales Ledger &amp; Business Tracker</span>
+            </div>
           </div>
         </div>
 
-        <!-- Right: Role Pill & Quick Lock -->
+        <!-- Right: Search, Role Pill & Quick Lock -->
         <div class="header-actions">
           <button id="btnQuickSearch" class="icon-btn header-search-trigger" title="Command Palette & Quick Search (Ctrl + K)" aria-label="Search">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
             <span class="btn-text-desktop">Search</span>
-            <kbd class="kbd-header">Ctrl+K</kbd>
+            <kbd class="kbd-header header-desktop-only">Ctrl+K</kbd>
           </button>
 
-          <!-- Audio Sound Effects Toggle (Feature 6) -->
-          <button id="btnToggleSound" class="icon-btn" title="Sound Effects (🔊 Click to Mute/Unmute)" aria-label="Toggle Sound Effects">
+          <!-- Audio Sound Effects Toggle (Feature 6 - Visible on Desktop, in Drawer on Mobile) -->
+          <button id="btnToggleSound" class="icon-btn header-desktop-only" title="Sound Effects (🔊 Click to Mute/Unmute)" aria-label="Toggle Sound Effects">
             <span id="soundToggleIcon" style="font-size: 15px; line-height: 1;">🔊</span>
           </button>
           
@@ -211,8 +212,8 @@
             <span id="recycleBinBadge" class="badge-trash-count" style="display:none;">0</span>
           </button>
 
-          <!-- Theme Switcher Button -->
-          <button id="btnOpenThemePicker" class="icon-btn btn-theme-toggle" title="Switch Theme / Appearance (🎨)" aria-label="Switch Theme">
+          <!-- Theme Switcher Button (Desktop Header, in Drawer on Mobile) -->
+          <button id="btnOpenThemePicker" class="icon-btn btn-theme-toggle header-desktop-only" title="Switch Theme / Appearance (🎨)" aria-label="Switch Theme">
             <span style="font-size: 15px; line-height: 1;">🎨</span>
             <span class="btn-text-desktop" id="headerThemeLabel">Theme</span>
           </button>
@@ -293,6 +294,22 @@
           <button type="button" class="theme-select-btn" data-theme-val="oled" title="Pitch OLED Black">
             <span class="theme-swatch" style="background: linear-gradient(135deg, #ffffff, #64748b); border: 1px solid rgba(255,255,255,0.4);"></span>
             <span>OLED</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sound Effects Toggle in Side Drawer (Mobile-friendly) -->
+      <div class="drawer-sound-box">
+        <div class="drawer-sound-row">
+          <div class="drawer-sound-info">
+            <span id="drawerSoundIcon" style="font-size: 16px;">🔊</span>
+            <div>
+              <span class="drawer-sound-label">Sound Effects</span>
+              <span class="drawer-sound-sub">Audio tap feedback &amp; chimes</span>
+            </div>
+          </div>
+          <button type="button" id="drawerBtnToggleSound" class="drawer-sound-pill" title="Toggle Sound">
+            <span id="drawerSoundStateText">Sound ON</span>
           </button>
         </div>
       </div>
@@ -1765,6 +1782,6 @@
   <!-- Notification Toast -->
   <div id="toastNotification" class="toast"></div>
 
-  <script src="app.js?v=5.2"></script>
+  <script src="app.js?v=5.3"></script>
 </body>
 </html>

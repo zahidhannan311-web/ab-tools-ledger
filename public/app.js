@@ -160,11 +160,24 @@ const SOUND = {
   toggle() {
     this.enabled = !this.enabled;
     localStorage.setItem('monkey_sound_enabled', this.enabled);
-    const icon = document.getElementById('soundToggleIcon');
-    if (icon) icon.textContent = this.enabled ? '🔊' : '🔇';
+    this.updateUI();
     showToast(this.enabled ? 'Sound Effects Enabled 🔊' : 'Sound Effects Muted 🔇');
     if (this.enabled) this.playCashChime();
     return this.enabled;
+  },
+
+  updateUI() {
+    const icon = document.getElementById('soundToggleIcon');
+    if (icon) icon.textContent = this.enabled ? '🔊' : '🔇';
+    const drawerIcon = document.getElementById('drawerSoundIcon');
+    if (drawerIcon) drawerIcon.textContent = this.enabled ? '🔊' : '🔇';
+    const drawerText = document.getElementById('drawerSoundStateText');
+    const drawerPill = document.getElementById('drawerBtnToggleSound');
+    if (drawerText) drawerText.textContent = this.enabled ? 'Sound ON' : 'Muted';
+    if (drawerPill) {
+      if (this.enabled) drawerPill.classList.remove('muted');
+      else drawerPill.classList.add('muted');
+    }
   }
 };
 
@@ -320,7 +333,7 @@ function updateUserHeaderBadge() {
       textEl.textContent = `👤 ${STATE.currentUser.name}`;
     } else {
       badgeEl.className = 'badge-role-pill';
-      textEl.textContent = `👑 Boss (Admin)`;
+      textEl.textContent = `👑 Admin`;
     }
   }
 
@@ -3123,10 +3136,14 @@ function setupEventListeners() {
     });
   });
 
-  // Sound Effects Toggle (Feature 6)
+  // Sound Effects Toggle (Feature 6 - Header and Drawer)
   document.getElementById('btnToggleSound')?.addEventListener('click', () => {
     SOUND.toggle();
   });
+  document.getElementById('drawerBtnToggleSound')?.addEventListener('click', () => {
+    SOUND.toggle();
+  });
+  SOUND.updateUI();
 
   // Command Palette & Global Search (Feature 1)
   document.getElementById('btnQuickSearch')?.addEventListener('click', openCommandPalette);

@@ -690,7 +690,16 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   position: relative;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .btn-hamburger {
@@ -713,12 +722,17 @@ body::before {
   color: #fff;
 }
 
+.header-brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .header-brand-center {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 10px;
-  margin: 0 auto;
   min-width: 0;
 }
 .logo-mark {
@@ -2167,38 +2181,62 @@ body::before {
   }
 }
 
+@media (max-width: 768px) {
+  .header-desktop-only,
+  .kbd-header,
+  .btn-text-desktop {
+    display: none !important;
+  }
+}
+
 @media (max-width: 600px) {
-  /* ===== Header Mobile Optimization ===== */
+  /* ===== Header Mobile Bulletproof Layout ===== */
   .header-content {
     padding: 8px 10px;
-    gap: 6px;
+    gap: 8px;
+    height: 52px;
+    justify-content: space-between;
+  }
+  .header-left {
+    gap: 8px;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
   }
   .btn-hamburger {
     width: 34px;
     height: 34px;
     border-radius: 8px;
+    flex-shrink: 0;
   }
-  .header-brand-center {
+  .header-brand-wrap {
     gap: 6px;
-    margin: 0 auto;
     min-width: 0;
+    overflow: hidden;
   }
   .logo-mark {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border-radius: 8px;
+    flex-shrink: 0;
+  }
+  .header-brand-info {
+    min-width: 0;
+    overflow: hidden;
   }
   .header-brand-top {
     gap: 5px;
     flex-wrap: nowrap;
+    align-items: center;
   }
   .header-title {
-    font-size: 13.5px;
+    font-size: 13px;
+    font-weight: 700;
     line-height: 1.15;
     white-space: nowrap;
   }
   .header-tagline {
-    display: none; /* Hide tagline on mobile to keep header clean and prevent vertical bloat */
+    display: none !important;
   }
   .sync-status-badge {
     font-size: 9px;
@@ -2207,7 +2245,9 @@ body::before {
     flex-shrink: 0;
   }
   .header-actions {
-    gap: 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
     flex-shrink: 0;
   }
   .header-actions .icon-btn {
@@ -2218,10 +2258,19 @@ body::before {
     align-items: center;
     justify-content: center;
     border-radius: 8px;
+    flex-shrink: 0;
   }
   .header-actions .icon-btn svg {
     width: 15px;
     height: 15px;
+  }
+  .header-search-trigger {
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    border-radius: 8px !important;
   }
   .badge-role-pill {
     padding: 3px 6px;
@@ -2230,6 +2279,7 @@ body::before {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    flex-shrink: 0;
   }
 
   /* ===== Action Quick Bar (Horizontal Scrollable) ===== */
@@ -3254,6 +3304,55 @@ body::before {
   height: 16px;
   border-radius: 50%;
   box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Side Drawer Sound Section */
+.drawer-sound-box {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  padding: 10px 14px;
+  margin: 0 14px 14px;
+}
+.drawer-sound-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.drawer-sound-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.drawer-sound-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.drawer-sound-sub {
+  display: block;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.drawer-sound-pill {
+  background: var(--gold-dim);
+  border: 1px solid var(--gold-border);
+  color: var(--gold-accent);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.drawer-sound-pill.muted {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--text-muted);
 }
 
 /* Admin Theme Customizer Gallery */
