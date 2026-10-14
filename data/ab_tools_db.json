@@ -1,6 +1,27 @@
 {
   "sales": [
     {
+      "id": "sale_1792003989824",
+      "date": "2026-10-14",
+      "customerPhone": "3161718323",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd156@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Pending",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T18:53:09.824Z",
+      "expiryDate": "2026-11-12",
+      "createdAt": "2026-10-14T18:53:09.824Z"
+    },
+    {
       "id": "sale_1791999510974",
       "date": "2026-10-14",
       "customerPhone": "+92 307 1422915",
@@ -4606,7 +4627,7 @@
         {
           "months": 18,
           "label": "18 Months (540 Days)",
-          "price": 350
+          "price": 750
         }
       ]
     },
@@ -4681,41 +4702,34 @@
           "price": 750
         }
       ]
-    },
+    }
+  ],
+  "recycleBin": [
     {
-      "id": "prod_capcut",
-      "name": "CapCut",
-      "type": "Shared",
-      "plans": [
-        {
-          "months": 1,
-          "label": "1 Month (30 Days)",
-          "price": 450
-        }
-      ]
-    },
-    {
-      "id": "prod_muse_ai",
-      "name": "Muse AI",
-      "type": "Shared",
-      "plans": [
-        {
-          "months": 1,
-          "label": "1 Month (30 Days)",
-          "price": 500
-        }
-      ]
+      "id": "trash_1792009977358_4dg8",
+      "originalId": "test_dummy_sale_id",
+      "type": "sale",
+      "item": {
+        "deleteReason": "Wrong customer number entered",
+        "deletedBy": "M.Ali",
+        "deleterRole": "employee",
+        "deleterId": "emp_1791761609185_p5ry"
+      },
+      "deleteReason": "Wrong customer number entered",
+      "deletedBy": "M.Ali",
+      "deleterRole": "employee",
+      "deleterId": "emp_1791761609185_p5ry",
+      "deletedAt": "2026-10-14T20:32:57.358Z"
     }
   ],
   "settings": {
     "businessName": "Monkey Tools",
     "currency": "Rs.",
-    "lastExcelExport": null,
-    "lastModified": 1792000941181,
+    "lastModified": 1792010024100,
     "deletedSaleIds": [
       "sale_1790808573942_ktuq",
-      "sale_1790841889749",
       "sale_1790891345201_z6tu",
+      "sale_1790841889749",
       "sale_1790838846301",
       "sale_1790972905387_rym0",
       "sale_1790987581614",
@@ -4733,11 +4747,16 @@
       "sale_1791827030131_n6ks",
       "sale_1791891732238",
       "sale_1791910919374",
-      "sale_1791742038836"
+      "sale_1791742038836",
+      "sale_1792006183073",
+      "sale_1792007433453",
+      "sale_1792008734383",
+      "test_dummy_sale_id"
     ],
     "deletedExpenseIds": [
       "exp_1790946533413"
     ],
+    "lastExcelExport": null,
     "templateExpiry": "Hello {customer}! Notice from {business}: Your {product} ({account}) expires on {expiry}. Kindly renew to keep uninterrupted access. Thank you!",
     "templatePending": "Hello {customer}! Friendly reminder from {business}: The payment of {currency} {amount} for your {product} ({plan}) is currently pending. Kindly clear the dues at your earliest convenience. Thank you!\n\n📱 JazzCash / EasyPaisa\n\nAccount Number: 03079335948\nAccount Holder: Muhammad Hannan\n(Same number for both Accounts)\n\n🏦 UBL Bank Transfer\n\nAccount Title: Muhammad Hannan\nAccount Number: 0967288558941\nBank Name: United Bank Limited (UBL)",
     "templateWelcome": "Assalam-o-Alaikum {customer}! Thank you for choosing {business}. Here are your {product} ({plan}) details:\nLogin: {account}\nExpiry: {expiry}\nAmount: {currency} {amount}\nHave a great experience!",
@@ -4762,82 +4781,26 @@
       "trash_1791805361793_ejoz",
       "sale_1791805352041",
       "trash_1791910931280_i24f",
-      "sale_1791910919374"
+      "sale_1791910919374",
+      "trash_1792007437830_t3e8",
+      "sale_1792007433453",
+      "trash_1792007401200_joq6",
+      "sale_1792006183073",
+      "trash_1791914323769_2sx0",
+      "sale_1791742038836",
+      "trash_1791914323255_phyf",
+      "trash_1792008886467_i0yy",
+      "sale_1792008734383",
+      "trash_1792008849303_ma0y"
     ],
     "productEmails": {
       "Surfshark": [
-        "abd155@kuromee.com"
-      ],
-      "Nord": [
-        "nord11@kuromee.com"
+        "abd153@kuromee.com"
       ]
     },
-    "deletedProductIds": []
+    "deletedProductIds": [],
+    "theme": "sapphire"
   },
-  "recycleBin": [
-    {
-      "id": "trash_1791914323769_2sx0",
-      "originalId": "sale_1791742038836",
-      "type": "sale",
-      "item": {
-        "id": "sale_1791742038836",
-        "date": "2026-10-11",
-        "customerPhone": "+92 342 8079825",
-        "customerName": "",
-        "product": "Nord",
-        "accountType": "Shared",
-        "accountLogin": "nord10@kuromee.com",
-        "planMonths": 3,
-        "planLabel": "3 Months (90 Days)",
-        "amount": 500,
-        "paymentStatus": "Paid",
-        "notes": "",
-        "updatedAt": "2026-10-11T18:46:38.436Z",
-        "expiryDate": "2027-01-08",
-        "createdAt": "2026-10-11T18:07:18.836Z",
-        "deleteReason": "Mind change",
-        "deletedBy": "Admin",
-        "deleterRole": "admin",
-        "deleterId": "admin"
-      },
-      "deleteReason": "Mind change",
-      "deletedBy": "Admin",
-      "deleterRole": "admin",
-      "deleterId": "admin",
-      "deletedAt": "2026-10-13T17:58:43.769Z"
-    },
-    {
-      "id": "trash_1791914323255_phyf",
-      "originalId": "sale_1791742038836",
-      "type": "sale",
-      "item": {
-        "id": "sale_1791742038836",
-        "date": "2026-10-11",
-        "customerPhone": "+92 342 8079825",
-        "customerName": "",
-        "product": "Nord",
-        "accountType": "Shared",
-        "accountLogin": "nord10@kuromee.com",
-        "planMonths": 3,
-        "planLabel": "3 Months (90 Days)",
-        "amount": 500,
-        "paymentStatus": "Paid",
-        "notes": "",
-        "updatedAt": "2026-10-11T18:46:38.436Z",
-        "expiryDate": "2027-01-08",
-        "createdAt": "2026-10-11T18:07:18.836Z",
-        "deleteReason": "Mind change",
-        "deletedBy": "Admin",
-        "deleterRole": "admin",
-        "deleterId": "admin"
-      },
-      "deleteReason": "Mind change",
-      "deletedBy": "Admin",
-      "deleterRole": "admin",
-      "deleterId": "admin",
-      "deletedAt": "2026-10-13T17:58:43.256Z"
-    }
-  ],
   "employees": [
     {
       "id": "emp_1791761609185_p5ry",

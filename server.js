@@ -29,7 +29,8 @@ try {
 }
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Disable caching for all API responses so mobile browsers and CDNs never serve stale data
@@ -839,12 +840,9 @@ app.patch('/api/sales/:id/status', async (req, res) => {
   res.json({ success: true, sale });
 });
 
-// Delete Sale (Moves to Recycle Bin with Mandatory Reason - Admin Only)
+// Delete Sale (Moves to Recycle Bin with Mandatory Reason)
 app.delete('/api/sales/:id', async (req, res) => {
   const reqRole = req.headers['x-user-role'] || req.body?.deleterRole || req.query?.role;
-  if (reqRole === 'employee') {
-    return res.status(403).json({ error: 'Access Denied: Only Admin (Boss) can delete sales records!' });
-  }
   const { id } = req.params;
   const { reason, deletedBy, deleterId, deleterRole, item: clientItem } = req.body || {};
   const db = readDb();
@@ -954,9 +952,6 @@ app.put('/api/expenses/:id', async (req, res) => {
 // Delete Expense (Moves to Recycle Bin - Admin Only)
 app.delete('/api/expenses/:id', async (req, res) => {
   const reqRole = req.headers['x-user-role'] || req.body?.deleterRole || req.query?.role;
-  if (reqRole === 'employee') {
-    return res.status(403).json({ error: 'Access Denied: Only Admin (Boss) can delete expense records!' });
-  }
   const { id } = req.params;
   const { reason, deletedBy, deleterId, deleterRole, item: clientItem } = req.body || {};
   const db = readDb();
@@ -1277,16 +1272,16 @@ app.post('/api/sync', async (req, res) => {
     const restoredSales = new Set(incomingSettings?.restoredSaleIds || []);
     const restoredExpenses = new Set(incomingSettings?.restoredExpenseIds || []);
 
-    // ANTI-FRAUD SECURITY: Employees can NEVER introduce new sale or expense deletions!
+    // Allow moving items to Recycle Bin from both Admin and Employees
     const deletedSales = new Set([
       ...(db.settings?.deletedSaleIds || []),
-      ...(!isEmployee ? (incomingSettings?.deletedSaleIds || []) : [])
+      ...(incomingSettings?.deletedSaleIds || [])
     ]);
     restoredSales.forEach(id => deletedSales.delete(id));
 
     const deletedExpenses = new Set([
       ...(db.settings?.deletedExpenseIds || []),
-      ...(!isEmployee ? (incomingSettings?.deletedExpenseIds || []) : [])
+      ...(incomingSettings?.deletedExpenseIds || [])
     ]);
     restoredExpenses.forEach(id => deletedExpenses.delete(id));
 
@@ -1364,8 +1359,8 @@ app.post('/api/sync', async (req, res) => {
       }
     });
 
-    // 2. Incoming client items (newly deleted records): Only Admin can delete items to Recycle Bin
-    if (!isEmployee && Array.isArray(incomingRecycleBin)) {
+    // 2. Incoming client items (newly trashed records): Both Admin and Employees can move items to Recycle Bin
+    if (Array.isArray(incomingRecycleBin)) {
       incomingRecycleBin.forEach(item => {
         if (!item) return;
         const key = item.id || item.originalId;

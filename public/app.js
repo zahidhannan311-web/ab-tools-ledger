@@ -2033,7 +2033,13 @@ function renderSales() {
 
   let allSales = STATE.data.sales || [];
   if (isEmployee) {
-    allSales = allSales.filter(s => (s.soldBy === STATE.currentUser.name || s.employeeId === STATE.currentUser.id));
+    const curName = (STATE.currentUser.name || '').trim().toLowerCase();
+    const curId = String(STATE.currentUser.id || '').trim();
+    allSales = allSales.filter(s => {
+      const sSoldBy = String(s.soldBy || '').trim().toLowerCase();
+      const sEmpId = String(s.employeeId || '').trim();
+      return (sSoldBy && sSoldBy === curName) || (sEmpId && sEmpId === curId);
+    });
   } else if (staffFilter !== 'ALL') {
     allSales = allSales.filter(s => (s.soldBy || 'Admin') === staffFilter);
   }
@@ -2333,9 +2339,7 @@ function renderSaleCardHtml(s) {
           </button>
           <button class="btn-action-icon" title="Copy Customer WhatsApp Receipt (1-Click)" onclick="quickCopySaleReceipt('${s.id}')">🧾</button>
           <button class="btn-action-icon" title="Edit Sale" onclick="openEditSale('${s.id}')">✏️</button>
-          ${!isEmployee ? `
-            <button class="btn-action-icon btn-action-delete" title="Delete Sale (Admin Only)" onclick="openDeleteSaleReasonModal('${s.id}')">🗑️</button>
-          ` : ''}
+          <button class="btn-action-icon btn-action-delete" title="Move to Recycle Bin" onclick="openDeleteSaleReasonModal('${s.id}')">🗑️</button>
         </div>
       </div>
     </div>
@@ -2408,12 +2412,10 @@ function renderExpenses() {
           </div>
           <div class="text-right">
             <div class="amount-text text-rose">- Rs. ${(e.amount || 0).toLocaleString('en-US')}</div>
-            ${!isEmployee ? `
-              <div class="item-btn-group mt-2 justify-end">
-                <button class="btn-action-icon" title="Edit Expense" onclick="openEditExpense('${e.id}')">✏️</button>
-                <button class="btn-action-icon btn-action-delete" title="Delete Expense" onclick="deleteExpense('${e.id}')">🗑️</button>
-              </div>
-            ` : ''}
+            <div class="item-btn-group mt-2 justify-end">
+              <button class="btn-action-icon" title="Edit Expense" onclick="openEditExpense('${e.id}')">✏️</button>
+              <button class="btn-action-icon btn-action-delete" title="Move to Recycle Bin" onclick="deleteExpense('${e.id}')">🗑️</button>
+            </div>
           </div>
         </div>
       </div>
