@@ -1,6 +1,279 @@
 {
   "sales": [
     {
+      "id": "sale_1791999510974",
+      "date": "2026-10-14",
+      "customerPhone": "+92 307 1422915",
+      "customerName": "",
+      "product": "Gemini Pro",
+      "accountType": "Private",
+      "accountLogin": "",
+      "planMonths": 18,
+      "planLabel": "18 Months (540 Days)",
+      "amount": 350,
+      "paymentStatus": "Pending",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T17:38:30.974Z",
+      "expiryDate": "2028-04-05",
+      "createdAt": "2026-10-14T17:38:30.974Z"
+    },
+    {
+      "id": "sale_1791998385249",
+      "date": "2026-10-14",
+      "customerPhone": "3023337408 - 418047",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd156@kuromee.com",
+      "planMonths": 6,
+      "planLabel": "6 Months (180 Days)",
+      "amount": 700,
+      "paymentStatus": "Paid",
+      "paymentProof": "",
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T17:26:34.050Z",
+      "expiryDate": "2027-04-11",
+      "createdAt": "2026-10-14T17:19:45.250Z"
+    },
+    {
+      "id": "sale_1791998307632",
+      "date": "2026-10-14",
+      "customerPhone": "3287192752",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd156@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Paid",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T17:18:27.632Z",
+      "expiryDate": "2026-11-12",
+      "createdAt": "2026-10-14T17:18:27.632Z"
+    },
+    {
+      "id": "sale_1791996301755",
+      "date": "2026-10-14",
+      "customerPhone": "+92 343 6381892",
+      "customerName": "",
+      "product": "Nord",
+      "accountType": "Shared",
+      "accountLogin": "nord11@kuromee.com",
+      "planMonths": 3,
+      "planLabel": "3 Months (90 Days)",
+      "amount": 500,
+      "paymentStatus": "Paid",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T16:45:01.755Z",
+      "expiryDate": "2027-01-11",
+      "createdAt": "2026-10-14T16:45:01.755Z"
+    },
+    {
+      "id": "sale_1791995021667",
+      "date": "2026-10-14",
+      "customerPhone": "3148650015",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd156@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 200,
+      "paymentStatus": "Paid",
+      "paymentProof": "",
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T16:45:43.647Z",
+      "expiryDate": "2026-11-12",
+      "createdAt": "2026-10-14T16:23:41.668Z"
+    },
+    {
+      "id": "sale_1791994866719",
+      "date": "2026-10-14",
+      "customerPhone": "447517270698",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd156@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Paid",
+      "paymentProof": "",
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T16:45:31.319Z",
+      "expiryDate": "2026-11-12",
+      "createdAt": "2026-10-14T16:21:06.719Z"
+    },
+    {
+      "id": "sale_1791990991462",
+      "date": "2026-10-14",
+      "customerPhone": "3483097430",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd155@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Paid",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T15:16:31.462Z",
+      "expiryDate": "2026-11-12",
+      "createdAt": "2026-10-14T15:16:31.462Z"
+    },
+    {
+      "id": "sale_1791989347087",
+      "date": "2026-10-14",
+      "customerPhone": "+92 306 0046885",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Private",
+      "accountLogin": "",
+      "planMonths": 2,
+      "planLabel": "2 Months (60 Days)",
+      "amount": 1600,
+      "paymentStatus": "Paid",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T14:49:07.086Z",
+      "expiryDate": "2026-12-12",
+      "createdAt": "2026-10-14T14:49:07.087Z"
+    },
+    {
+      "id": "sale_1791968031005",
+      "date": "2026-10-14",
+      "customerPhone": "8801831597070",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd155@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Pending",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T08:53:51.005Z",
+      "expiryDate": "2026-11-12",
+      "createdAt": "2026-10-14T08:53:51.005Z"
+    },
+    {
+      "id": "sale_1791967823562",
+      "date": "2026-10-14",
+      "customerPhone": "3047732450",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd155@kuromee.com",
+      "planMonths": 12,
+      "planLabel": "12 Months (360 Days)",
+      "amount": 1400,
+      "paymentStatus": "Paid",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T08:50:23.562Z",
+      "expiryDate": "2027-10-08",
+      "createdAt": "2026-10-14T08:50:23.562Z"
+    },
+    {
+      "id": "sale_1791965686279",
+      "date": "2026-10-14",
+      "customerPhone": "3088173286 - 2 Devices",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd155@kuromee.com",
+      "planMonths": 2,
+      "planLabel": "2 Months (60 Days)",
+      "amount": 800,
+      "paymentStatus": "Pending",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T08:52:21.336Z",
+      "expiryDate": "2026-12-12",
+      "createdAt": "2026-10-14T08:14:46.279Z"
+    },
+    {
+      "id": "sale_1791923430537",
+      "date": "2026-10-14",
+      "customerPhone": "+92 339 6122211",
+      "customerName": "",
+      "product": "Gemini Pro",
+      "accountType": "Private",
+      "accountLogin": "",
+      "planMonths": 18,
+      "planLabel": "18 Months (540 Days)",
+      "amount": 2000,
+      "paymentStatus": "Paid",
+      "paymentProof": "",
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "10 Accounts",
+      "updatedAt": "2026-10-14T08:52:39.417Z",
+      "expiryDate": "2028-04-05",
+      "createdAt": "2026-10-13T20:30:30.537Z"
+    },
+    {
+      "id": "sale_1791914399954",
+      "date": "2026-10-13",
+      "customerPhone": "3037845377",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd155@kuromee.com",
+      "planMonths": 12,
+      "planLabel": "12 Months (360 Days)",
+      "amount": 1400,
+      "paymentStatus": "Paid",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-13T17:59:59.954Z",
+      "expiryDate": "2027-10-07",
+      "createdAt": "2026-10-13T17:59:59.954Z"
+    },
+    {
       "id": "sale_1791910826919",
       "date": "2026-10-13",
       "customerPhone": "+92 310 9031198",
@@ -11,13 +284,13 @@
       "planMonths": 3,
       "planLabel": "3 Months (90 Days)",
       "amount": 500,
-      "paymentStatus": "Pending",
-      "paymentProof": null,
+      "paymentStatus": "Paid",
+      "paymentProof": "",
       "paymentReceivedIn": "Boss JazzCash",
       "soldBy": "Admin",
       "employeeId": "admin",
       "notes": "Tomorrow",
-      "updatedAt": "2026-10-13T17:00:26.919Z",
+      "updatedAt": "2026-10-14T15:39:49.645Z",
       "expiryDate": "2027-01-10",
       "createdAt": "2026-10-13T17:00:26.919Z"
     },
@@ -116,13 +389,13 @@
       "planMonths": 18,
       "planLabel": "18 Months (540 Days)",
       "amount": 350,
-      "paymentStatus": "Pending",
-      "paymentProof": null,
+      "paymentStatus": "Paid",
+      "paymentProof": "",
       "paymentReceivedIn": "Boss JazzCash",
       "soldBy": "Admin",
       "employeeId": "admin",
       "notes": "",
-      "updatedAt": "2026-10-13T15:03:47.498Z",
+      "updatedAt": "2026-10-14T15:32:58.581Z",
       "expiryDate": "2028-04-04",
       "createdAt": "2026-10-13T15:03:47.499Z"
     },
@@ -599,13 +872,13 @@
       "planMonths": 2,
       "planLabel": "2 Months (60 Days)",
       "amount": 400,
-      "paymentStatus": "Pending",
-      "paymentProof": null,
+      "paymentStatus": "Paid",
+      "paymentProof": "",
       "paymentReceivedIn": "Boss JazzCash",
       "soldBy": "Admin",
       "employeeId": "admin",
       "notes": "",
-      "updatedAt": "2026-10-12T17:50:43.128Z",
+      "updatedAt": "2026-10-14T15:34:11.333Z",
       "expiryDate": "2026-12-10",
       "createdAt": "2026-10-12T17:24:25.739Z"
     },
@@ -1112,23 +1385,6 @@
       "updatedAt": "2026-10-12T09:36:03.937Z",
       "expiryDate": "2026-11-09",
       "createdAt": "2026-10-11T18:43:49.083Z"
-    },
-    {
-      "id": "sale_1791742038836",
-      "date": "2026-10-11",
-      "customerPhone": "+92 342 8079825",
-      "customerName": "",
-      "product": "Nord",
-      "accountType": "Shared",
-      "accountLogin": "nord10@kuromee.com",
-      "planMonths": 3,
-      "planLabel": "3 Months (90 Days)",
-      "amount": 500,
-      "paymentStatus": "Paid",
-      "notes": "",
-      "updatedAt": "2026-10-11T18:46:38.436Z",
-      "expiryDate": "2027-01-08",
-      "createdAt": "2026-10-11T18:07:18.836Z"
     },
     {
       "id": "sale_1791742019233",
@@ -4343,26 +4599,26 @@
       ]
     },
     {
-      "id": "prod_gemini_pro",
+      "id": "prod_gemini_pro_private",
       "name": "Gemini Pro",
-      "type": "Shared",
+      "type": "Private",
       "plans": [
         {
           "months": 18,
           "label": "18 Months (540 Days)",
-          "price": 750
+          "price": 350
         }
       ]
     },
     {
-      "id": "prod_capcut",
+      "id": "prod_capcut_private",
       "name": "CapCut",
-      "type": "Shared",
+      "type": "Private",
       "plans": [
         {
           "months": 1,
-          "label": "1 Month (30 Days)",
-          "price": 450
+          "label": "1 Month (25 Days)",
+          "price": 650
         }
       ]
     },
@@ -4381,12 +4637,12 @@
     {
       "id": "prod_muse_ai",
       "name": "Muse AI",
-      "type": "Shared",
+      "type": "Private",
       "plans": [
         {
           "months": 1,
-          "label": "1 Month (30 Days)",
-          "price": 500
+          "label": "1 Month(s)",
+          "price": 1000
         }
       ]
     },
@@ -4415,39 +4671,51 @@
       ]
     },
     {
-      "id": "prod_gemini_pro_private",
+      "id": "prod_gemini_pro",
       "name": "Gemini Pro",
-      "type": "Private",
+      "type": "Shared",
       "plans": [
         {
           "months": 18,
           "label": "18 Months (540 Days)",
-          "price": 350
+          "price": 750
         }
       ]
     },
     {
-      "id": "prod_capcut_private",
+      "id": "prod_capcut",
       "name": "CapCut",
-      "type": "Private",
+      "type": "Shared",
       "plans": [
         {
           "months": 1,
-          "label": "1 Month (25 Days)",
-          "price": 650
+          "label": "1 Month (30 Days)",
+          "price": 450
+        }
+      ]
+    },
+    {
+      "id": "prod_muse_ai",
+      "name": "Muse AI",
+      "type": "Shared",
+      "plans": [
+        {
+          "months": 1,
+          "label": "1 Month (30 Days)",
+          "price": 500
         }
       ]
     }
   ],
-  "recycleBin": [],
   "settings": {
     "businessName": "Monkey Tools",
     "currency": "Rs.",
-    "lastModified": 1791913486864,
+    "lastExcelExport": null,
+    "lastModified": 1792000941181,
     "deletedSaleIds": [
       "sale_1790808573942_ktuq",
-      "sale_1790891345201_z6tu",
       "sale_1790841889749",
+      "sale_1790891345201_z6tu",
       "sale_1790838846301",
       "sale_1790972905387_rym0",
       "sale_1790987581614",
@@ -4464,12 +4732,12 @@
       "sale_1791827029140_2kdg",
       "sale_1791827030131_n6ks",
       "sale_1791891732238",
-      "sale_1791910919374"
+      "sale_1791910919374",
+      "sale_1791742038836"
     ],
     "deletedExpenseIds": [
       "exp_1790946533413"
     ],
-    "lastExcelExport": null,
     "templateExpiry": "Hello {customer}! Notice from {business}: Your {product} ({account}) expires on {expiry}. Kindly renew to keep uninterrupted access. Thank you!",
     "templatePending": "Hello {customer}! Friendly reminder from {business}: The payment of {currency} {amount} for your {product} ({plan}) is currently pending. Kindly clear the dues at your earliest convenience. Thank you!\n\n📱 JazzCash / EasyPaisa\n\nAccount Number: 03079335948\nAccount Holder: Muhammad Hannan\n(Same number for both Accounts)\n\n🏦 UBL Bank Transfer\n\nAccount Title: Muhammad Hannan\nAccount Number: 0967288558941\nBank Name: United Bank Limited (UBL)",
     "templateWelcome": "Assalam-o-Alaikum {customer}! Thank you for choosing {business}. Here are your {product} ({plan}) details:\nLogin: {account}\nExpiry: {expiry}\nAmount: {currency} {amount}\nHave a great experience!",
@@ -4503,8 +4771,73 @@
       "Nord": [
         "nord11@kuromee.com"
       ]
-    }
+    },
+    "deletedProductIds": []
   },
+  "recycleBin": [
+    {
+      "id": "trash_1791914323769_2sx0",
+      "originalId": "sale_1791742038836",
+      "type": "sale",
+      "item": {
+        "id": "sale_1791742038836",
+        "date": "2026-10-11",
+        "customerPhone": "+92 342 8079825",
+        "customerName": "",
+        "product": "Nord",
+        "accountType": "Shared",
+        "accountLogin": "nord10@kuromee.com",
+        "planMonths": 3,
+        "planLabel": "3 Months (90 Days)",
+        "amount": 500,
+        "paymentStatus": "Paid",
+        "notes": "",
+        "updatedAt": "2026-10-11T18:46:38.436Z",
+        "expiryDate": "2027-01-08",
+        "createdAt": "2026-10-11T18:07:18.836Z",
+        "deleteReason": "Mind change",
+        "deletedBy": "Admin",
+        "deleterRole": "admin",
+        "deleterId": "admin"
+      },
+      "deleteReason": "Mind change",
+      "deletedBy": "Admin",
+      "deleterRole": "admin",
+      "deleterId": "admin",
+      "deletedAt": "2026-10-13T17:58:43.769Z"
+    },
+    {
+      "id": "trash_1791914323255_phyf",
+      "originalId": "sale_1791742038836",
+      "type": "sale",
+      "item": {
+        "id": "sale_1791742038836",
+        "date": "2026-10-11",
+        "customerPhone": "+92 342 8079825",
+        "customerName": "",
+        "product": "Nord",
+        "accountType": "Shared",
+        "accountLogin": "nord10@kuromee.com",
+        "planMonths": 3,
+        "planLabel": "3 Months (90 Days)",
+        "amount": 500,
+        "paymentStatus": "Paid",
+        "notes": "",
+        "updatedAt": "2026-10-11T18:46:38.436Z",
+        "expiryDate": "2027-01-08",
+        "createdAt": "2026-10-11T18:07:18.836Z",
+        "deleteReason": "Mind change",
+        "deletedBy": "Admin",
+        "deleterRole": "admin",
+        "deleterId": "admin"
+      },
+      "deleteReason": "Mind change",
+      "deletedBy": "Admin",
+      "deleterRole": "admin",
+      "deleterId": "admin",
+      "deletedAt": "2026-10-13T17:58:43.256Z"
+    }
+  ],
   "employees": [
     {
       "id": "emp_1791761609185_p5ry",

@@ -1091,39 +1091,97 @@ app.delete('/api/recycle-bin', async (req, res) => {
 
 // ======================== PRODUCTS / CATALOG (ADMIN) ========================
 
-// Add or Update Full Product
-app.post('/api/products', async (req, res) => {
-  const { name, type, plans } = req.body;
-  if (!name) {
+// Add or Update Full Product (In-place edit, prevents duplicate creation)
+const handleSaveProduct = async (req, res) => {
+  const { id: bodyId, editId, name, type, plans } = req.body || {};
+  const targetId = req.params?.id || editId || bodyId;
+
+  if (!name || !String(name).trim()) {
     return res.status(400).json({ error: 'Product name is required' });
   }
 
-  const db = readDb();
-  const id = 'prod_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + (type || 'shared').toLowerCase();
+  const cleanName = String(name).trim();
+  const cleanType = String(type || 'Shared').trim();
+  const cleanPlans = Array.isArray(plans) ? plans.map(pl => ({
+    months: Number(pl.months) || 1,
+    label: String(pl.label || `${pl.months || 1} Month(s)`).trim(),
+    price: Number(pl.price) || 0
+  })) : [];
 
-  const existingIndex = db.products.findIndex(p => p.id === id);
+  const db = readDb();
+  db.products = db.products || [];
+
+  let existingIndex = -1;
+  // 1. Try finding by target ID
+  if (targetId) {
+    existingIndex = db.products.findIndex(p => p && p.id === targetId);
+  }
+
+  // 2. Fallback: match by product name and account type
+  if (existingIndex === -1) {
+    existingIndex = db.products.findIndex(p => 
+      p && p.name && p.name.trim().toLowerCase() === cleanName.toLowerCase() &&
+      String(p.type || 'Shared').trim().toLowerCase() === cleanType.toLowerCase()
+    );
+  }
+
+  const finalId = targetId || (existingIndex >= 0 ? db.products[existingIndex].id : ('prod_' + cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + cleanType.toLowerCase()));
+
   const productObj = {
-    id,
-    name: name.trim(),
-    type: type || 'Shared',
-    plans: Array.isArray(plans) ? plans : []
+    id: finalId,
+    name: cleanName,
+    type: cleanType,
+    plans: cleanPlans
   };
 
   if (existingIndex >= 0) {
+    // In-place update existing product (does NOT append to bottom or create duplicate)
     db.products[existingIndex] = productObj;
   } else {
+    // Add new product
     db.products.push(productObj);
   }
 
+  // Deduplicate products by (name + type) to ensure no existing duplicates remain
+  const seenMap = new Map();
+  const dedupedProducts = [];
+  for (const prod of db.products) {
+    if (!prod || !prod.name) continue;
+    const key = `${prod.name.trim().toLowerCase()}__${(prod.type || 'Shared').trim().toLowerCase()}`;
+    if (seenMap.has(key)) {
+      const prevIdx = seenMap.get(key);
+      if (prod.id === finalId) {
+        dedupedProducts[prevIdx] = prod;
+      }
+    } else {
+      seenMap.set(key, dedupedProducts.length);
+      dedupedProducts.push(prod);
+    }
+  }
+  db.products = dedupedProducts;
+
+  db.settings = db.settings || {};
+  db.settings.lastModified = Date.now();
+
   await writeDb(db);
   res.json({ success: true, product: productObj });
-});
+};
+
+app.post('/api/products', handleSaveProduct);
+app.put('/api/products/:id', handleSaveProduct);
 
 // Delete Product
 app.delete('/api/products/:id', async (req, res) => {
   const { id } = req.params;
   const db = readDb();
-  db.products = db.products.filter(p => p.id !== id);
+  db.products = (db.products || []).filter(p => p && p.id !== id);
+  db.settings = db.settings || {};
+  db.settings.deletedProductIds = db.settings.deletedProductIds || [];
+  if (!db.settings.deletedProductIds.includes(id)) {
+    db.settings.deletedProductIds.push(id);
+    if (db.settings.deletedProductIds.length > 500) db.settings.deletedProductIds.shift();
+  }
+  db.settings.lastModified = Date.now();
   await writeDb(db);
   res.json({ success: true, message: 'Product deleted successfully' });
 });
@@ -1239,14 +1297,26 @@ app.post('/api/sync', async (req, res) => {
       db.expenses = mergeRecordLists(db.expenses, incomingExpenses, deletedExpenses);
     }
 
+    // Product deletions tracking
+    const deletedProducts = new Set([
+      ...(db.settings?.deletedProductIds || []),
+      ...(!isEmployee ? (incomingSettings?.deletedProductIds || []) : [])
+    ]);
+
     if (Array.isArray(incomingProducts) && incomingProducts.length > 0) {
-      // Non-destructive product merge
+      // Non-destructive product merge with deduplication by name + type
       const prodMap = new Map();
       (db.products || DEFAULT_PRODUCTS).forEach(p => {
-        if (p && p.id) prodMap.set(p.id, p);
+        if (p && p.id && !deletedProducts.has(p.id)) {
+          const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
+          prodMap.set(key, p);
+        }
       });
       incomingProducts.forEach(p => {
-        if (p && p.id) prodMap.set(p.id, p);
+        if (p && p.id && !deletedProducts.has(p.id)) {
+          const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
+          prodMap.set(key, p);
+        }
       });
       db.products = Array.from(prodMap.values());
     }
@@ -1330,6 +1400,7 @@ app.post('/api/sync', async (req, res) => {
       lastModified: Date.now(),
       deletedSaleIds: Array.from(deletedSales),
       deletedExpenseIds: Array.from(deletedExpenses),
+      deletedProductIds: Array.from(deletedProducts).slice(-500),
       restoredSaleIds: Array.from(restoredSales).slice(-500),
       restoredExpenseIds: Array.from(restoredExpenses).slice(-500),
       purgedTrashIds: Array.from(purgedTrash).slice(-500)

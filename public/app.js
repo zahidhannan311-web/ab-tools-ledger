@@ -31,7 +31,9 @@ const STATE = {
       currency: 'Rs.'
     }
   },
-  enteredPin: ''
+  enteredPin: '',
+  quickFilter: 'ALL',
+  paletteFilter: 'ALL'
 };
 
 function sanitizeBusinessName(name) {
@@ -51,8 +53,180 @@ const DEFAULT_TEMPLATES = {
   paid: 'Dear {customer}, we have received your payment of {currency} {amount} for {product} ({plan}). Thank you for trusting {business}!'
 };
 
+// ==================== MULTI-THEME CONFIGURATION & MANAGER ====================
+const AVAILABLE_THEMES = {
+  gold: {
+    id: 'gold',
+    name: '👑 Midnight Luxe Gold',
+    shortName: 'Luxe Gold',
+    accentColor: '#f59e0b',
+    metaColor: '#080a10'
+  },
+  sapphire: {
+    id: 'sapphire',
+    name: '🌌 Deep Sapphire',
+    shortName: 'Sapphire',
+    accentColor: '#38bdf8',
+    metaColor: '#060913'
+  },
+  emerald: {
+    id: 'emerald',
+    name: '🌿 Emerald Matrix',
+    shortName: 'Emerald',
+    accentColor: '#10b981',
+    metaColor: '#050d0a'
+  },
+  amethyst: {
+    id: 'amethyst',
+    name: '💜 Amethyst Velvet',
+    shortName: 'Amethyst',
+    accentColor: '#a855f7',
+    metaColor: '#0a0614'
+  },
+  oled: {
+    id: 'oled',
+    name: '🖤 Pitch OLED Black',
+    shortName: 'OLED Black',
+    accentColor: '#ffffff',
+    metaColor: '#000000'
+  }
+};
+
+// ==================== SOUND SYNTHESIZER MODULE (FEATURE 6) ====================
+const SOUND = {
+  ctx: null,
+  enabled: localStorage.getItem('monkey_sound_enabled') !== 'false',
+
+  init() {
+    if (!this.ctx && (window.AudioContext || window.webkitAudioContext)) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  },
+
+  playCashChime() {
+    if (!this.enabled) return;
+    try {
+      this.init();
+      if (!this.ctx) return;
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+
+      const now = this.ctx.currentTime;
+      const osc1 = this.ctx.createOscillator();
+      const gain1 = this.ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(880, now);
+      gain1.gain.setValueAtTime(0.18, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc1.connect(gain1);
+      gain1.connect(this.ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.35);
+
+      const osc2 = this.ctx.createOscillator();
+      const gain2 = this.ctx.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(1320, now + 0.08);
+      gain2.gain.setValueAtTime(0.22, now + 0.08);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+      osc2.connect(gain2);
+      gain2.connect(this.ctx.destination);
+      osc2.start(now + 0.08);
+      osc2.stop(now + 0.55);
+    } catch (_) {}
+  },
+
+  playSuccessTap() {
+    if (!this.enabled) return;
+    try {
+      this.init();
+      if (!this.ctx) return;
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.09);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    } catch (_) {}
+  },
+
+  toggle() {
+    this.enabled = !this.enabled;
+    localStorage.setItem('monkey_sound_enabled', this.enabled);
+    const icon = document.getElementById('soundToggleIcon');
+    if (icon) icon.textContent = this.enabled ? '🔊' : '🔇';
+    showToast(this.enabled ? 'Sound Effects Enabled 🔊' : 'Sound Effects Muted 🔇');
+    if (this.enabled) this.playCashChime();
+    return this.enabled;
+  }
+};
+
+function initAppTheme() {
+  const savedTheme = localStorage.getItem('ab_tools_theme') || STATE.data.settings?.theme || 'gold';
+  setAppTheme(savedTheme, false);
+}
+
+function setAppTheme(themeId, save = true) {
+  const theme = AVAILABLE_THEMES[themeId] || AVAILABLE_THEMES.gold;
+  document.body.setAttribute('data-theme', theme.id);
+
+  if (save) {
+    try {
+      localStorage.setItem('ab_tools_theme', theme.id);
+      localStorage.setItem('ab_tools_theme_user_override', 'true');
+      STATE.data.settings = STATE.data.settings || {};
+      STATE.data.settings.theme = theme.id;
+      saveLocalState();
+      triggerAutoSaveSync();
+    } catch (_) {}
+  }
+
+  // Update theme meta color for mobile browser status bar
+  let metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) {
+    metaTheme.setAttribute('content', theme.metaColor);
+  }
+
+  // Update Header theme label
+  const headerLabel = document.getElementById('headerThemeLabel');
+  if (headerLabel) headerLabel.textContent = theme.shortName;
+
+  // Update Side Drawer theme tag
+  const drawerTag = document.getElementById('drawerThemeActiveTag');
+  if (drawerTag) drawerTag.textContent = theme.shortName;
+
+  // Update Admin view theme badge
+  const adminPill = document.getElementById('adminThemeCurrentPill');
+  if (adminPill) adminPill.textContent = theme.name;
+
+  // Update active state in Side Drawer buttons
+  document.querySelectorAll('.theme-select-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-theme-val') === theme.id);
+  });
+
+  // Update active state in Admin Theme Cards
+  document.querySelectorAll('.theme-card-option').forEach(card => {
+    card.classList.toggle('active', card.getAttribute('data-theme-card') === theme.id);
+  });
+
+  // Update active state in Theme Modal
+  document.querySelectorAll('.theme-modal-row').forEach(row => {
+    row.classList.toggle('active', row.getAttribute('data-theme-val') === theme.id);
+  });
+}
+
+window.setAppTheme = setAppTheme;
+
 // ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', async () => {
+  initAppTheme();
   setupViewportKeyboardHandling();
   setupEventListeners();
   setupTouchNumpad();
@@ -736,6 +910,10 @@ async function performServerSync() {
           ...(STATE.data.settings?.deletedExpenseIds || []),
           ...(serverResult.settings?.deletedExpenseIds || [])
         ]));
+        const combinedDeletedProducts = Array.from(new Set([
+          ...(STATE.data.settings?.deletedProductIds || []),
+          ...(serverResult.settings?.deletedProductIds || [])
+        ]));
 
         const mergedSales = mergeClientRecords(STATE.data.sales, serverResult.sales, combinedDeletedSales);
         const mergedExpenses = mergeClientRecords(STATE.data.expenses, serverResult.expenses, combinedDeletedExpenses);
@@ -755,7 +933,13 @@ async function performServerSync() {
         STATE.data.sales = mergedSales;
         STATE.data.expenses = mergedExpenses;
         if (serverResult.products && serverResult.products.length) {
-          STATE.data.products = serverResult.products;
+          const validProds = serverResult.products.filter(p => p && p.id && !combinedDeletedProducts.includes(p.id));
+          const pMap = new Map();
+          validProds.forEach(p => {
+            const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
+            pMap.set(key, p);
+          });
+          STATE.data.products = Array.from(pMap.values());
         }
         if (Array.isArray(serverResult.employees)) {
           STATE.data.employees = serverResult.employees;
@@ -790,6 +974,7 @@ async function performServerSync() {
           businessName: sanitizeBusinessName(serverResult.settings?.businessName || STATE.data.settings?.businessName),
           deletedSaleIds: combinedDeletedSales,
           deletedExpenseIds: combinedDeletedExpenses,
+          deletedProductIds: combinedDeletedProducts,
           restoredSaleIds: combinedRestoredSales,
           restoredExpenseIds: combinedRestoredExpenses,
           purgedTrashIds: combinedPurgedTrash
@@ -1089,6 +1274,15 @@ async function loadAppData() {
         const delSet = new Set(parsed.settings.deletedSaleIds);
         if (parsed.sales) {
           parsed.sales = parsed.sales.filter(s => s && s.id && !delSet.has(s.id) && !ignoredSaleIds.has(s.id));
+        }
+        if (parsed.products && Array.isArray(parsed.products)) {
+          const delProds = new Set(parsed.settings.deletedProductIds || []);
+          const pMap = new Map();
+          parsed.products.filter(p => p && p.id && !delProds.has(p.id)).forEach(p => {
+            const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
+            pMap.set(key, p);
+          });
+          parsed.products = Array.from(pMap.values());
         }
         parsed.recycleBin = parsed.recycleBin || [];
         STATE.data = parsed;
@@ -1634,28 +1828,21 @@ function isDateInPeriod(dateStr, period) {
 function renderApp() {
   renderKPIs();
 
-  // Instant render for the currently visible view (0ms latency)
-  if (STATE.currentView === 'salesView') {
+  // Instant targeted render only for the active view (lightning-fast 0ms response)
+  const view = STATE.currentView;
+  if (view === 'salesView') {
     renderSales();
-  } else if (STATE.currentView === 'expensesView') {
+  } else if (view === 'expensesView') {
     renderExpenses();
-  } else if (STATE.currentView === 'pendingView') {
+  } else if (view === 'pendingView') {
     renderPendingPayments();
-  } else if (STATE.currentView === 'remindersView') {
+  } else if (view === 'stockView') {
+    renderStockAndSlots();
+  } else if (view === 'remindersView') {
     renderReminders();
-  } else if (STATE.currentView === 'adminView') {
+  } else if (view === 'adminView') {
     renderAdminCatalog();
   }
-
-  // Defer rendering inactive background tabs to avoid blocking user interactions
-  const defer = window.requestIdleCallback || ((cb) => setTimeout(cb, 30));
-  defer(() => {
-    if (STATE.currentView !== 'salesView') renderSales();
-    if (STATE.currentView !== 'expensesView') renderExpenses();
-    if (STATE.currentView !== 'pendingView') renderPendingPayments();
-    if (STATE.currentView !== 'remindersView') renderReminders();
-    if (STATE.currentView !== 'adminView') renderAdminCatalog();
-  });
 }
 
 function renderKPIs() {
@@ -1691,6 +1878,52 @@ function renderKPIs() {
   const commissionCard = document.getElementById('employeeCommissionCard');
   const profitValEl = document.getElementById('kpiProfit');
   if (profitValEl) profitValEl.textContent = netProfit.toLocaleString('en-US');
+
+  // Option 3: High-End KPI Calculations (Stripe / Trading Terminal Style)
+  const marginPercent = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 100) : 0;
+  const avgTicket = filteredSales.length > 0 ? Math.round(totalRevenue / filteredSales.length) : 0;
+  const pendingRatio = totalRevenue > 0 ? Math.round((filteredPendingTotal / totalRevenue) * 100) : 0;
+
+  const avgTicketEl = document.getElementById('kpiAvgTicket');
+  if (avgTicketEl) {
+    avgTicketEl.textContent = `Avg: Rs. ${avgTicket.toLocaleString('en-US')}`;
+  }
+
+  const marginBadgeEl = document.getElementById('kpiMarginBadge');
+  if (marginBadgeEl) {
+    marginBadgeEl.textContent = `${marginPercent >= 0 ? '▲' : '▼'} ${marginPercent}% Margin`;
+    marginBadgeEl.className = `kpi-margin-pill ${marginPercent >= 50 ? 'margin-high' : (marginPercent >= 20 ? 'margin-med' : (marginPercent >= 0 ? 'margin-low' : 'margin-loss'))}`;
+  }
+
+  const marginBarEl = document.getElementById('kpiMarginProgressBar');
+  if (marginBarEl) {
+    const clampedWidth = Math.max(0, Math.min(100, marginPercent));
+    marginBarEl.style.width = `${clampedWidth}%`;
+    marginBarEl.className = `kpi-margin-bar ${marginPercent >= 50 ? 'bar-high' : (marginPercent >= 20 ? 'bar-med' : (marginPercent >= 0 ? 'bar-low' : 'bar-loss'))}`;
+  }
+
+  const profitRatioTextEl = document.getElementById('kpiProfitRatioText');
+  if (profitRatioTextEl) {
+    if (netProfit < 0) {
+      profitRatioTextEl.textContent = 'Deficit / Loss';
+      profitRatioTextEl.style.color = '#f87171';
+    } else if (marginPercent >= 65) {
+      profitRatioTextEl.textContent = '🔥 Prime Yield';
+      profitRatioTextEl.style.color = '#34d399';
+    } else if (marginPercent >= 35) {
+      profitRatioTextEl.textContent = '✅ High Yield';
+      profitRatioTextEl.style.color = '#38bdf8';
+    } else {
+      profitRatioTextEl.textContent = '⚖️ Moderate';
+      profitRatioTextEl.style.color = 'var(--text-secondary)';
+    }
+  }
+
+  const pendingRatioBadge = document.getElementById('kpiPendingRatioBadge');
+  if (pendingRatioBadge) {
+    pendingRatioBadge.textContent = `${pendingRatio}% of Rev`;
+    pendingRatioBadge.className = `kpi-pending-pill ${pendingRatio > 30 ? 'pending-high' : (pendingRatio > 10 ? 'pending-med' : 'pending-low')}`;
+  }
 
   // Multi-role KPI visibility:
   if (isEmployee) {
@@ -1813,6 +2046,25 @@ function renderSales() {
     }
   }
 
+  // 1-Tap Quick Filter Chips (Feature 5)
+  if (STATE.quickFilter && STATE.quickFilter !== 'ALL') {
+    const todayStr = getLocalTodayDateString();
+    if (STATE.quickFilter === 'TODAY') {
+      list = list.filter(s => s.date === todayStr);
+    } else if (STATE.quickFilter === 'EXPIRING_3D') {
+      list = list.filter(s => {
+        const d = calculateDaysRemaining(s.expiryDate);
+        return d !== null && d >= 0 && d <= 3;
+      });
+    } else if (STATE.quickFilter === 'PENDING') {
+      list = list.filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid');
+    } else if (STATE.quickFilter === 'PRIVATE') {
+      list = list.filter(s => String(s.accountType).toLowerCase().includes('private'));
+    } else if (STATE.quickFilter === 'SHARED') {
+      list = list.filter(s => !String(s.accountType).toLowerCase().includes('private'));
+    }
+  }
+
   let bannerHtml = '';
   if (period === 'custom') {
     const formattedDate = formatDateWithDay(STATE.customSelectedDate || getLocalTodayDateString());
@@ -1840,6 +2092,152 @@ function renderSales() {
   container.innerHTML = bannerHtml + list.map(s => renderSaleCardHtml(s)).join('');
 }
 
+// ==================== PRODUCT BRAND LOGOS & STYLING (OPTION 1) ====================
+function getProductBrandMeta(productName) {
+  const norm = String(productName || '').toLowerCase().trim();
+
+  if (norm.includes('surfshark')) {
+    return { key: 'surfshark', icon: '🦈', displayName: 'Surfshark', badgeClass: 'brand-surfshark', category: 'VPN Security' };
+  }
+  if (norm.includes('nord')) {
+    return { key: 'nord', icon: '🛡️', displayName: 'NordVPN', badgeClass: 'brand-nord', category: 'VPN Security' };
+  }
+  if (norm.includes('gemini') || norm.includes('google')) {
+    return { key: 'gemini', icon: '✨', displayName: 'Gemini Pro', badgeClass: 'brand-gemini', category: 'AI Model' };
+  }
+  if (norm.includes('chatgpt') || norm.includes('gpt') || norm.includes('openai')) {
+    return { key: 'chatgpt', icon: '🤖', displayName: 'ChatGPT Plus', badgeClass: 'brand-chatgpt', category: 'AI Model' };
+  }
+  if (norm.includes('capcut')) {
+    return { key: 'capcut', icon: '🎬', displayName: 'CapCut Pro', badgeClass: 'brand-capcut', category: 'Video Editor' };
+  }
+  if (norm.includes('muse')) {
+    return { key: 'muse', icon: '🎨', displayName: 'Muse AI', badgeClass: 'brand-muse', category: 'Creative AI' };
+  }
+  if (norm.includes('hma')) {
+    return { key: 'hma', icon: '🦙', displayName: 'HMA VPN', badgeClass: 'brand-hma', category: 'VPN Security' };
+  }
+  if (norm.includes('proton')) {
+    return { key: 'proton', icon: '🔒', displayName: 'Proton VPN', badgeClass: 'brand-proton', category: 'VPN Security' };
+  }
+  if (norm.includes('canva')) {
+    return { key: 'canva', icon: '🖌️', displayName: 'Canva Pro', badgeClass: 'brand-canva', category: 'Design Suite' };
+  }
+  if (norm.includes('netflix')) {
+    return { key: 'netflix', icon: '🍿', displayName: 'Netflix UHD', badgeClass: 'brand-netflix', category: 'Streaming' };
+  }
+  if (norm.includes('prime') || norm.includes('amazon')) {
+    return { key: 'prime', icon: '📦', displayName: 'Prime Video', badgeClass: 'brand-prime', category: 'Streaming' };
+  }
+  if (norm.includes('spotify')) {
+    return { key: 'spotify', icon: '🎵', displayName: 'Spotify Premium', badgeClass: 'brand-spotify', category: 'Audio' };
+  }
+  if (norm.includes('youtube')) {
+    return { key: 'youtube', icon: '📺', displayName: 'YouTube Premium', badgeClass: 'brand-youtube', category: 'Video Streaming' };
+  }
+
+  return { key: 'tool', icon: '⚡', displayName: productName || 'Digital Tool', badgeClass: 'brand-generic', category: 'Subscription' };
+}
+
+function getProductBrandBadge(productName, accountType) {
+  const meta = getProductBrandMeta(productName);
+  const isPrivate = String(accountType || '').toLowerCase().includes('private');
+
+  return `
+    <div class="prod-brand-pill-wrap">
+      <span class="prod-brand-badge ${meta.badgeClass}" title="${escapeHtml(meta.category)}">
+        <span class="prod-brand-icon">${meta.icon}</span>
+        <span class="prod-brand-name">${escapeHtml(productName || meta.displayName)}</span>
+      </span>
+      <span class="account-type-badge ${isPrivate ? 'type-private' : 'type-shared'}" title="${isPrivate ? 'Private dedicated account' : 'Shared multi-screen account'}">
+        ${isPrivate ? '👑 Private' : '👥 Shared'}
+      </span>
+    </div>
+  `;
+}
+
+// ==================== 1-CLICK DIRECT ACTIONS (OPTION 2) ====================
+function cleanPhoneForCall(phone) {
+  if (!phone) return '';
+  const match = phone.match(/(\+?\d[\d\s-]{7,})/);
+  return match ? match[0].replace(/[\s-]/g, '') : phone.replace(/[^0-9+]/g, '');
+}
+
+function quickCopyCredential(btn, text) {
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '✓ Copied!';
+      btn.classList.add('copy-success');
+      setTimeout(() => {
+        btn.innerHTML = orig;
+        btn.classList.remove('copy-success');
+      }, 1600);
+    }
+    SOUND.playSuccessTap();
+    showToast(`Login copied to clipboard! 📋`);
+  }).catch(() => {
+    copyText(text);
+  });
+}
+
+function quickCopySaleReceipt(saleId) {
+  const sale = (STATE.data.sales || []).find(s => s.id === saleId);
+  if (!sale) return;
+
+  const receipt = [
+    `⭐ *MONKEY TOOLS — ORDER RECEIPT* ⭐`,
+    `━━━━━━━━━━━━━━━━━━━━━━`,
+    `📦 *Product:* ${sale.product} (${sale.accountType || 'Shared'})`,
+    `⏳ *Plan:* ${sale.planLabel || sale.planMonths + ' Month(s)'}`,
+    sale.accountLogin ? `🔑 *Login:* ${sale.accountLogin}` : null,
+    `📅 *Date:* ${formatDateDisplay(sale.date)}`,
+    `⏰ *Expiry Date:* ${formatDateDisplay(sale.expiryDate)}`,
+    `💰 *Amount:* Rs. ${(sale.amount || 0).toLocaleString('en-US')}`,
+    `💳 *Status:* ${sale.paymentStatus === 'Paid' ? 'Paid ✓' : sale.paymentStatus}`,
+    `━━━━━━━━━━━━━━━━━━━━━━`,
+    `🙏 Thank you for choosing Monkey Tools!`
+  ].filter(Boolean).join('\n');
+
+  navigator.clipboard.writeText(receipt).then(() => {
+    SOUND.playSuccessTap();
+    showToast('Customer Receipt copied to clipboard! 📋');
+  }).catch(() => {
+    copyText(receipt);
+  });
+}
+
+function quickSetSaleStatus(saleId, newStatus, event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  const sale = (STATE.data.sales || []).find(s => s.id === saleId);
+  if (!sale) return;
+
+  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+  if (isEmployee && newStatus === 'Paid' && !sale.paymentProof) {
+    openQuickMarkPaid(saleId);
+    return;
+  }
+
+  if (sale.paymentStatus === newStatus) return;
+
+  sale.paymentStatus = newStatus;
+  sale.updatedAt = new Date().toISOString();
+
+  if (newStatus === 'Paid') {
+    SOUND.playCashChime();
+  } else {
+    SOUND.playSuccessTap();
+  }
+
+  saveLocalState();
+  triggerAutoSaveSync(true);
+  showToast(`Status updated to ${newStatus} ✓`);
+  renderApp();
+}
+
 function renderSaleCardHtml(s) {
   const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
   const statusClass = s.paymentStatus === 'Paid' ? 'status-paid' : (s.paymentStatus === 'Pending' ? 'status-pending' : 'status-unpaid');
@@ -1848,13 +2246,17 @@ function renderSaleCardHtml(s) {
   const isExpiresToday = daysLeft === 0;
   const isExpiresTomorrow = daysLeft === 1;
   const soldBy = s.soldBy || 'Admin';
+  const cleanPhone = cleanPhoneForCall(s.customerPhone);
 
   return `
     <div class="item-card ${isExpired ? 'is-expired' : ''}" data-sale-id="${s.id}">
       <div class="item-card-header">
         <div class="item-user-info">
-          <span class="user-phone-badge">${formatPhone(s.customerPhone)}</span>
-          ${s.customerName ? `<span class="user-name-tag">${escapeHtml(s.customerName)}</span>` : ''}
+          <span class="user-phone-badge" onclick="openCustomerCrm('${escapeHtml(s.customerPhone)}', '${escapeHtml(s.customerName || '')}')" style="cursor:pointer;" title="Click to view Customer CRM Profile">
+            👤 ${formatPhone(s.customerPhone)}
+          </span>
+          ${s.customerName ? `<span class="user-name-tag" onclick="openCustomerCrm('${escapeHtml(s.customerPhone)}', '${escapeHtml(s.customerName || '')}')" style="cursor:pointer;" title="Click to view Customer CRM Profile">${escapeHtml(s.customerName)}</span>` : ''}
+          <a href="tel:${cleanPhone}" class="user-phone-link" title="Direct Phone Call">📞</a>
           <span class="badge-staff ${soldBy === 'Admin' ? 'staff-admin' : 'staff-ali'}">👤 ${escapeHtml(soldBy)}</span>
           ${isExpired ? `<span class="badge-expired-header">🔴 Expired</span>` : (isExpiresToday ? `<span class="badge-urgent-pill">⚠️ Expires Today</span>` : '')}
         </div>
@@ -1867,13 +2269,15 @@ function renderSaleCardHtml(s) {
       <div class="item-details-grid">
         <div class="detail-item">
           <span class="detail-label">Product &amp; Type</span>
-          <span class="detail-value text-gold"><strong>${escapeHtml(s.product)}</strong> (${escapeHtml(s.accountType || 'Shared')})</span>
+          <div class="detail-value mt-1">
+            ${getProductBrandBadge(s.product, s.accountType)}
+          </div>
         </div>
         <div class="detail-item">
           <span class="detail-label">Assigned Account</span>
           <span class="detail-value account-email">
             ${s.accountLogin ? escapeHtml(s.accountLogin) : '<span class="text-muted">None / Private Plan</span>'}
-            ${s.accountLogin ? `<button class="btn-xs btn-outline ml-1" title="Copy Login" onclick="copyText('${escapeHtml(s.accountLogin)}')">📋 Copy</button>` : ''}
+            ${s.accountLogin ? `<button type="button" class="btn-copy-credential ml-1" title="1-Click Copy Login" onclick="quickCopyCredential(this, '${escapeHtml(s.accountLogin)}')">📋 Copy</button>` : ''}
           </span>
         </div>
         <div class="detail-item">
@@ -1892,7 +2296,15 @@ function renderSaleCardHtml(s) {
 
       <div class="item-actions-bar">
         <div class="badges-group">
-          <span class="status-badge ${statusClass}">${s.paymentStatus}</span>
+          <!-- 1-Click Interactive Status Switcher -->
+          <div class="interactive-status-badge-wrap" title="1-Click change status">
+            <select class="status-badge-select ${statusClass}" onchange="quickSetSaleStatus('${s.id}', this.value, event)">
+              <option value="Paid" ${s.paymentStatus === 'Paid' ? 'selected' : ''}>🟢 Paid</option>
+              <option value="Pending" ${s.paymentStatus === 'Pending' ? 'selected' : ''}>🟡 Pending</option>
+              <option value="Unpaid" ${s.paymentStatus === 'Unpaid' ? 'selected' : ''}>🔴 Unpaid</option>
+            </select>
+          </div>
+
           ${s.paymentProof ? `
             <button type="button" class="btn-proof-preview" onclick="openViewPaymentProof('${s.id}')">📷 Proof (${escapeHtml(s.paymentReceivedIn || 'Boss')})</button>
           ` : ''}
@@ -1906,6 +2318,7 @@ function renderSaleCardHtml(s) {
           <button class="btn-whatsapp" onclick="sendWhatsAppReminder('${s.id}')">
             <span>💬 WhatsApp</span>
           </button>
+          <button class="btn-action-icon" title="Copy Customer WhatsApp Receipt (1-Click)" onclick="quickCopySaleReceipt('${s.id}')">🧾</button>
           <button class="btn-action-icon" title="Edit Sale" onclick="openEditSale('${s.id}')">✏️</button>
           ${!isEmployee ? `
             <button class="btn-action-icon btn-action-delete" title="Delete Sale (Admin Only)" onclick="openDeleteSaleReasonModal('${s.id}')">🗑️</button>
@@ -1915,6 +2328,7 @@ function renderSaleCardHtml(s) {
     </div>
   `;
 }
+
 
 // ==================== RENDER EXPENSES LIST ====================
 function renderExpenses() {
@@ -2016,6 +2430,308 @@ function renderPendingPayments() {
   }
 
   container.innerHTML = pendingSales.map(s => renderSaleCardHtml(s)).join('');
+}
+
+// ==================== SHARED ACCOUNTS & SLOTS TRACKER (FEATURE 3) ====================
+function renderStockAndSlots() {
+  const container = document.getElementById('stockListContainer');
+  if (!container) return;
+
+  const sales = STATE.data.sales || [];
+  const accountsMap = {};
+
+  sales.forEach(s => {
+    const login = (s.accountLogin || '').trim();
+    if (!login) return;
+    const key = `${s.product}___${login}`;
+    if (!accountsMap[key]) {
+      accountsMap[key] = {
+        product: s.product,
+        login: login,
+        accountType: s.accountType || 'Shared',
+        sales: []
+      };
+    }
+    accountsMap[key].sales.push(s);
+  });
+
+  const accountKeys = Object.keys(accountsMap);
+  const navStockBadge = document.getElementById('navStockCount');
+  if (navStockBadge) navStockBadge.textContent = accountKeys.length;
+
+  if (accountKeys.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="grid-column: 1 / -1;">
+        <div class="empty-state-icon">📦</div>
+        <div class="empty-state-title">No assigned accounts yet</div>
+        <p class="text-muted mt-2">When you sell tools with assigned account logins, live slot counters will appear here.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = accountKeys.map(k => {
+    const acc = accountsMap[k];
+    const isPrivate = String(acc.accountType).toLowerCase().includes('private');
+    const capacity = isPrivate ? 1 : (acc.product.toLowerCase().includes('vpn') || acc.product.toLowerCase().includes('surf') ? 5 : 4);
+    const activeSales = acc.sales.filter(s => {
+      const d = calculateDaysRemaining(s.expiryDate);
+      return d === null || d >= 0;
+    });
+    const usedSlots = activeSales.length;
+    const freeSlots = Math.max(0, capacity - usedSlots);
+    const isFull = freeSlots === 0;
+
+    return `
+      <div class="stock-card">
+        <div class="stock-card-head">
+          <div>
+            ${getProductBrandBadge(acc.product, acc.accountType)}
+            <div class="stock-email-title mt-2">
+              <span>${escapeHtml(acc.login)}</span>
+              <button class="btn-copy-credential" onclick="quickCopyCredential(this, '${escapeHtml(acc.login)}')">📋</button>
+            </div>
+          </div>
+          <span class="stock-capacity-badge ${isFull ? 'capacity-full' : 'capacity-available'}">
+            ${isFull ? '🔴 FULL (0 Free)' : `🟢 ${freeSlots} Free Slot${freeSlots === 1 ? '' : 's'}`}
+          </span>
+        </div>
+
+        <div class="stock-slots-list">
+          ${activeSales.map((s, idx) => {
+            const days = calculateDaysRemaining(s.expiryDate);
+            return `
+              <div class="slot-item slot-occupied">
+                <div class="slot-customer-info">
+                  <span>👤 Slot ${idx + 1}:</span>
+                  <a href="javascript:void(0)" onclick="openCustomerCrm('${escapeHtml(s.customerPhone)}', '${escapeHtml(s.customerName || '')}')" class="text-gold" style="text-decoration:none;">
+                    ${formatPhone(s.customerPhone)}
+                  </a>
+                </div>
+                <div class="slot-expiry-info">
+                  ${formatDaysBadge(days)}
+                </div>
+              </div>
+            `;
+          }).join('')}
+
+          ${Array.from({ length: freeSlots }).map((_, idx) => `
+            <div class="slot-item slot-free" onclick="openNewSaleWithStock('${escapeHtml(acc.product)}', '${escapeHtml(acc.login)}', '${escapeHtml(acc.accountType)}')">
+              <span class="text-emerald font-bold">🟢 Slot ${usedSlots + idx + 1}: Empty Slot</span>
+              <span class="text-muted" style="font-size:11px;">+ Click to Assign</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openNewSaleWithStock(product, login, type) {
+  openSaleModal();
+  setTimeout(() => {
+    const prodSelect = document.getElementById('saleProductSelect');
+    if (prodSelect) {
+      prodSelect.value = product;
+      prodSelect.dispatchEvent(new Event('change'));
+    }
+    const loginInput = document.getElementById('saleAccountLogin');
+    if (loginInput) loginInput.value = login;
+  }, 100);
+}
+
+// ==================== CUSTOMER CRM SLIDE-OVER DRAWER (FEATURE 2) ====================
+function openCustomerCrm(customerPhone, customerName) {
+  if (!customerPhone) return;
+  const cleanPhone = cleanPhoneForCall(customerPhone);
+  const sales = STATE.data.sales || [];
+  const custSales = sales.filter(s => cleanPhoneForCall(s.customerPhone) === cleanPhone);
+
+  const totalSpent = custSales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+  const pendingDue = custSales
+    .filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid')
+    .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+
+  const activePlans = custSales.filter(s => {
+    const d = calculateDaysRemaining(s.expiryDate);
+    return d === null || d >= 0;
+  });
+
+  const bestName = customerName || (custSales.find(s => s.customerName)?.customerName) || 'Customer';
+  const nameEl = document.getElementById('crmCustomerName');
+  if (nameEl) nameEl.textContent = bestName;
+  const phoneEl = document.getElementById('crmCustomerPhone');
+  if (phoneEl) phoneEl.textContent = formatPhone(customerPhone);
+
+  const badgeEl = document.getElementById('crmCustomerBadge');
+  if (badgeEl) {
+    if (custSales.length >= 3 || totalSpent >= 3000) {
+      badgeEl.textContent = '👑 VIP Customer';
+      badgeEl.className = 'crm-badge text-gold';
+    } else if (custSales.length === 2) {
+      badgeEl.textContent = '⭐ Regular';
+      badgeEl.className = 'crm-badge text-emerald';
+    } else {
+      badgeEl.textContent = '🌱 New Customer';
+      badgeEl.className = 'crm-badge text-secondary';
+    }
+  }
+
+  document.getElementById('crmTotalSpend').textContent = `Rs. ${totalSpent.toLocaleString('en-US')}`;
+  document.getElementById('crmTotalOrders').textContent = custSales.length;
+  document.getElementById('crmActiveCount').textContent = activePlans.length;
+  document.getElementById('crmPendingDue').textContent = `Rs. ${pendingDue.toLocaleString('en-US')}`;
+  document.getElementById('crmHistoryCount').textContent = `${custSales.length} orders`;
+
+  const waBtn = document.getElementById('crmBtnWhatsApp');
+  if (waBtn) {
+    waBtn.onclick = () => {
+      const waUrl = `https://wa.me/${cleanPhone.replace('+', '')}?text=${encodeURIComponent(`Hello ${bestName}! Greetings from Monkey Tools.`)}`;
+      window.open(waUrl, '_blank');
+    };
+  }
+  const callBtn = document.getElementById('crmBtnCall');
+  if (callBtn) callBtn.href = `tel:${cleanPhone}`;
+
+  const newOrderBtn = document.getElementById('crmBtnNewOrder');
+  if (newOrderBtn) {
+    newOrderBtn.onclick = () => {
+      closeCustomerCrm();
+      openSaleModal();
+      setTimeout(() => {
+        const pInput = document.getElementById('saleCustomerPhone');
+        if (pInput) pInput.value = customerPhone;
+        const nInput = document.getElementById('saleCustomerName');
+        if (nInput) nInput.value = bestName;
+      }, 100);
+    };
+  }
+
+  const histContainer = document.getElementById('crmHistoryListContainer');
+  if (histContainer) {
+    histContainer.innerHTML = custSales.map(s => {
+      const days = calculateDaysRemaining(s.expiryDate);
+      return `
+        <div class="crm-history-card">
+          <div class="flex justify-between items-start">
+            ${getProductBrandBadge(s.product, s.accountType)}
+            <span class="amount-text text-sm">Rs. ${(s.amount || 0).toLocaleString()}</span>
+          </div>
+          <div class="text-xs text-muted flex justify-between mt-1">
+            <span>Purchased: ${formatDateDisplay(s.date)}</span>
+            <span>Expires: ${formatDateDisplay(s.expiryDate)} ${formatDaysBadge(days)}</span>
+          </div>
+          ${s.accountLogin ? `
+            <div class="text-xs font-mono text-gold flex items-center justify-between mt-1 bg-black/20 p-1.5 rounded">
+              <span>🔑 ${escapeHtml(s.accountLogin)}</span>
+              <button class="btn-copy-credential" onclick="quickCopyCredential(this, '${escapeHtml(s.accountLogin)}')">📋 Copy</button>
+            </div>
+          ` : ''}
+          <div class="flex justify-between items-center mt-1 pt-1 border-t border-white/5">
+            <span class="status-badge ${s.paymentStatus === 'Paid' ? 'status-paid' : 'status-pending'} text-xs">${s.paymentStatus}</span>
+            <button class="btn btn-xs btn-outline" onclick="openEditSale('${s.id}')">✏️ Edit</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('customerCrmBackdrop').style.display = 'block';
+  document.getElementById('customerCrmDrawer').classList.add('active');
+  SOUND.playSuccessTap();
+}
+
+function closeCustomerCrm() {
+  const backdrop = document.getElementById('customerCrmBackdrop');
+  if (backdrop) backdrop.style.display = 'none';
+  const drawer = document.getElementById('customerCrmDrawer');
+  if (drawer) drawer.classList.remove('active');
+}
+
+// ==================== COMMAND PALETTE & GLOBAL SEARCH (FEATURE 1) ====================
+function openCommandPalette() {
+  const modal = document.getElementById('commandPaletteModal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  const input = document.getElementById('paletteSearchInput');
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+  handlePaletteSearch('');
+  SOUND.playSuccessTap();
+}
+
+function closeCommandPalette() {
+  const modal = document.getElementById('commandPaletteModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function handlePaletteSearch(rawQuery) {
+  const q = String(rawQuery || '').toLowerCase().trim();
+  const container = document.getElementById('paletteResultsContainer');
+  const countText = document.getElementById('paletteResultCountText');
+  const clearBtn = document.getElementById('btnPaletteClear');
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
+  if (!container) return;
+
+  const sales = STATE.data.sales || [];
+  let filtered = sales;
+
+  if (STATE.paletteFilter === 'PAID') {
+    filtered = filtered.filter(s => s.paymentStatus === 'Paid');
+  } else if (STATE.paletteFilter === 'PENDING') {
+    filtered = filtered.filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid');
+  } else if (STATE.paletteFilter === 'EXPIRED') {
+    filtered = filtered.filter(s => {
+      const d = calculateDaysRemaining(s.expiryDate);
+      return d !== null && d < 0;
+    });
+  }
+
+  if (q) {
+    filtered = filtered.filter(s => {
+      return String(s.customerPhone || '').toLowerCase().includes(q) ||
+             String(s.customerName || '').toLowerCase().includes(q) ||
+             String(s.product || '').toLowerCase().includes(q) ||
+             String(s.accountLogin || '').toLowerCase().includes(q) ||
+             String(s.notes || '').toLowerCase().includes(q);
+    });
+  }
+
+  if (countText) countText.textContent = `${filtered.length} result${filtered.length === 1 ? '' : 's'}`;
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 24px 0;">
+        <div style="font-size: 26px;">🔍</div>
+        <div class="empty-state-title" style="font-size: 14px;">No transactions match "${escapeHtml(q)}"</div>
+        <p class="text-muted mt-1 text-xs">Try searching by customer phone (03...), name, email, or tool name.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtered.slice(0, 25).map(s => {
+    return `
+      <div class="palette-result-item" onclick="openCustomerCrm('${escapeHtml(s.customerPhone)}', '${escapeHtml(s.customerName || '')}'); closeCommandPalette();">
+        <div class="palette-item-left">
+          <div class="palette-item-phone">
+            <span>📞 ${formatPhone(s.customerPhone)}</span>
+            ${s.customerName ? `<span class="user-name-tag text-xs">${escapeHtml(s.customerName)}</span>` : ''}
+          </div>
+          <div class="palette-item-sub">
+            <strong class="text-gold">${escapeHtml(s.product)}</strong> (${escapeHtml(s.accountType || 'Shared')}) ·
+            ${s.accountLogin ? `<span class="font-mono text-muted">${escapeHtml(s.accountLogin)}</span>` : '<span class="text-muted">Private Plan</span>'}
+          </div>
+        </div>
+        <div class="palette-item-right">
+          <span class="status-badge ${s.paymentStatus === 'Paid' ? 'status-paid' : 'status-pending'}">${s.paymentStatus}</span>
+          <span class="font-mono text-sm text-gold font-bold">Rs. ${(s.amount || 0).toLocaleString()}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 // ==================== DAILY REMINDERS ====================
@@ -2378,8 +3094,7 @@ function renderAdminCatalog() {
     <div class="catalog-item-box">
       <div class="catalog-item-head">
         <div class="flex items-center gap-2">
-          <span class="catalog-prod-name">${escapeHtml(p.name)}</span>
-          <span class="catalog-type-pill">${escapeHtml(p.type || 'Shared')}</span>
+          ${getProductBrandBadge(p.name, p.type)}
         </div>
         <div class="item-btn-group">
           <button class="btn btn-xs btn-outline" onclick="openEditProduct('${p.id}')">✏️ Edit</button>
@@ -2397,6 +3112,62 @@ function renderAdminCatalog() {
 
 // ==================== EVENT LISTENERS & MODALS ====================
 function setupEventListeners() {
+  // 1-Tap Quick Filter Chips (Feature 5)
+  document.querySelectorAll('.filter-chip[data-qfilter]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.filter-chip[data-qfilter]').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      STATE.quickFilter = chip.getAttribute('data-qfilter');
+      SOUND.playSuccessTap();
+      renderSales();
+    });
+  });
+
+  // Sound Effects Toggle (Feature 6)
+  document.getElementById('btnToggleSound')?.addEventListener('click', () => {
+    SOUND.toggle();
+  });
+
+  // Command Palette & Global Search (Feature 1)
+  document.getElementById('btnQuickSearch')?.addEventListener('click', openCommandPalette);
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      openCommandPalette();
+    } else if (e.key === 'Escape') {
+      closeCommandPalette();
+      closeCustomerCrm();
+    }
+  });
+
+  document.getElementById('paletteSearchInput')?.addEventListener('input', (e) => {
+    handlePaletteSearch(e.target.value);
+  });
+  document.getElementById('btnPaletteClear')?.addEventListener('click', () => {
+    const input = document.getElementById('paletteSearchInput');
+    if (input) input.value = '';
+    handlePaletteSearch('');
+  });
+
+  document.querySelectorAll('.palette-filter-pill[data-pfilter]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.palette-filter-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      STATE.paletteFilter = pill.getAttribute('data-pfilter');
+      SOUND.playSuccessTap();
+      const input = document.getElementById('paletteSearchInput');
+      handlePaletteSearch(input ? input.value : '');
+    });
+  });
+
+  document.getElementById('commandPaletteModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'commandPaletteModal') closeCommandPalette();
+  });
+
+  // Customer CRM Drawer (Feature 2)
+  document.getElementById('btnCloseCrmDrawer')?.addEventListener('click', closeCustomerCrm);
+  document.getElementById('customerCrmBackdrop')?.addEventListener('click', closeCustomerCrm);
+
   // Navigation Tabs (Desktop & Mobile)
   document.querySelectorAll('.nav-tab, .mobile-nav-btn[data-view]').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -2555,13 +3326,29 @@ function setupEventListeners() {
     handleSwitchUser();
   });
 
+  // Theme Switcher Button in Header
+  document.getElementById('btnOpenThemePicker')?.addEventListener('click', () => {
+    openModal('themeModal');
+  });
+
+  // Theme Select Buttons in Side Drawer
+  document.querySelectorAll('.theme-select-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const themeVal = btn.getAttribute('data-theme-val');
+      if (themeVal) {
+        setAppTheme(themeVal);
+        showToast(`Theme switched to ${AVAILABLE_THEMES[themeVal]?.shortName || themeVal}! 🎨`);
+      }
+    });
+  });
+
   // Top Bar Search Button
   document.getElementById('btnQuickSearch')?.addEventListener('click', () => {
-    openModal('searchModal');
-    setupSearchModal();
-    setTimeout(() => {
-      document.getElementById('globalSearchInput')?.focus();
-    }, 200);
+    openCommandPalette();
+  });
+  document.getElementById('drawerSearchInput')?.addEventListener('focus', () => {
+    closeSideDrawer();
+    openCommandPalette();
   });
 
   // Excel Download Buttons
@@ -2892,10 +3679,13 @@ function switchView(viewId) {
     t.classList.toggle('active', t.getAttribute('data-view') === viewId);
   });
 
+  SOUND.playSuccessTap();
+
   // Ensure target view content is rendered immediately
   if (viewId === 'salesView') renderSales();
   else if (viewId === 'expensesView') renderExpenses();
   else if (viewId === 'pendingView') renderPendingPayments();
+  else if (viewId === 'stockView') renderStockAndSlots();
   else if (viewId === 'remindersView') renderReminders();
   else if (viewId === 'adminView') renderAdminCatalog();
 
@@ -3163,6 +3953,11 @@ async function handleSaleSubmit(e) {
   saveLocalState();
   closeModal('saleModal');
   showToast(editId ? 'Sale updated successfully! 💾' : 'New sale added & auto-saved! 🎉');
+  if (paymentStatus === 'Paid' || !editId) {
+    SOUND.playCashChime();
+  } else {
+    SOUND.playSuccessTap();
+  }
   renderApp();
 
   // Instant Cloud Auto-Save (NO REFRESH NEEDED)
@@ -3234,6 +4029,7 @@ async function handleConfirmQuickMarkPaid(e) {
 
   saveLocalState();
   closeModal('quickMarkPaidModal');
+  SOUND.playCashChime();
   showToast('Payment verified & marked as Paid! ✓');
   renderApp();
   triggerAutoSaveSync(true);
@@ -4077,6 +4873,8 @@ window.emptyRecycleBin = emptyRecycleBin;
 function openNewProductModal() {
   document.getElementById('productEditId').value = '';
   document.getElementById('productModalTitle').textContent = 'Add New Tool / Product';
+  const saveBtn = document.getElementById('btnSaveProduct');
+  if (saveBtn) saveBtn.textContent = 'Save Product';
   document.getElementById('productForm').reset();
   const rows = document.getElementById('plansListRowsContainer');
   rows.innerHTML = '';
@@ -4089,7 +4887,9 @@ function openEditProduct(id) {
   if (!prod) return;
 
   document.getElementById('productEditId').value = id;
-  document.getElementById('productModalTitle').textContent = 'Edit Product & Plans';
+  document.getElementById('productModalTitle').textContent = `Edit Tool: ${prod.name}`;
+  const saveBtn = document.getElementById('btnSaveProduct');
+  if (saveBtn) saveBtn.textContent = 'Update Product & Plans';
   document.getElementById('prodNameInput').value = prod.name;
   document.getElementById('prodTypeSelect').value = prod.type || 'Shared';
 
@@ -4126,6 +4926,11 @@ async function handleProductSubmit(e) {
   const name = document.getElementById('prodNameInput').value.trim();
   const type = document.getElementById('prodTypeSelect').value;
 
+  if (!name) {
+    showToast('Please enter a product name');
+    return;
+  }
+
   const planRows = document.querySelectorAll('.plan-edit-row');
   const plans = [];
 
@@ -4136,38 +4941,64 @@ async function handleProductSubmit(e) {
     plans.push({ months, label, price });
   });
 
-  const id = editId || ('prod_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + (type || 'shared').toLowerCase());
+  STATE.data.products = STATE.data.products || [];
+
+  // If editing, find existing product by editId or by name+type
+  let existingIdx = -1;
+  if (editId) {
+    existingIdx = STATE.data.products.findIndex(p => p && p.id === editId);
+  }
+  if (existingIdx === -1) {
+    existingIdx = STATE.data.products.findIndex(p => 
+      p && p.name && p.name.trim().toLowerCase() === name.toLowerCase() &&
+      String(p.type || 'Shared').trim().toLowerCase() === (type || 'Shared').toLowerCase()
+    );
+  }
+
+  const finalId = editId || (existingIdx >= 0 ? STATE.data.products[existingIdx].id : ('prod_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + (type || 'shared').toLowerCase()));
+
   const productObj = {
-    id,
+    id: finalId,
     name,
     type: type || 'Shared',
     plans
   };
 
-  // Immediate Local Update (Never lost on refresh)
-  STATE.data.products = STATE.data.products || [];
-  const existingIdx = STATE.data.products.findIndex(p => p.id === id);
   if (existingIdx >= 0) {
+    // In-place update existing product (never duplicate or append to bottom)
     STATE.data.products[existingIdx] = productObj;
   } else {
+    // Add new product
     STATE.data.products.push(productObj);
   }
+
+  // Deduplicate products in local state by (name + type)
+  const dedupMap = new Map();
+  STATE.data.products.forEach(p => {
+    if (p && p.name) {
+      const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
+      dedupMap.set(key, p);
+    }
+  });
+  STATE.data.products = Array.from(dedupMap.values());
 
   saveLocalState();
   populateProductDropdowns();
   renderAdminCatalog();
   renderApp();
   closeModal('productModal');
-  showToast('Product & Pricing saved & auto-synced! 🎉');
+  showToast(editId ? 'Product & Pricing updated! ✓' : 'Product & Pricing saved! 🎉');
 
   // Instant Cloud Auto-Save (NO REFRESH NEEDED)
   triggerAutoSaveSync();
 
   try {
-    await fetch('/api/products', {
-      method: 'POST',
+    const endpoint = editId ? `/api/products/${encodeURIComponent(editId)}` : '/api/products';
+    const method = editId ? 'PUT' : 'POST';
+    await fetch(endpoint, {
+      method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, type, plans })
+      body: JSON.stringify({ id: finalId, editId, name, type, plans })
     });
   } catch (err) {
     console.warn('Product sync warning:', err);
@@ -4176,18 +5007,24 @@ async function handleProductSubmit(e) {
 
 async function deleteProduct(id) {
   if (!confirm('Are you sure you want to delete this tool and all its plans?')) return;
-  STATE.data.products = (STATE.data.products || []).filter(p => p.id !== id);
+  STATE.data.products = (STATE.data.products || []).filter(p => p && p.id !== id);
+  STATE.data.settings = STATE.data.settings || {};
+  STATE.data.settings.deletedProductIds = STATE.data.settings.deletedProductIds || [];
+  if (!STATE.data.settings.deletedProductIds.includes(id)) {
+    STATE.data.settings.deletedProductIds.push(id);
+    if (STATE.data.settings.deletedProductIds.length > 500) STATE.data.settings.deletedProductIds.shift();
+  }
   saveLocalState();
   populateProductDropdowns();
   renderAdminCatalog();
   renderApp();
-  showToast('Product deleted & auto-synced');
+  showToast('Tool deleted successfully ✓');
 
   // Instant Cloud Auto-Save (NO REFRESH NEEDED)
   triggerAutoSaveSync();
 
   try {
-    await fetch(`/api/products/${id}`, { method: 'DELETE' });
+    await fetch(`/api/products/${encodeURIComponent(id)}`, { method: 'DELETE' });
   } catch (err) {
     console.warn('Delete product sync warning:', err);
   }
@@ -4526,7 +5363,20 @@ async function syncDirectUpstashRedis() {
 
           STATE.data.sales = mergedSales;
           STATE.data.expenses = mergedExpenses;
-          if (parsed.products && parsed.products.length) STATE.data.products = parsed.products;
+          const combinedDelProducts = Array.from(new Set([
+            ...(STATE.data.settings?.deletedProductIds || []),
+            ...(parsed.settings?.deletedProductIds || [])
+          ]));
+
+          if (parsed.products && parsed.products.length) {
+            const valid = parsed.products.filter(p => p && p.id && !combinedDelProducts.includes(p.id));
+            const pMap = new Map();
+            valid.forEach(p => {
+              const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
+              pMap.set(key, p);
+            });
+            STATE.data.products = Array.from(pMap.values());
+          }
           const combinedPurgedTrash = Array.from(new Set([
             ...(STATE.data.settings?.purgedTrashIds || []),
             ...(parsed.settings?.purgedTrashIds || [])
@@ -4557,6 +5407,7 @@ async function syncDirectUpstashRedis() {
             businessName: sanitizeBusinessName(parsed.settings?.businessName || STATE.data.settings?.businessName),
             deletedSaleIds: combinedDelSales,
             deletedExpenseIds: combinedDelExp,
+            deletedProductIds: combinedDelProducts,
             restoredSaleIds: combinedRestoredSales,
             restoredExpenseIds: combinedRestoredExpenses,
             purgedTrashIds: combinedPurgedTrash

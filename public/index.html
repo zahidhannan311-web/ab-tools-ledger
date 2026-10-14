@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=5.1">
+  <link rel="stylesheet" href="style.css?v=6.0">
 </head>
 <body>
 
@@ -180,11 +180,17 @@
 
         <!-- Right: Role Pill & Quick Lock -->
         <div class="header-actions">
-          <button id="btnQuickSearch" class="icon-btn header-desktop-only" title="Search Phone / Customer / Account" aria-label="Search">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <button id="btnQuickSearch" class="icon-btn header-search-trigger" title="Command Palette & Quick Search (Ctrl + K)" aria-label="Search">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
-            <span class="btn-text-desktop">Search (🔍)</span>
+            <span class="btn-text-desktop">Search</span>
+            <kbd class="kbd-header">Ctrl+K</kbd>
+          </button>
+
+          <!-- Audio Sound Effects Toggle (Feature 6) -->
+          <button id="btnToggleSound" class="icon-btn" title="Sound Effects (🔊 Click to Mute/Unmute)" aria-label="Toggle Sound Effects">
+            <span id="soundToggleIcon" style="font-size: 15px; line-height: 1;">🔊</span>
           </button>
           
           <button id="btnDownloadExcel" class="icon-btn btn-excel header-desktop-only" title="Download Excel (.xlsx)" aria-label="Download Excel">
@@ -203,6 +209,12 @@
             </svg>
             <span class="btn-text-desktop">Recycle Bin</span>
             <span id="recycleBinBadge" class="badge-trash-count" style="display:none;">0</span>
+          </button>
+
+          <!-- Theme Switcher Button -->
+          <button id="btnOpenThemePicker" class="icon-btn btn-theme-toggle" title="Switch Theme / Appearance (🎨)" aria-label="Switch Theme">
+            <span style="font-size: 15px; line-height: 1;">🎨</span>
+            <span class="btn-text-desktop" id="headerThemeLabel">Theme</span>
           </button>
 
           <!-- Current User Role Badge -->
@@ -252,6 +264,36 @@
         <div class="drawer-user-info">
           <div class="drawer-user-name" id="drawerUserName">Admin (Boss)</div>
           <div class="drawer-user-status"><span class="sync-dot success"></span> <span id="drawerUserRole">Boss Admin</span></div>
+        </div>
+      </div>
+
+      <!-- Theme Switcher in Side Drawer -->
+      <div class="drawer-theme-box">
+        <div class="drawer-theme-head">
+          <span class="drawer-theme-title">🎨 Theme &amp; Accent</span>
+          <span class="drawer-theme-active-tag" id="drawerThemeActiveTag">Gold</span>
+        </div>
+        <div class="theme-palette-grid">
+          <button type="button" class="theme-select-btn active" data-theme-val="gold" title="Midnight Luxe Gold">
+            <span class="theme-swatch" style="background: linear-gradient(135deg, #f59e0b, #b45309);"></span>
+            <span>Gold</span>
+          </button>
+          <button type="button" class="theme-select-btn" data-theme-val="sapphire" title="Deep Sapphire Blue">
+            <span class="theme-swatch" style="background: linear-gradient(135deg, #38bdf8, #0369a1);"></span>
+            <span>Sapphire</span>
+          </button>
+          <button type="button" class="theme-select-btn" data-theme-val="emerald" title="Emerald Matrix">
+            <span class="theme-swatch" style="background: linear-gradient(135deg, #10b981, #047857);"></span>
+            <span>Emerald</span>
+          </button>
+          <button type="button" class="theme-select-btn" data-theme-val="amethyst" title="Amethyst Velvet">
+            <span class="theme-swatch" style="background: linear-gradient(135deg, #a855f7, #6b21a8);"></span>
+            <span>Amethyst</span>
+          </button>
+          <button type="button" class="theme-select-btn" data-theme-val="oled" title="Pitch OLED Black">
+            <span class="theme-swatch" style="background: linear-gradient(135deg, #ffffff, #64748b); border: 1px solid rgba(255,255,255,0.4);"></span>
+            <span>OLED</span>
+          </button>
         </div>
       </div>
 
@@ -401,7 +443,10 @@
             </div>
           </div>
           <div class="stat-value"><span class="currency">Rs.</span> <span id="kpiRevenue">0</span></div>
-          <div class="stat-meta"><span id="kpiSalesCount">0</span> sales completed</div>
+          <div class="stat-meta flex justify-between items-center">
+            <span><strong id="kpiSalesCount">0</strong> sales completed</span>
+            <span id="kpiAvgTicket" class="kpi-micro-badge">Avg: Rs. 0</span>
+          </div>
         </div>
 
         <!-- Expense Card -->
@@ -431,19 +476,31 @@
         <!-- Profit Card (Boss Only) -->
         <div class="stat-card stat-profit" id="kpiProfitCard">
           <div class="stat-header">
-            <span class="stat-label">Net Profit</span>
+            <div class="stat-header-title-wrap">
+              <span class="stat-label">Net Profit</span>
+              <span id="kpiMarginBadge" class="kpi-margin-pill">0% Margin</span>
+            </div>
             <div class="stat-icon-wrap icon-gold">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
             </div>
           </div>
           <div class="stat-value"><span class="currency">Rs.</span> <span id="kpiProfit">0</span></div>
-          <div class="stat-meta">Revenue − Expense</div>
+          <div class="stat-meta flex justify-between items-center">
+            <span>Revenue − Expense</span>
+            <span id="kpiProfitRatioText" class="kpi-micro-ratio">Healthy</span>
+          </div>
+          <div class="kpi-margin-bar-container">
+            <div id="kpiMarginProgressBar" class="kpi-margin-bar" style="width: 0%;"></div>
+          </div>
         </div>
 
         <!-- Pending Wasooli Card -->
         <div class="stat-card stat-pending clickable" id="kpiPendingCard" title="Click to view pending payments">
           <div class="stat-header">
-            <span class="stat-label">Pending Payments</span>
+            <div class="stat-header-title-wrap">
+              <span class="stat-label">Pending Payments</span>
+              <span id="kpiPendingRatioBadge" class="kpi-pending-pill">0% of Rev</span>
+            </div>
             <div class="stat-icon-wrap icon-amber">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
             </div>
@@ -453,7 +510,7 @@
         </div>
       </section>
 
-      <!-- Navigation Tabs (Sales, Expenses, Pending, Reminders, Admin) -->
+      <!-- Navigation Tabs (Sales, Expenses, Pending, Stock/Slots, Reminders, Admin) -->
       <nav class="content-nav-bar">
         <button class="nav-tab active" data-view="salesView">
           📋 Sales (<span id="navSalesCount">0</span>)
@@ -464,8 +521,11 @@
         <button class="nav-tab" data-view="pendingView">
           ⏳ Pending (<span id="navPendingCount">0</span>)
         </button>
+        <button class="nav-tab" data-view="stockView">
+          📦 Stock &amp; Slots (<span id="navStockCount">0</span>)
+        </button>
         <button class="nav-tab" data-view="remindersView">
-          ⏰ WhatsApp Reminders
+          ⏰ Reminders (<span id="remindersCountBadge">0</span>)
         </button>
         <button class="nav-tab" data-view="adminView">
           ⚙️ Admin Panel
@@ -495,6 +555,16 @@
               <option value="Active">🟢 Active Plans</option>
             </select>
           </div>
+        </div>
+
+        <!-- 1-Tap Instant Quick Filter Chips (Feature 5) -->
+        <div class="quick-filter-chips-bar" id="quickFilterChipsBar">
+          <button type="button" class="filter-chip active" data-qfilter="ALL">✨ All Sales</button>
+          <button type="button" class="filter-chip" data-qfilter="TODAY">🔥 Today</button>
+          <button type="button" class="filter-chip" data-qfilter="EXPIRING_3D">⏰ Expiring Soon (3d)</button>
+          <button type="button" class="filter-chip" data-qfilter="PENDING">⏳ Pending Wasooli</button>
+          <button type="button" class="filter-chip" data-qfilter="PRIVATE">👑 Private Plans</button>
+          <button type="button" class="filter-chip" data-qfilter="SHARED">👥 Shared Plans</button>
         </div>
 
         <div id="salesListContainer" class="cards-list">
@@ -581,6 +651,23 @@
           <div id="expiryRemindersList" class="reminders-list">
             <!-- Dynamic expiry WhatsApp cards -->
           </div>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 4: STOCK & ACCOUNT SLOTS TRACKER ==================== -->
+      <section id="stockView" class="view-panel">
+        <div class="view-header">
+          <div>
+            <h2 class="view-title">Stock &amp; Account Slots Manager</h2>
+            <p class="view-subtitle">Live screen/slot capacity tracker for shared &amp; private tool accounts</p>
+          </div>
+          <div class="view-filters">
+            <button type="button" class="btn btn-sm btn-gold" onclick="openSaleModal()">+ Assign New Sale</button>
+          </div>
+        </div>
+
+        <div id="stockListContainer" class="stock-cards-grid">
+          <!-- Dynamic Accounts & Slots Cards -->
         </div>
       </section>
 
@@ -723,6 +810,75 @@
               </div>
               <div id="settingsFeedbackMsg" class="pin-feedback-msg" style="margin-top: 4px;"></div>
             </form>
+          </div>
+
+          <!-- Theme & Appearance Customizer (Admin Settings) -->
+          <div class="admin-card" id="adminThemeCard">
+            <div class="admin-card-header">
+              <div class="admin-card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"></path></svg>
+                <span>Theme &amp; Visual Appearance</span>
+              </div>
+              <span class="badge-gold font-mono" id="adminThemeCurrentPill">👑 Luxe Gold</span>
+            </div>
+            <p class="admin-card-desc">Choose your preferred visual theme. All dashboard colors, cards, and glowing accents update instantly with zero lag.</p>
+
+            <div class="theme-cards-gallery">
+              <div class="theme-card-option active" data-theme-card="gold" onclick="setAppTheme('gold')">
+                <div class="theme-card-preview theme-preview-gold">
+                  <div class="theme-preview-dots"><span></span><span></span></div>
+                  <div class="theme-preview-bar"></div>
+                </div>
+                <div class="theme-card-meta">
+                  <strong>👑 Midnight Luxe Gold</strong>
+                  <span>Obsidian Black &amp; Amber Gold (Executive Luxe)</span>
+                </div>
+              </div>
+
+              <div class="theme-card-option" data-theme-card="sapphire" onclick="setAppTheme('sapphire')">
+                <div class="theme-card-preview theme-preview-sapphire">
+                  <div class="theme-preview-dots"><span></span><span></span></div>
+                  <div class="theme-preview-bar"></div>
+                </div>
+                <div class="theme-card-meta">
+                  <strong>🌌 Deep Sapphire</strong>
+                  <span>Midnight Blue &amp; Electric Sky Cyan (SaaS Pro)</span>
+                </div>
+              </div>
+
+              <div class="theme-card-option" data-theme-card="emerald" onclick="setAppTheme('emerald')">
+                <div class="theme-card-preview theme-preview-emerald">
+                  <div class="theme-preview-dots"><span></span><span></span></div>
+                  <div class="theme-preview-bar"></div>
+                </div>
+                <div class="theme-card-meta">
+                  <strong>🌿 Emerald Matrix</strong>
+                  <span>Deep Forest &amp; Neon Money Green (High-Profit Vibe)</span>
+                </div>
+              </div>
+
+              <div class="theme-card-option" data-theme-card="amethyst" onclick="setAppTheme('amethyst')">
+                <div class="theme-card-preview theme-preview-amethyst">
+                  <div class="theme-preview-dots"><span></span><span></span></div>
+                  <div class="theme-preview-bar"></div>
+                </div>
+                <div class="theme-card-meta">
+                  <strong>💜 Amethyst Velvet</strong>
+                  <span>Night Violet &amp; Neon Lilac (Cyber Luxury)</span>
+                </div>
+              </div>
+
+              <div class="theme-card-option" data-theme-card="oled" onclick="setAppTheme('oled')">
+                <div class="theme-card-preview theme-preview-oled">
+                  <div class="theme-preview-dots"><span></span><span></span></div>
+                  <div class="theme-preview-bar"></div>
+                </div>
+                <div class="theme-card-meta">
+                  <strong>🖤 Pitch OLED Black</strong>
+                  <span>Pure 0% Black &amp; Crisp Titanium White (Battery Saver)</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- 4. WhatsApp Message Templates (Alag Alag Sections) -->
@@ -1197,6 +1353,66 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL: THEME & APPEARANCE PICKER ==================== -->
+  <div id="themeModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🎨 Switch Theme &amp; Style</h3>
+        <button class="modal-close-btn" data-close-modal="themeModal">&times;</button>
+      </div>
+      <div class="modal-form" style="padding-top: 6px;">
+        <p class="text-muted" style="font-size: 13px; margin-bottom: 14px;">Select your favorite color scheme. Instant preview without page refresh:</p>
+        
+        <div class="theme-modal-options">
+          <button type="button" class="theme-modal-row active" data-theme-val="gold" onclick="setAppTheme('gold'); closeModal('themeModal');">
+            <span class="theme-color-disc" style="background: linear-gradient(135deg, #f59e0b, #b45309);"></span>
+            <div class="theme-modal-text">
+              <span class="theme-modal-name">👑 Midnight Luxe Gold</span>
+              <span class="theme-modal-sub">Warm Obsidian Black &amp; Amber Gold</span>
+            </div>
+            <span class="theme-modal-check">✓</span>
+          </button>
+
+          <button type="button" class="theme-modal-row" data-theme-val="sapphire" onclick="setAppTheme('sapphire'); closeModal('themeModal');">
+            <span class="theme-color-disc" style="background: linear-gradient(135deg, #38bdf8, #0369a1);"></span>
+            <div class="theme-modal-text">
+              <span class="theme-modal-name">🌌 Deep Sapphire</span>
+              <span class="theme-modal-sub">Cyber Navy &amp; Electric Sky Cyan</span>
+            </div>
+            <span class="theme-modal-check">✓</span>
+          </button>
+
+          <button type="button" class="theme-modal-row" data-theme-val="emerald" onclick="setAppTheme('emerald'); closeModal('themeModal');">
+            <span class="theme-color-disc" style="background: linear-gradient(135deg, #10b981, #047857);"></span>
+            <div class="theme-modal-text">
+              <span class="theme-modal-name">🌿 Emerald Matrix</span>
+              <span class="theme-modal-sub">Deep Forest &amp; Neon Profit Green</span>
+            </div>
+            <span class="theme-modal-check">✓</span>
+          </button>
+
+          <button type="button" class="theme-modal-row" data-theme-val="amethyst" onclick="setAppTheme('amethyst'); closeModal('themeModal');">
+            <span class="theme-color-disc" style="background: linear-gradient(135deg, #a855f7, #6b21a8);"></span>
+            <div class="theme-modal-text">
+              <span class="theme-modal-name">💜 Amethyst Velvet</span>
+              <span class="theme-modal-sub">Midnight Violet &amp; Neon Lilac</span>
+            </div>
+            <span class="theme-modal-check">✓</span>
+          </button>
+
+          <button type="button" class="theme-modal-row" data-theme-val="oled" onclick="setAppTheme('oled'); closeModal('themeModal');">
+            <span class="theme-color-disc" style="background: linear-gradient(135deg, #ffffff, #64748b); border: 1px solid rgba(255,255,255,0.3);"></span>
+            <div class="theme-modal-text">
+              <span class="theme-modal-name">🖤 Pitch OLED Black</span>
+              <span class="theme-modal-sub">True 0% Pure Black &amp; Crisp White</span>
+            </div>
+            <span class="theme-modal-check">✓</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- WhatsApp Message Picker Modal -->
   <div id="whatsappModal" class="modal-overlay">
     <div class="modal-card">
@@ -1450,9 +1666,105 @@
     </div>
   </div>
 
+  <!-- ==================== FEATURE 1: COMMAND PALETTE & GLOBAL SEARCH ==================== -->
+  <div id="commandPaletteModal" class="palette-backdrop" style="display:none;">
+    <div class="palette-box">
+      <div class="palette-header">
+        <svg class="palette-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="paletteSearchInput" class="palette-input" placeholder="Search phone, customer, login email, or tool... (Press Esc to close)" autocomplete="off">
+        <button type="button" class="btn-palette-clear" id="btnPaletteClear" style="display:none;">&times;</button>
+        <kbd class="palette-esc-kbd">ESC</kbd>
+      </div>
+
+      <div class="palette-filter-row">
+        <button type="button" class="palette-filter-pill active" data-pfilter="ALL">All Records</button>
+        <button type="button" class="palette-filter-pill" data-pfilter="PAID">Paid Only</button>
+        <button type="button" class="palette-filter-pill" data-pfilter="PENDING">Pending Wasooli</button>
+        <button type="button" class="palette-filter-pill" data-pfilter="EXPIRED">Expired</button>
+      </div>
+
+      <div class="palette-results-list" id="paletteResultsContainer">
+        <!-- Results or recent searches dynamically rendered here -->
+      </div>
+
+      <div class="palette-footer">
+        <div class="palette-shortcuts-hint">
+          <span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span>
+          <span><kbd>Enter</kbd> Open CRM</span>
+          <span><kbd>Esc</kbd> Close</span>
+        </div>
+        <span id="paletteResultCountText" class="palette-count-text">0 results found</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== FEATURE 2: CUSTOMER CRM SLIDE-OVER DRAWER ==================== -->
+  <div id="customerCrmBackdrop" class="drawer-backdrop" style="display:none;"></div>
+  <aside id="customerCrmDrawer" class="crm-drawer" aria-hidden="true">
+    <div class="crm-drawer-header">
+      <div class="crm-profile-main">
+        <div class="crm-avatar" id="crmCustomerAvatar">👤</div>
+        <div class="crm-profile-details">
+          <div class="flex items-center gap-2">
+            <h3 class="crm-customer-name" id="crmCustomerName">Customer Profile</h3>
+            <span class="crm-badge" id="crmCustomerBadge">👑 VIP</span>
+          </div>
+          <div class="crm-customer-phone" id="crmCustomerPhone">+92 300 0000000</div>
+        </div>
+      </div>
+      <button type="button" id="btnCloseCrmDrawer" class="btn-close-drawer" aria-label="Close Profile">&times;</button>
+    </div>
+
+    <div class="crm-drawer-body">
+      <!-- CRM Quick Actions -->
+      <div class="crm-quick-actions">
+        <button type="button" class="crm-action-btn crm-btn-wa" id="crmBtnWhatsApp">
+          <span>💬 WhatsApp</span>
+        </button>
+        <a id="crmBtnCall" class="crm-action-btn crm-btn-call" href="#">
+          <span>📞 Direct Call</span>
+        </a>
+        <button type="button" class="crm-action-btn crm-btn-new" id="crmBtnNewOrder">
+          <span>➕ New Sale</span>
+        </button>
+      </div>
+
+      <!-- Lifetime Stats Cards -->
+      <div class="crm-stats-grid">
+        <div class="crm-stat-box">
+          <span class="crm-stat-label">Lifetime Spend</span>
+          <span class="crm-stat-val text-gold" id="crmTotalSpend">Rs. 0</span>
+        </div>
+        <div class="crm-stat-box">
+          <span class="crm-stat-label">Total Orders</span>
+          <span class="crm-stat-val font-mono" id="crmTotalOrders">0</span>
+        </div>
+        <div class="crm-stat-box">
+          <span class="crm-stat-label">Active Plans</span>
+          <span class="crm-stat-val text-emerald font-mono" id="crmActiveCount">0</span>
+        </div>
+        <div class="crm-stat-box">
+          <span class="crm-stat-label">Pending Due</span>
+          <span class="crm-stat-val text-amber font-mono" id="crmPendingDue">Rs. 0</span>
+        </div>
+      </div>
+
+      <!-- Purchase History List -->
+      <div class="crm-history-section">
+        <div class="crm-section-head">
+          <h4 class="crm-section-title">Purchase History &amp; Subscriptions</h4>
+          <span class="crm-history-count" id="crmHistoryCount">0 items</span>
+        </div>
+        <div class="crm-history-list" id="crmHistoryListContainer">
+          <!-- Injected sale items for this customer -->
+        </div>
+      </div>
+    </div>
+  </aside>
+
   <!-- Notification Toast -->
   <div id="toastNotification" class="toast"></div>
 
-  <script src="app.js?v=5.1"></script>
+  <script src="app.js?v=5.2"></script>
 </body>
 </html>
