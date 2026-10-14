@@ -1406,28 +1406,45 @@ body::before {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
 }
 .btn-action-icon {
   background: transparent;
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
   border-radius: 6px;
-  width: 30px;
-  height: 30px;
-  display: flex;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s;
+  flex-shrink: 0;
 }
 .btn-action-icon:hover {
   background: var(--bg-surface);
   color: var(--text-primary);
   border-color: var(--gold-border);
 }
+.btn-action-icon.btn-action-delete,
+.btn-action-delete {
+  background: rgba(239, 68, 68, 0.12) !important;
+  border: 1px solid rgba(239, 68, 68, 0.4) !important;
+  color: #f87171 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0 !important;
+  font-size: 14px;
+}
+.btn-action-icon.btn-action-delete:hover,
 .btn-action-delete:hover {
-  border-color: var(--danger-border);
-  color: var(--danger-red);
+  background: rgba(239, 68, 68, 0.25) !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+  transform: scale(1.08);
 }
 
 /* ==================== EXPENSE CARDS ==================== */
@@ -2395,6 +2412,29 @@ body::before {
   }
   .modal-actions {
     gap: 8px;
+  }
+
+  /* Item Cards Action Bar Mobile Optimization (Guarantees Bin Icon is always 100% visible) */
+  .item-actions-bar {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  .item-actions-bar .badges-group {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+  .item-actions-bar .item-btn-group {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+    width: 100% !important;
+    flex-wrap: wrap !important;
   }
 }
 

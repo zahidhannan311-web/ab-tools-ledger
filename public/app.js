@@ -1228,38 +1228,9 @@ function mergeRecycleBinRecords(localBin = [], incomingBin = [], purgedIds = [],
 // Helper: Check if a deleted entry is visible to the currently logged in user
 function isTrashItemVisibleToCurrentUser(entry) {
   if (!entry) return false;
-  // Admin/Boss sees ALL deleted items across the entire company
-  if (!STATE.currentUser || STATE.currentUser.role === 'admin') {
-    return true;
-  }
-
-  // Employee only sees items created by them or deleted by them
-  const cUser = STATE.currentUser;
-  const cName = (cUser.name || '').trim().toLowerCase();
-  const cId = cUser.id;
-  const item = entry.item || {};
-
-  // Check who deleted it
-  const delBy = (entry.deletedBy || item.deletedBy || '').trim().toLowerCase();
-  if (delBy && delBy === cName) return true;
-  if (entry.deleterId && entry.deleterId === cId) return true;
-  if (item.deleterId && item.deleterId === cId) return true;
-
-  // Check sales ownership
-  if (entry.type === 'sale') {
-    const soldBy = (item.soldBy || '').trim().toLowerCase();
-    if (soldBy && soldBy === cName) return true;
-    if (item.employeeId && item.employeeId === cId) return true;
-  }
-
-  // Check expense ownership
-  if (entry.type === 'expense') {
-    const assignedName = (item.assignedToName || '').trim().toLowerCase();
-    if (assignedName && assignedName === cName) return true;
-    if (item.assignedTo && item.assignedTo === cId) return true;
-  }
-
-  return false;
+  // Both Admin and Employee can view deleted records so they can Restore them
+  // Permanent purge remains strictly restricted to Admin (Boss)
+  return true;
 }
 
 function getEmployeeName(empId) {
@@ -2644,7 +2615,10 @@ function openCustomerCrm(customerPhone, customerName) {
           ` : ''}
           <div class="flex justify-between items-center mt-1 pt-1 border-t border-white/5">
             <span class="status-badge ${s.paymentStatus === 'Paid' ? 'status-paid' : 'status-pending'} text-xs">${s.paymentStatus}</span>
-            <button class="btn btn-xs btn-outline" onclick="openEditSale('${s.id}')">✏️ Edit</button>
+            <div style="display:flex;gap:5px;">
+              <button class="btn btn-xs btn-outline" onclick="openEditSale('${s.id}')">✏️ Edit</button>
+              <button class="btn btn-xs btn-outline btn-action-delete" title="Move to Recycle Bin" onclick="openDeleteSaleReasonModal('${s.id}')">🗑️</button>
+            </div>
           </div>
         </div>
       `;
@@ -4078,13 +4052,8 @@ function openViewPaymentProof(id) {
   openModal('viewPaymentProofModal');
 }
 
-// Delete Sale with Mandatory Reason (Admin Only)
+// Delete Sale with Mandatory Reason (Moves to Recycle Bin)
 function openDeleteSaleReasonModal(id) {
-  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
-  if (isEmployee) {
-    showToast('🚫 Access Denied: Only Admin (Boss) can delete sales records! Anti-fraud security active.', { duration: 6000 });
-    return;
-  }
   const sale = (STATE.data.sales || []).find(s => s.id === id);
   if (!sale) return;
 
@@ -4100,12 +4069,6 @@ function openDeleteSaleReasonModal(id) {
 
 async function handleConfirmDeleteSale(e) {
   e.preventDefault();
-  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
-  if (isEmployee) {
-    closeModal('deleteSaleReasonModal');
-    showToast('🚫 Access Denied: Only Admin (Boss) can delete sales records! Anti-fraud security active.', { duration: 6000 });
-    return;
-  }
   const id = document.getElementById('deleteSaleTargetId').value;
   const reason = document.getElementById('deleteSaleReasonInput').value.trim();
   if (!reason) {
@@ -4495,12 +4458,7 @@ async function handleExpenseSubmit(e) {
 }
 
 async function deleteExpense(id) {
-  const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
-  if (isEmployee) {
-    showToast('🚫 Access Denied: Only Admin (Boss) can delete expense records! Anti-fraud security active.', { duration: 6000 });
-    return;
-  }
-  if (!confirm('Are you sure you want to delete this expense record?')) return;
+  if (!confirm('Are you sure you want to move this expense to the Recycle Bin?')) return;
   const expense = (STATE.data.expenses || []).find(e => e.id === id);
   if (!expense) return;
 
@@ -4576,6 +4534,12 @@ function updateRecycleBinBadge() {
   if (drawerBadge) {
     drawerBadge.textContent = count;
     drawerBadge.style.display = count > 0 ? 'inline-block' : 'none';
+  }
+
+  const quickBadge = document.getElementById('quickTrashBadge');
+  if (quickBadge) {
+    quickBadge.textContent = count;
+    quickBadge.style.display = count > 0 ? 'inline-block' : 'none';
   }
 
   const salesCount = bin.filter(t => t.type === 'sale').length;
@@ -4884,6 +4848,12 @@ function emptyRecycleBin() {
   showToast('Recycle Bin emptied by Admin! 🗑️');
 }
 
+function openRecycleBinModal() {
+  openModal('recycleBinModal');
+  renderRecycleBin('all');
+}
+
+window.openRecycleBinModal = openRecycleBinModal;
 window.restoreFromRecycleBin = restoreFromRecycleBin;
 window.permanentlyDeleteFromTrash = permanentlyDeleteFromTrash;
 window.emptyRecycleBin = emptyRecycleBin;

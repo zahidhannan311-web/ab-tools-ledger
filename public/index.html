@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=6.2">
+  <link rel="stylesheet" href="style.css?v=6.5">
 </head>
 <body>
 
@@ -401,6 +401,10 @@
         <button id="btnOpenRemindersView" class="btn btn-reminder-pill btn-sm">
           <span>⏰ Reminders</span>
           <span id="remindersCountBadge" class="badge-count">0</span>
+        </button>
+        <button id="btnQuickRecycleBin" class="btn btn-subtle btn-sm" onclick="openRecycleBinModal()" title="Recycle Bin (Deleted Records &amp; Restore)">
+          <span>🗑️ Bin</span>
+          <span id="quickTrashBadge" class="badge-count" style="display:none;background:#f59e0b;color:#000;">0</span>
         </button>
         <div class="live-date-pill" id="liveDatePill" title="Today's Live Date">
           <span class="live-pulse"></span>
@@ -1782,6 +1786,6 @@
   <!-- Notification Toast -->
   <div id="toastNotification" class="toast"></div>
 
-  <script src="app.js?v=5.4"></script>
+  <script src="app.js?v=5.6"></script>
 </body>
 </html>

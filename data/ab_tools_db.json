@@ -1,6 +1,31 @@
 {
   "sales": [
     {
+      "id": "sale_1792010316668",
+      "date": "2026-10-15",
+      "customerPhone": "57575",
+      "customerName": "",
+      "product": "Surfshark",
+      "accountType": "Shared",
+      "accountLogin": "abd156@kuromee.com",
+      "planMonths": 1,
+      "planLabel": "1 Month (30 Days)",
+      "amount": 250,
+      "paymentStatus": "Pending",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "M.Ali",
+      "employeeId": "emp_1791761609185_p5ry",
+      "notes": "",
+      "updatedAt": "2026-10-14T20:38:36.659Z",
+      "expiryDate": "2026-11-13",
+      "createdAt": "2026-10-14T20:38:36.669Z",
+      "deleteReason": "Testing employee delete and restore",
+      "deletedBy": "M.Ali",
+      "deleterRole": "employee",
+      "deleterId": "emp_1791761609185_p5ry"
+    },
+    {
       "id": "sale_1792003989824",
       "date": "2026-10-14",
       "customerPhone": "3161718323",
@@ -4725,7 +4750,7 @@
   "settings": {
     "businessName": "Monkey Tools",
     "currency": "Rs.",
-    "lastModified": 1792010024100,
+    "lastModified": 1792011993884,
     "deletedSaleIds": [
       "sale_1790808573942_ktuq",
       "sale_1790891345201_z6tu",
@@ -4763,7 +4788,9 @@
     "templatePaid": "Dear {customer}, we have received your payment of {currency} {amount} for {product} ({plan}). Thank you for trusting {business}!",
     "kvUrl": "https://desired-elephant-221971.upstash.io",
     "kvToken": "gQAAAAAAA2MTAAIgcDFkZTgzY2JmODU0YWE0YjI3OGFiODkyZjMyNzUxMzcyMw",
-    "restoredSaleIds": [],
+    "restoredSaleIds": [
+      "sale_1792010316668"
+    ],
     "restoredExpenseIds": [],
     "purgedTrashIds": [
       "trash_1791891747705_bmla",
