@@ -2201,12 +2201,41 @@ body::before {
 @media (max-width: 768px) {
   .header-desktop-only,
   .kbd-header,
-  .btn-text-desktop {
+  .btn-text-desktop,
+  .palette-esc-kbd,
+  .palette-shortcuts-hint {
     display: none !important;
+  }
+  .palette-footer {
+    justify-content: center !important;
+  }
+  .palette-close-btn {
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
   }
 }
 
 @media (max-width: 600px) {
+  .palette-backdrop {
+    padding: 18px 10px 14px;
+  }
+  .palette-header {
+    padding: 10px 12px;
+  }
+  .palette-input {
+    font-size: 14px;
+  }
+  .palette-filter-row {
+    overflow-x: auto;
+    padding: 6px 10px;
+    scrollbar-width: none;
+  }
+  .palette-filter-pill {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
   /* ===== Header Mobile Bulletproof Layout ===== */
   .header-content {
     padding: 8px 10px;
@@ -4151,15 +4180,52 @@ body::before {
 .btn-palette-clear:hover {
   color: #fff;
 }
+.palette-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
 .palette-esc-kbd {
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
-  padding: 2px 5px;
+  padding: 3px 6px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+.palette-esc-kbd:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.palette-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.18s ease;
+}
+.palette-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #ff6b6b;
+  transform: scale(1.05);
+}
+.palette-close-btn:active {
+  transform: scale(0.95);
 }
 .palette-filter-row {
   display: flex;

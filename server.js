@@ -88,6 +88,42 @@ async function syncFromCloudKV() {
             parsed.expenses = parsed.expenses.filter(e => e && e.id && !delExpenses.has(e.id));
           }
           parsed.recycleBin = parsed.recycleBin || [];
+
+          // Intelligent timestamp-aware merge with memoryDb: NEVER let stale KV reads revert newer product prices!
+          if (memoryDb) {
+            const memModified = Number(memoryDb.settings?.lastModified) || 0;
+            const parsedModified = Number(parsed.settings?.lastModified) || 0;
+
+            const prodMap = new Map();
+            (parsed.products || []).forEach(p => {
+              if (p && p.name) {
+                const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
+                prodMap.set(key, p);
+              }
+            });
+
+            (memoryDb.products || []).forEach(p => {
+              if (p && p.name) {
+                const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
+                if (!prodMap.has(key)) {
+                  prodMap.set(key, p);
+                } else {
+                  const cloudP = prodMap.get(key);
+                  const memTime = new Date(p.updatedAt || 0).getTime();
+                  const cloudTime = new Date(cloudP.updatedAt || 0).getTime();
+                  if (memTime >= cloudTime) {
+                    prodMap.set(key, p);
+                  }
+                }
+              }
+            });
+
+            parsed.products = Array.from(prodMap.values());
+            if (memModified > parsedModified) {
+              parsed.settings.lastModified = memModified;
+            }
+          }
+
           memoryDb = parsed;
           return true;
         }
@@ -133,11 +169,13 @@ app.use(async (req, res, next) => {
 });
 
 // Default initial catalog as specified in specification
+// Default initial catalog as specified in specification
 const DEFAULT_PRODUCTS = [
   {
     id: 'prod_surfshark_shared',
     name: 'Surfshark',
     type: 'Shared',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     plans: [
       { months: 1, label: '1 Month (30 Days)', price: 250 },
       { months: 2, label: '2 Months (60 Days)', price: 400 },
@@ -150,6 +188,7 @@ const DEFAULT_PRODUCTS = [
     id: 'prod_surfshark_private',
     name: 'Surfshark',
     type: 'Private',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     plans: [
       { months: 2, label: '2 Months (60 Days)', price: 2200 },
       { months: 12, label: '1 Year (360 Days)', price: 9499 }
@@ -159,6 +198,7 @@ const DEFAULT_PRODUCTS = [
     id: 'prod_nord_shared',
     name: 'Nord',
     type: 'Shared',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     plans: [
       { months: 3, label: '3 Months (90 Days)', price: 500 },
       { months: 6, label: '6 Months (180 Days)', price: 900 },
@@ -170,23 +210,44 @@ const DEFAULT_PRODUCTS = [
     id: 'prod_nord_private',
     name: 'Nord',
     type: 'Private',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     plans: [
       { months: 3, label: '3 Months (90 Days)', price: 1800 },
       { months: 12, label: '12 Months (360 Days)', price: 6500 }
     ]
   },
   {
+    id: 'prod_gemini_pro_private',
+    name: 'Gemini Pro',
+    type: 'Private',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    plans: [
+      { months: 18, label: '18 Months (540 Days)', price: 350 }
+    ]
+  },
+  {
     id: 'prod_gemini_pro',
     name: 'Gemini Pro',
     type: 'Shared',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     plans: [
       { months: 18, label: '18 Months (540 Days)', price: 750 }
+    ]
+  },
+  {
+    id: 'prod_capcut_private',
+    name: 'CapCut',
+    type: 'Private',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    plans: [
+      { months: 1, label: '1 Month (25 Days)', price: 650 }
     ]
   },
   {
     id: 'prod_capcut',
     name: 'CapCut',
     type: 'Shared',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     plans: [
       { months: 1, label: '1 Month (30 Days)', price: 450 }
     ]
@@ -195,6 +256,7 @@ const DEFAULT_PRODUCTS = [
     id: 'prod_chatgpt',
     name: 'ChatGPT',
     type: 'Shared',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     plans: [
       { months: 1, label: '1 Month (30 Days)', price: 800 }
     ]
@@ -202,9 +264,28 @@ const DEFAULT_PRODUCTS = [
   {
     id: 'prod_muse_ai',
     name: 'Muse AI',
-    type: 'Shared',
+    type: 'Private',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     plans: [
-      { months: 1, label: '1 Month (30 Days)', price: 500 }
+      { months: 1, label: '1 Month(s)', price: 1000 }
+    ]
+  },
+  {
+    id: 'prod_hma_vpn_private',
+    name: 'HMA Vpn',
+    type: 'Private',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    plans: [
+      { months: 1, label: '1 Month (30 Days)', price: 1200 }
+    ]
+  },
+  {
+    id: 'prod_proton_vpn_private',
+    name: 'Proton Vpn',
+    type: 'Private',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    plans: [
+      { months: 1, label: '1 Month (30 Days)', price: 1200 }
     ]
   }
 ];
@@ -1088,7 +1169,7 @@ app.delete('/api/recycle-bin', async (req, res) => {
 
 // Add or Update Full Product (In-place edit, prevents duplicate creation)
 const handleSaveProduct = async (req, res) => {
-  const { id: bodyId, editId, name, type, plans } = req.body || {};
+  const { id: bodyId, editId, name, type, plans, updatedAt } = req.body || {};
   const targetId = req.params?.id || editId || bodyId;
 
   if (!name || !String(name).trim()) {
@@ -1102,6 +1183,8 @@ const handleSaveProduct = async (req, res) => {
     label: String(pl.label || `${pl.months || 1} Month(s)`).trim(),
     price: Number(pl.price) || 0
   })) : [];
+
+  const nowIso = updatedAt || new Date().toISOString();
 
   const db = readDb();
   db.products = db.products || [];
@@ -1126,18 +1209,19 @@ const handleSaveProduct = async (req, res) => {
     id: finalId,
     name: cleanName,
     type: cleanType,
-    plans: cleanPlans
+    plans: cleanPlans,
+    updatedAt: nowIso
   };
 
   if (existingIndex >= 0) {
-    // In-place update existing product (does NOT append to bottom or create duplicate)
+    // In-place update existing product
     db.products[existingIndex] = productObj;
   } else {
     // Add new product
     db.products.push(productObj);
   }
 
-  // Deduplicate products by (name + type) to ensure no existing duplicates remain
+  // Deduplicate products by (name + type) keeping the newest update
   const seenMap = new Map();
   const dedupedProducts = [];
   for (const prod of db.products) {
@@ -1145,7 +1229,10 @@ const handleSaveProduct = async (req, res) => {
     const key = `${prod.name.trim().toLowerCase()}__${(prod.type || 'Shared').trim().toLowerCase()}`;
     if (seenMap.has(key)) {
       const prevIdx = seenMap.get(key);
-      if (prod.id === finalId) {
+      const prevProd = dedupedProducts[prevIdx];
+      const prevTime = new Date(prevProd?.updatedAt || 0).getTime();
+      const currTime = new Date(prod.updatedAt || 0).getTime();
+      if (prod.id === finalId || currTime >= prevTime) {
         dedupedProducts[prevIdx] = prod;
       }
     } else {
@@ -1292,14 +1379,14 @@ app.post('/api/sync', async (req, res) => {
       db.expenses = mergeRecordLists(db.expenses, incomingExpenses, deletedExpenses);
     }
 
-    // Product deletions tracking
+    // Product deletions tracking (Admin only)
     const deletedProducts = new Set([
       ...(db.settings?.deletedProductIds || []),
       ...(!isEmployee ? (incomingSettings?.deletedProductIds || []) : [])
     ]);
 
-    if (Array.isArray(incomingProducts) && incomingProducts.length > 0) {
-      // Non-destructive product merge with deduplication by name + type
+    // Product updates: Strictly Admin-managed with timestamp conflict resolution
+    if (!isEmployee && Array.isArray(incomingProducts) && incomingProducts.length > 0) {
       const prodMap = new Map();
       (db.products || DEFAULT_PRODUCTS).forEach(p => {
         if (p && p.id && !deletedProducts.has(p.id)) {
@@ -1310,7 +1397,16 @@ app.post('/api/sync', async (req, res) => {
       incomingProducts.forEach(p => {
         if (p && p.id && !deletedProducts.has(p.id)) {
           const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
-          prodMap.set(key, p);
+          if (!prodMap.has(key)) {
+            prodMap.set(key, p);
+          } else {
+            const existing = prodMap.get(key);
+            const inTime = new Date(p.updatedAt || 0).getTime();
+            const exTime = new Date(existing.updatedAt || 0).getTime();
+            if (inTime >= exTime) {
+              prodMap.set(key, p);
+            }
+          }
         }
       });
       db.products = Array.from(prodMap.values());

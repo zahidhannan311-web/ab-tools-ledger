@@ -933,8 +933,7 @@ async function performServerSync() {
 
         // Robust deep comparison: detect ANY addition, deletion, or status update (e.g. Paid)
         const salesChanged = JSON.stringify(mergedSales) !== JSON.stringify(STATE.data.sales || []);
-        const expChanged = JSON.stringify(mergedExpenses) !== JSON.stringify(STATE.data.expenses || []);
-        const prodsChanged = JSON.stringify(serverResult.products || []) !== JSON.stringify(STATE.data.products || []);
+        let prodsChanged = false;
         
         // Exclude lastModified from settings comparison so periodic sync doesn't falsely report changes
         const currentSettingsCopy = { ...(STATE.data.settings || {}) };
@@ -948,11 +947,32 @@ async function performServerSync() {
         if (serverResult.products && serverResult.products.length) {
           const validProds = serverResult.products.filter(p => p && p.id && !combinedDeletedProducts.includes(p.id));
           const pMap = new Map();
+          (STATE.data.products || []).forEach(p => {
+            if (p && p.name && !combinedDeletedProducts.includes(p.id)) {
+              const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
+              pMap.set(key, p);
+            }
+          });
           validProds.forEach(p => {
             const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
-            pMap.set(key, p);
+            if (!pMap.has(key)) {
+              pMap.set(key, p);
+              prodsChanged = true;
+            } else {
+              const localProd = pMap.get(key);
+              const srvTime = new Date(p.updatedAt || 0).getTime();
+              const locTime = new Date(localProd.updatedAt || 0).getTime();
+              if (srvTime > locTime) {
+                pMap.set(key, p);
+                prodsChanged = true;
+              }
+            }
           });
-          STATE.data.products = Array.from(pMap.values());
+          const mergedProducts = Array.from(pMap.values());
+          if (JSON.stringify(mergedProducts) !== JSON.stringify(STATE.data.products || [])) {
+            prodsChanged = true;
+          }
+          STATE.data.products = mergedProducts;
         }
         if (Array.isArray(serverResult.employees)) {
           STATE.data.employees = serverResult.employees;
@@ -3153,6 +3173,13 @@ function setupEventListeners() {
     });
   });
 
+  document.getElementById('btnClosePalette')?.addEventListener('click', () => {
+    closeCommandPalette();
+  });
+  document.getElementById('btnPaletteEscKbd')?.addEventListener('click', () => {
+    closeCommandPalette();
+  });
+
   document.getElementById('commandPaletteModal')?.addEventListener('click', (e) => {
     if (e.target.id === 'commandPaletteModal') closeCommandPalette();
   });
@@ -4924,12 +4951,13 @@ async function handleProductSubmit(e) {
   const plans = [];
 
   planRows.forEach(row => {
-    const months = Number(row.querySelector('.plan-months-input').value) || 1;
-    const label = row.querySelector('.plan-label-input').value.trim() || `${months} Month(s)`;
-    const price = Number(row.querySelector('.plan-price-input').value) || 0;
+    const months = Number(row.querySelector('.plan-months-input')?.value) || 1;
+    const label = row.querySelector('.plan-label-input')?.value.trim() || `${months} Month(s)`;
+    const price = Number(row.querySelector('.plan-price-input')?.value) || 0;
     plans.push({ months, label, price });
   });
 
+  const nowIso = new Date().toISOString();
   STATE.data.products = STATE.data.products || [];
 
   // If editing, find existing product by editId or by name+type
@@ -4950,23 +4978,33 @@ async function handleProductSubmit(e) {
     id: finalId,
     name,
     type: type || 'Shared',
-    plans
+    plans,
+    updatedAt: nowIso
   };
 
   if (existingIdx >= 0) {
-    // In-place update existing product (never duplicate or append to bottom)
+    // In-place update existing product
     STATE.data.products[existingIdx] = productObj;
   } else {
     // Add new product
     STATE.data.products.push(productObj);
   }
 
-  // Deduplicate products in local state by (name + type)
+  // Deduplicate products in local state by (name + type) keeping newest update
   const dedupMap = new Map();
   STATE.data.products.forEach(p => {
     if (p && p.name) {
       const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
-      dedupMap.set(key, p);
+      if (!dedupMap.has(key)) {
+        dedupMap.set(key, p);
+      } else {
+        const prev = dedupMap.get(key);
+        const prevTime = new Date(prev.updatedAt || 0).getTime();
+        const curTime = new Date(p.updatedAt || 0).getTime();
+        if (p.id === finalId || curTime >= prevTime) {
+          dedupMap.set(key, p);
+        }
+      }
     }
   });
   STATE.data.products = Array.from(dedupMap.values());
@@ -4978,20 +5016,32 @@ async function handleProductSubmit(e) {
   closeModal('productModal');
   showToast(editId ? 'Product & Pricing updated! ✓' : 'Product & Pricing saved! 🎉');
 
-  // Instant Cloud Auto-Save (NO REFRESH NEEDED)
-  triggerAutoSaveSync();
-
+  // Server API call to persist to server disk & cloud
   try {
     const endpoint = editId ? `/api/products/${encodeURIComponent(editId)}` : '/api/products';
     const method = editId ? 'PUT' : 'POST';
-    await fetch(endpoint, {
+    const res = await fetch(endpoint, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: finalId, editId, name, type, plans })
+      body: JSON.stringify({ id: finalId, editId, name, type, plans, updatedAt: nowIso })
     });
+    if (res.ok) {
+      const resJson = await res.json();
+      if (resJson && resJson.product) {
+        const sIdx = STATE.data.products.findIndex(p => p.id === resJson.product.id);
+        if (sIdx >= 0) STATE.data.products[sIdx] = resJson.product;
+        saveLocalState();
+        populateProductDropdowns();
+        renderAdminCatalog();
+      }
+    }
   } catch (err) {
     console.warn('Product sync warning:', err);
   }
+
+  // Push to Cloud KV & schedule instant sync
+  await pushDirectUpstashRedis();
+  triggerAutoSaveSync(true);
 }
 
 async function deleteProduct(id) {
@@ -5357,14 +5407,36 @@ async function syncDirectUpstashRedis() {
             ...(parsed.settings?.deletedProductIds || [])
           ]));
 
+          let directProdsChanged = false;
           if (parsed.products && parsed.products.length) {
             const valid = parsed.products.filter(p => p && p.id && !combinedDelProducts.includes(p.id));
             const pMap = new Map();
+            (STATE.data.products || []).forEach(p => {
+              if (p && p.name && !combinedDelProducts.includes(p.id)) {
+                const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
+                pMap.set(key, p);
+              }
+            });
             valid.forEach(p => {
               const key = `${p.name.trim().toLowerCase()}__${(p.type || 'Shared').trim().toLowerCase()}`;
-              pMap.set(key, p);
+              if (!pMap.has(key)) {
+                pMap.set(key, p);
+                directProdsChanged = true;
+              } else {
+                const local = pMap.get(key);
+                const rTime = new Date(p.updatedAt || 0).getTime();
+                const lTime = new Date(local.updatedAt || 0).getTime();
+                if (rTime > lTime) {
+                  pMap.set(key, p);
+                  directProdsChanged = true;
+                }
+              }
             });
-            STATE.data.products = Array.from(pMap.values());
+            const mergedProducts = Array.from(pMap.values());
+            if (JSON.stringify(mergedProducts) !== JSON.stringify(STATE.data.products || [])) {
+              directProdsChanged = true;
+            }
+            STATE.data.products = mergedProducts;
           }
           const combinedPurgedTrash = Array.from(new Set([
             ...(STATE.data.settings?.purgedTrashIds || []),
@@ -5413,7 +5485,11 @@ async function syncDirectUpstashRedis() {
 
           saveLocalState();
           syncSettingsFormUI();
-          if (salesChanged || expChanged) {
+          if (directProdsChanged) {
+            populateProductDropdowns();
+            renderAdminCatalog();
+          }
+          if (salesChanged || expChanged || directProdsChanged) {
             renderApp();
           }
         }

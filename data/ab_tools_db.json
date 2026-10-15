@@ -1,29 +1,88 @@
 {
   "sales": [
     {
-      "id": "sale_1792010316668",
+      "id": "sale_1792015612316",
       "date": "2026-10-15",
-      "customerPhone": "57575",
+      "customerPhone": "+92 336 7770245",
       "customerName": "",
-      "product": "Surfshark",
-      "accountType": "Shared",
-      "accountLogin": "abd156@kuromee.com",
+      "product": "Muse AI",
+      "accountType": "Private",
+      "accountLogin": "",
       "planMonths": 1,
-      "planLabel": "1 Month (30 Days)",
-      "amount": 250,
-      "paymentStatus": "Pending",
+      "planLabel": "No Time",
+      "amount": 1000,
+      "paymentStatus": "Paid",
       "paymentProof": null,
       "paymentReceivedIn": "Boss JazzCash",
-      "soldBy": "M.Ali",
-      "employeeId": "emp_1791761609185_p5ry",
+      "soldBy": "Admin",
+      "employeeId": "admin",
       "notes": "",
-      "updatedAt": "2026-10-14T20:38:36.659Z",
+      "updatedAt": "2026-10-14T22:14:46.858Z",
       "expiryDate": "2026-11-13",
-      "createdAt": "2026-10-14T20:38:36.669Z",
-      "deleteReason": "Testing employee delete and restore",
-      "deletedBy": "M.Ali",
-      "deleterRole": "employee",
-      "deleterId": "emp_1791761609185_p5ry"
+      "createdAt": "2026-10-14T22:06:52.316Z"
+    },
+    {
+      "id": "sale_1792013771745",
+      "date": "2026-10-15",
+      "customerPhone": "+92 336 7770245",
+      "customerName": "",
+      "product": "Nord",
+      "accountType": "Private",
+      "accountLogin": "",
+      "planMonths": 3,
+      "planLabel": "3 Months (90 Days)",
+      "amount": 1500,
+      "paymentStatus": "Paid",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T21:36:11.745Z",
+      "expiryDate": "2027-01-12",
+      "createdAt": "2026-10-14T21:36:11.745Z"
+    },
+    {
+      "id": "sale_1792013755649",
+      "date": "2026-10-15",
+      "customerPhone": "+92 302 7283125",
+      "customerName": "",
+      "product": "Gemini Pro",
+      "accountType": "Private",
+      "accountLogin": "",
+      "planMonths": 18,
+      "planLabel": "18 Months (540 Days)",
+      "amount": 1400,
+      "paymentStatus": "Paid",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "4 Accounts",
+      "updatedAt": "2026-10-14T21:35:55.649Z",
+      "expiryDate": "2028-04-06",
+      "createdAt": "2026-10-14T21:35:55.649Z"
+    },
+    {
+      "id": "sale_1792013726378",
+      "date": "2026-10-15",
+      "customerPhone": "+92 327 9701481",
+      "customerName": "",
+      "product": "Muse AI",
+      "accountType": "Private",
+      "accountLogin": "",
+      "planMonths": 1,
+      "planLabel": "1 Month(s)",
+      "amount": 1000,
+      "paymentStatus": "Paid",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-14T21:35:26.378Z",
+      "expiryDate": "2026-11-13",
+      "createdAt": "2026-10-14T21:35:26.378Z"
     },
     {
       "id": "sale_1792003989824",
@@ -4342,6 +4401,39 @@
   ],
   "expenses": [
     {
+      "id": "exp_1792015593188",
+      "date": "2026-10-15",
+      "category": "Vendor Purchasing",
+      "description": "Muse purchased",
+      "amount": 250,
+      "assignedTo": "admin",
+      "assignedToName": "Boss (Admin)",
+      "updatedAt": "2026-10-14T22:06:33.188Z",
+      "createdAt": "2026-10-14T22:06:33.188Z"
+    },
+    {
+      "id": "exp_1792014045018",
+      "date": "2026-10-15",
+      "category": "Vendor Purchasing",
+      "description": "Muse purchased",
+      "amount": 250,
+      "assignedTo": "admin",
+      "assignedToName": "Boss (Admin)",
+      "updatedAt": "2026-10-14T21:40:45.018Z",
+      "createdAt": "2026-10-14T21:40:45.018Z"
+    },
+    {
+      "id": "exp_1792013785128",
+      "date": "2026-10-15",
+      "category": "Vendor Purchasing",
+      "description": "Binance Nord and Gemini",
+      "amount": 1000,
+      "assignedTo": "admin",
+      "assignedToName": "Boss (Admin)",
+      "updatedAt": "2026-10-14T21:36:25.128Z",
+      "createdAt": "2026-10-14T21:36:25.128Z"
+    },
+    {
       "id": "exp_1791903481278",
       "date": "2026-10-13",
       "category": "Vendor Purchasing",
@@ -4559,7 +4651,7 @@
         {
           "months": 1,
           "label": "1 Month (30 Days)",
-          "price": 250
+          "price": 280
         },
         {
           "months": 2,
@@ -4581,7 +4673,8 @@
           "label": "12 Months (360 Days)",
           "price": 1600
         }
-      ]
+      ],
+      "updatedAt": "2026-10-14T22:08:35.286Z"
     },
     {
       "id": "prod_surfshark_private",
@@ -4652,7 +4745,7 @@
         {
           "months": 18,
           "label": "18 Months (540 Days)",
-          "price": 750
+          "price": 350
         }
       ]
     },
@@ -4727,30 +4820,37 @@
           "price": 750
         }
       ]
-    }
-  ],
-  "recycleBin": [
+    },
     {
-      "id": "trash_1792009977358_4dg8",
-      "originalId": "test_dummy_sale_id",
-      "type": "sale",
-      "item": {
-        "deleteReason": "Wrong customer number entered",
-        "deletedBy": "M.Ali",
-        "deleterRole": "employee",
-        "deleterId": "emp_1791761609185_p5ry"
-      },
-      "deleteReason": "Wrong customer number entered",
-      "deletedBy": "M.Ali",
-      "deleterRole": "employee",
-      "deleterId": "emp_1791761609185_p5ry",
-      "deletedAt": "2026-10-14T20:32:57.358Z"
+      "id": "prod_express_vpn_private",
+      "name": "Express Vpn",
+      "type": "Private",
+      "plans": [
+        {
+          "months": 1,
+          "label": "1 Month (30 Days)",
+          "price": 1200
+        }
+      ]
+    },
+    {
+      "id": "prod_canva_pro_private",
+      "name": "Canva Pro",
+      "type": "Private",
+      "plans": [
+        {
+          "months": 36,
+          "label": "3 Year (30 Days)",
+          "price": 800
+        }
+      ]
     }
   ],
+  "recycleBin": [],
   "settings": {
     "businessName": "Monkey Tools",
     "currency": "Rs.",
-    "lastModified": 1792011993884,
+    "lastModified": 1792049425225,
     "deletedSaleIds": [
       "sale_1790808573942_ktuq",
       "sale_1790891345201_z6tu",
@@ -4776,7 +4876,8 @@
       "sale_1792006183073",
       "sale_1792007433453",
       "sale_1792008734383",
-      "test_dummy_sale_id"
+      "test_dummy_sale_id",
+      "sale_1792015513284"
     ],
     "deletedExpenseIds": [
       "exp_1790946533413"
@@ -4818,7 +4919,11 @@
       "trash_1791914323255_phyf",
       "trash_1792008886467_i0yy",
       "sale_1792008734383",
-      "trash_1792008849303_ma0y"
+      "trash_1792008849303_ma0y",
+      "trash_1792009977358_4dg8",
+      "test_dummy_sale_id",
+      "trash_1792015487940_i3yy",
+      "sale_1792015513284"
     ],
     "productEmails": {
       "Surfshark": [
@@ -4826,7 +4931,7 @@
       ]
     },
     "deletedProductIds": [],
-    "theme": "sapphire"
+    "theme": "oled"
   },
   "employees": [
     {
