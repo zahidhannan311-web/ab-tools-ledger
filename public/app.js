@@ -2037,6 +2037,30 @@ function renderSales() {
 
   let list = allSales.filter(s => isDateInPeriod(s.date, period));
 
+  // Live in-page Sales Search Filter
+  const salesSearchInput = document.getElementById('salesSearchInput');
+  const salesSearchVal = (salesSearchInput?.value || '').trim().toLowerCase();
+  const clearSalesSearchBtn = document.getElementById('btnClearSalesSearch');
+  if (clearSalesSearchBtn) {
+    clearSalesSearchBtn.style.display = salesSearchVal ? 'block' : 'none';
+  }
+  if (salesSearchVal) {
+    list = list.filter(s => {
+      const phone = String(s.customerPhone || '').toLowerCase();
+      const name = String(s.customerName || '').toLowerCase();
+      const login = String(s.accountLogin || '').toLowerCase();
+      const prod = String(s.product || '').toLowerCase();
+      const notes = String(s.notes || '').toLowerCase();
+      const plan = String(s.planLabel || '').toLowerCase();
+      return phone.includes(salesSearchVal) ||
+             name.includes(salesSearchVal) ||
+             login.includes(salesSearchVal) ||
+             prod.includes(salesSearchVal) ||
+             notes.includes(salesSearchVal) ||
+             plan.includes(salesSearchVal);
+    });
+  }
+
   if (productFilter !== 'ALL') {
     list = list.filter(s => s.product === productFilter);
   }
@@ -2192,30 +2216,53 @@ function quickCopyCredential(btn, text) {
   });
 }
 
-function quickCopySaleReceipt(saleId) {
-  const sale = (STATE.data.sales || []).find(s => s.id === saleId);
-  if (!sale) return;
+function quickCopySaleReceipt(saleOrId) {
+  let sale = null;
+  if (typeof saleOrId === 'object' && saleOrId !== null) {
+    sale = saleOrId;
+  } else {
+    sale = (STATE.data.sales || []).find(s => s.id === saleOrId);
+    if (!sale && STATE.data.recycleBin) {
+      const binItem = STATE.data.recycleBin.find(b => b.id === saleOrId || b.item?.id === saleOrId || b.data?.id === saleOrId);
+      if (binItem) sale = binItem.item || binItem.data;
+    }
+  }
+  if (!sale) {
+    showToast('Sale record not found ⚠️');
+    return;
+  }
+
+  const settings = STATE.data.settings || {};
+  const bizName = sanitizeBusinessName(settings.businessName) || 'MONKEY TOOLS';
 
   const receipt = [
-    `⭐ *MONKEY TOOLS — ORDER RECEIPT* ⭐`,
+    `⭐ *${bizName.toUpperCase()} — ORDER RECEIPT* ⭐`,
     `━━━━━━━━━━━━━━━━━━━━━━`,
-    `📦 *Product:* ${sale.product} (${sale.accountType || 'Shared'})`,
-    `⏳ *Plan:* ${sale.planLabel || sale.planMonths + ' Month(s)'}`,
+    sale.customerName ? `👤 *Customer:* ${sale.customerName}` : null,
+    sale.customerPhone ? `📞 *Phone:* ${formatPhone(sale.customerPhone)}` : null,
+    `📦 *Product:* ${sale.product || 'Digital Tool'} (${sale.accountType || 'Shared'})`,
+    `⏳ *Plan:* ${sale.planLabel || (sale.planMonths ? sale.planMonths + ' Month(s)' : '1 Month')}`,
     sale.accountLogin ? `🔑 *Login:* ${sale.accountLogin}` : null,
     `📅 *Date:* ${formatDateDisplay(sale.date)}`,
     `⏰ *Expiry Date:* ${formatDateDisplay(sale.expiryDate)}`,
     `💰 *Amount:* Rs. ${(sale.amount || 0).toLocaleString('en-US')}`,
     `💳 *Status:* ${sale.paymentStatus === 'Paid' ? 'Paid ✓' : sale.paymentStatus}`,
     `━━━━━━━━━━━━━━━━━━━━━━`,
-    `🙏 Thank you for choosing Monkey Tools!`
+    `🙏 Thank you for choosing ${bizName}!`
   ].filter(Boolean).join('\n');
 
-  navigator.clipboard.writeText(receipt).then(() => {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(receipt).then(() => {
+      SOUND.playSuccessTap();
+      showToast('Customer Receipt copied to clipboard! 📋');
+    }).catch(() => {
+      SOUND.playSuccessTap();
+      copyText(receipt);
+    });
+  } else {
     SOUND.playSuccessTap();
-    showToast('Customer Receipt copied to clipboard! 📋');
-  }).catch(() => {
     copyText(receipt);
-  });
+  }
 }
 
 function quickSetSaleStatus(saleId, newStatus, event) {
@@ -2560,8 +2607,9 @@ function renderStockAndSlots() {
                     ${formatPhone(s.customerPhone)}
                   </a>
                 </div>
-                <div class="slot-expiry-info">
+                <div class="slot-expiry-info" style="display:flex;align-items:center;gap:6px;">
                   ${formatDaysBadge(days)}
+                  <button type="button" class="btn-copy-credential" style="padding:2px 6px;font-size:11px;" title="Copy Customer WhatsApp Receipt" onclick="quickCopySaleReceipt('${s.id}')">🧾 Receipt</button>
                 </div>
               </div>
             `;
@@ -2875,6 +2923,7 @@ function openCustomerCrm(customerPhone, customerName) {
           <div class="flex justify-between items-center mt-1 pt-1 border-t border-white/5">
             <span class="status-badge ${s.paymentStatus === 'Paid' ? 'status-paid' : 'status-pending'} text-xs">${s.paymentStatus}</span>
             <div style="display:flex;gap:5px;">
+              <button class="btn btn-xs btn-outline" title="Copy Customer WhatsApp Receipt" onclick="quickCopySaleReceipt('${s.id}')">🧾 Receipt</button>
               <button class="btn btn-xs btn-outline" onclick="openEditSale('${s.id}')">✏️ Edit</button>
               <button class="btn btn-xs btn-outline btn-action-delete" title="Move to Recycle Bin" onclick="openDeleteSaleReasonModal('${s.id}')">🗑️</button>
             </div>
@@ -2974,6 +3023,9 @@ function handlePaletteSearch(rawQuery) {
           </div>
         </div>
         <div class="palette-item-right">
+          <button type="button" class="btn-palette-receipt" title="1-Click Copy WhatsApp Receipt" onclick="event.stopPropagation(); quickCopySaleReceipt('${s.id}')">
+            🧾 <span class="receipt-label-text">Receipt</span>
+          </button>
           <span class="status-badge ${s.paymentStatus === 'Paid' ? 'status-paid' : 'status-pending'}">${s.paymentStatus}</span>
           <span class="font-mono text-sm text-gold font-bold">Rs. ${(s.amount || 0).toLocaleString()}</span>
         </div>
@@ -3029,6 +3081,7 @@ function renderReminders() {
           </div>
           <div class="item-btn-group">
             <button class="btn btn-xs btn-gold" onclick="markSalePaid('${s.id}')">Mark Paid</button>
+            <button class="btn btn-xs btn-outline" title="Copy Customer WhatsApp Receipt" onclick="quickCopySaleReceipt('${s.id}')">🧾 Receipt</button>
             <button class="btn-whatsapp" onclick="openWhatsAppPickerModal('${s.id}', 'pending')">
               <span>💬 Send WhatsApp</span>
             </button>
@@ -3071,6 +3124,7 @@ function renderReminders() {
             <div class="reminder-msg-preview">"${escapeHtml(msg)}"</div>
           </div>
           <div class="item-btn-group">
+            <button class="btn btn-xs btn-outline" title="Copy Customer WhatsApp Receipt" onclick="quickCopySaleReceipt('${s.id}')">🧾 Receipt</button>
             <button class="btn-whatsapp" onclick="openWhatsAppPickerModal('${s.id}', 'expiry')">
               <span>💬 Send Renewal WhatsApp</span>
             </button>
@@ -3727,6 +3781,21 @@ function setupEventListeners() {
   }
 
   // Sales & Expense filter changes
+  const salesSearchInput = document.getElementById('salesSearchInput');
+  const btnClearSalesSearch = document.getElementById('btnClearSalesSearch');
+  salesSearchInput?.addEventListener('input', () => {
+    if (btnClearSalesSearch) btnClearSalesSearch.style.display = salesSearchInput.value ? 'block' : 'none';
+    renderSales();
+  });
+  btnClearSalesSearch?.addEventListener('click', () => {
+    if (salesSearchInput) {
+      salesSearchInput.value = '';
+      btnClearSalesSearch.style.display = 'none';
+      salesSearchInput.focus();
+    }
+    renderSales();
+  });
+
   document.getElementById('salesFilterStaff')?.addEventListener('change', renderSales);
   document.getElementById('salesFilterProduct')?.addEventListener('change', renderSales);
   document.getElementById('salesFilterStatus')?.addEventListener('change', renderSales);
@@ -4051,6 +4120,9 @@ function openSaleModal() {
   saleEmailManualMode = false;
   document.getElementById('saleAccountLogin').value = '';
 
+  const receiptBtn = document.getElementById('btnSaleModalCopyReceipt');
+  if (receiptBtn) receiptBtn.style.display = 'none';
+
   // Reset proof screenshot
   document.getElementById('saleProofFileInput').value = '';
   document.getElementById('saleProofBase64').value = '';
@@ -4112,6 +4184,12 @@ function openEditSale(id) {
 
   const accountSelect = document.getElementById('salePaymentReceivedInSelect');
   if (accountSelect) accountSelect.value = sale.paymentReceivedIn || 'Boss JazzCash';
+
+  const receiptBtn = document.getElementById('btnSaleModalCopyReceipt');
+  if (receiptBtn) {
+    receiptBtn.style.display = 'inline-flex';
+    receiptBtn.onclick = () => quickCopySaleReceipt(id);
+  }
 
   updateLiveExpiryPreview();
   openModal('saleModal');
@@ -4954,6 +5032,11 @@ function renderRecycleBin(filter = null) {
           <div class="trash-timestamp">🕒 Deleted: ${deletedTimeFormatted}</div>
         </div>
         <div class="trash-item-actions">
+          ${isSale ? `
+            <button type="button" class="btn-restore" style="background:rgba(245,158,11,0.12);color:var(--gold-accent);border:1px solid rgba(245,158,11,0.35);" title="Copy WhatsApp Receipt" onclick="quickCopySaleReceipt('${entry.id}')">
+              <span>🧾 Receipt</span>
+            </button>
+          ` : ''}
           <button type="button" class="btn-restore" title="Restore to ledger" onclick="restoreFromRecycleBin('${entry.id}')">
             <span>🔄 Restore</span>
           </button>
@@ -5860,11 +5943,37 @@ function formatPhone(phone) {
 }
 
 function copyText(text) {
-  navigator.clipboard.writeText(text).then(() => {
-    showToast(`Copied to clipboard: ${text}`);
-  }).catch(() => {
-    showToast(`Copied to clipboard!`);
-  });
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Copied to clipboard! 📋');
+    }).catch(() => {
+      fallbackCopyText(text);
+    });
+  } else {
+    fallbackCopyText(text);
+  }
+}
+
+function fallbackCopyText(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (successful) {
+      showToast('Copied to clipboard! 📋');
+    } else {
+      showToast('Failed to copy ⚠️');
+    }
+  } catch (e) {
+    showToast('Failed to copy ⚠️');
+  }
 }
 
 function showToast(msg, options = {}) {

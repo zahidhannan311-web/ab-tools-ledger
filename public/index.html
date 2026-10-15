@@ -571,6 +571,11 @@
             <p class="view-subtitle">All sales transactions, customer phones, and assigned accounts</p>
           </div>
           <div class="view-filters">
+            <div class="sales-search-box">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="search" id="salesSearchInput" class="sales-search-input" placeholder="Search phone, customer, tool..." autocomplete="off">
+              <button type="button" id="btnClearSalesSearch" class="btn-clear-sales-search" style="display:none;" title="Clear search">&times;</button>
+            </div>
             <select id="salesFilterStaff" class="custom-select select-sm">
               <option value="ALL">👥 All Staff</option>
             </select>
@@ -1249,6 +1254,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn btn-outline" data-close-modal="saleModal">Cancel</button>
+          <button type="button" id="btnSaleModalCopyReceipt" class="btn btn-outline" style="display:none;" title="Copy Customer WhatsApp Receipt">🧾 Copy Receipt</button>
           <button type="submit" id="btnSaveSale" class="btn btn-gold flex-1">Save Sale</button>
         </div>
       </form>
