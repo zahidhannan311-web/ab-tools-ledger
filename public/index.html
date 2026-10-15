@@ -316,6 +316,16 @@
 
       <!-- Scrollable Navigation Options -->
       <div class="drawer-menu-links">
+        <button type="button" class="drawer-nav-item" id="drawerBtnStock">
+          <div class="drawer-icon-wrap" style="color:#10b981; background:rgba(16,185,129,0.12);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          </div>
+          <div class="drawer-nav-text">
+            <span class="drawer-nav-label">Stock &amp; Slots Tracker</span>
+            <span class="drawer-nav-sub">Live screen/slot capacity (<span id="drawerStockBadge">0</span>)</span>
+          </div>
+        </button>
+
         <button type="button" class="drawer-nav-item" id="drawerBtnExcel">
           <div class="drawer-icon-wrap" style="color:#10b981; background:rgba(16,185,129,0.12);">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -682,7 +692,8 @@
             <h2 class="view-title">Stock &amp; Account Slots Manager</h2>
             <p class="view-subtitle">Live screen/slot capacity tracker for shared &amp; private tool accounts</p>
           </div>
-          <div class="view-filters">
+          <div class="view-filters flex items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline" onclick="openAddStockAccountModal()">+ Add Account to Stock</button>
             <button type="button" class="btn btn-sm btn-gold" onclick="openSaleModal()">+ Assign New Sale</button>
           </div>
         </div>
@@ -1060,9 +1071,9 @@
         </div>
         <span>+ Sale</span>
       </button>
-      <button class="mobile-nav-btn" data-view="remindersView">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-        <span>Reminders</span>
+      <button class="mobile-nav-btn" data-view="stockView">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+        <span>Stock</span>
       </button>
       <button class="mobile-nav-btn" data-view="adminView">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -1682,6 +1693,117 @@
         <div class="modal-actions">
           <button type="button" class="btn btn-outline" data-close-modal="employeeModal">Cancel</button>
           <button type="submit" id="btnSaveEmployee" class="btn btn-gold flex-1">Save Employee</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: EDIT STOCK & ACCOUNT SLOTS CAPACITY ==================== -->
+  <div id="editSlotCapacityModal" class="modal-overlay">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3 class="modal-title">⚙️ Edit Account Slot Capacity</h3>
+        <button class="modal-close-btn" data-close-modal="editSlotCapacityModal">&times;</button>
+      </div>
+
+      <form id="editSlotCapacityForm" class="modal-form">
+        <input type="hidden" id="editSlotAccountKey" value="">
+        <input type="hidden" id="editSlotProduct" value="">
+        <input type="hidden" id="editSlotLogin" value="">
+
+        <div class="account-capacity-info-box">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs text-muted">Tool Account</span>
+            <span id="editSlotProductBadge"></span>
+          </div>
+          <div id="editSlotEmailDisplay" class="font-mono text-sm font-bold text-gold" style="word-break:break-all;"></div>
+          <div id="editSlotCurrentUsage" class="text-xs text-muted mt-1"></div>
+        </div>
+
+        <div class="form-group mt-3">
+          <label for="editSlotCapacityInput" class="flex justify-between items-center">
+            <span>Total Allowed Members / Slots <span class="text-gold">*</span></span>
+            <span class="text-xs text-gold font-bold" id="editSlotMembersCountLabel">5 Members</span>
+          </label>
+          <div class="slots-stepper-wrap mt-1">
+            <button type="button" class="btn-stepper" id="btnSlotStepMinus" onclick="stepSlotCapacity(-1)">−</button>
+            <input type="number" id="editSlotCapacityInput" class="form-control text-center font-bold text-lg" min="1" max="100" value="5" required>
+            <button type="button" class="btn-stepper" id="btnSlotStepPlus" onclick="stepSlotCapacity(1)">+</button>
+          </div>
+          <small class="text-muted mt-1 block">Aap khud specify karein ke is account me kitne users/members add ho sakte hain (e.g. 1, 4, 5, 6, 8, 10, etc.).</small>
+        </div>
+
+        <!-- Quick Preset Chips -->
+        <div class="slots-presets-wrap">
+          <span class="text-xs text-muted mb-1 block">Quick Set:</span>
+          <div class="slots-presets-chips">
+            <button type="button" class="btn-slot-chip" onclick="setSlotPreset(1)">1 (Private)</button>
+            <button type="button" class="btn-slot-chip" onclick="setSlotPreset(4)">4 (Screens)</button>
+            <button type="button" class="btn-slot-chip" onclick="setSlotPreset(5)">5 (VPNs)</button>
+            <button type="button" class="btn-slot-chip" onclick="setSlotPreset(6)">6 (Family)</button>
+            <button type="button" class="btn-slot-chip" onclick="setSlotPreset(10)">10 (Max)</button>
+          </div>
+        </div>
+
+        <div id="removeStockAccountSection" style="display:none;" class="mt-2 text-center">
+          <button type="button" class="btn btn-outline btn-xs text-danger" onclick="handleRemoveCurrentStockAccount()">🗑️ Remove Account from Stock</button>
+        </div>
+
+        <div class="modal-actions mt-3">
+          <button type="button" class="btn btn-outline" data-close-modal="editSlotCapacityModal">Cancel</button>
+          <button type="submit" id="btnSaveSlotCapacity" class="btn btn-gold flex-1">Save Capacity</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: ADD NEW ACCOUNT TO STOCK ==================== -->
+  <div id="addStockAccountModal" class="modal-overlay">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3 class="modal-title">📦 Add New Account to Stock</h3>
+        <button class="modal-close-btn" data-close-modal="addStockAccountModal">&times;</button>
+      </div>
+
+      <form id="addStockAccountForm" class="modal-form">
+        <div class="form-group">
+          <label for="newStockProductSelect">Product / Tool <span class="text-gold">*</span></label>
+          <select id="newStockProductSelect" class="form-control" required></select>
+        </div>
+
+        <div class="form-group">
+          <label for="newStockLoginInput">Account Login / Email / ID <span class="text-gold">*</span></label>
+          <input type="text" id="newStockLoginInput" class="form-control font-mono" placeholder="e.g. nord15@kuromee.com" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="newStockTypeSelect">Account Type</label>
+            <select id="newStockTypeSelect" class="form-control">
+              <option value="Shared">Shared</option>
+              <option value="Private">Private</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label for="newStockCapacityInput">Total Slots <span class="text-gold">*</span></label>
+            <input type="number" id="newStockCapacityInput" class="form-control text-center font-bold" min="1" max="100" value="5" required>
+          </div>
+        </div>
+
+        <div class="slots-presets-wrap">
+          <span class="text-xs text-muted mb-1 block">Quick Set:</span>
+          <div class="slots-presets-chips">
+            <button type="button" class="btn-slot-chip" onclick="document.getElementById('newStockCapacityInput').value=1">1 (Private)</button>
+            <button type="button" class="btn-slot-chip" onclick="document.getElementById('newStockCapacityInput').value=4">4 (Screens)</button>
+            <button type="button" class="btn-slot-chip" onclick="document.getElementById('newStockCapacityInput').value=5">5 (VPNs)</button>
+            <button type="button" class="btn-slot-chip" onclick="document.getElementById('newStockCapacityInput').value=6">6 (Family)</button>
+            <button type="button" class="btn-slot-chip" onclick="document.getElementById('newStockCapacityInput').value=10">10 (Max)</button>
+          </div>
+        </div>
+
+        <div class="modal-actions mt-3">
+          <button type="button" class="btn btn-outline" data-close-modal="addStockAccountModal">Cancel</button>
+          <button type="submit" id="btnSaveNewStockAccount" class="btn btn-gold flex-1">Add to Stock</button>
         </div>
       </form>
     </div>

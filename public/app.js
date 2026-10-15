@@ -2439,6 +2439,30 @@ function renderPendingPayments() {
 }
 
 // ==================== SHARED ACCOUNTS & SLOTS TRACKER (FEATURE 3) ====================
+function getAccountSlotCapacity(product, login, accountType, currentUsed = 0) {
+  const normLogin = String(login || '').trim().toLowerCase();
+  const normProd = String(product || '').trim().toLowerCase();
+  const isPrivate = String(accountType || '').toLowerCase().includes('private');
+
+  const customCapacities = STATE.data.settings?.accountCapacities || {};
+  const specificKey = `${normProd}___${normLogin}`;
+
+  let cap;
+  if (customCapacities[specificKey] !== undefined) {
+    cap = Number(customCapacities[specificKey]);
+  } else if (customCapacities[normLogin] !== undefined) {
+    cap = Number(customCapacities[normLogin]);
+  } else {
+    // Default fallback
+    if (isPrivate) cap = 1;
+    else if (normProd.includes('vpn') || normProd.includes('surf') || normProd.includes('nord')) cap = 5;
+    else cap = 4;
+  }
+
+  if (isNaN(cap) || cap < 1) cap = isPrivate ? 1 : 5;
+  return Math.max(cap, currentUsed);
+}
+
 function renderStockAndSlots() {
   const container = document.getElementById('stockListContainer');
   if (!container) return;
@@ -2446,6 +2470,22 @@ function renderStockAndSlots() {
   const sales = STATE.data.sales || [];
   const accountsMap = {};
 
+  // 1. Manually registered stock accounts
+  const customAccounts = STATE.data.settings?.customStockAccounts || [];
+  customAccounts.forEach(ca => {
+    if (!ca || !ca.login) return;
+    const login = String(ca.login).trim();
+    const product = String(ca.product || '').trim();
+    const key = `${product}___${login}`;
+    accountsMap[key] = {
+      product: product,
+      login: login,
+      accountType: ca.accountType || 'Shared',
+      sales: []
+    };
+  });
+
+  // 2. Sales records accounts
   sales.forEach(s => {
     const login = (s.accountLogin || '').trim();
     if (!login) return;
@@ -2464,13 +2504,15 @@ function renderStockAndSlots() {
   const accountKeys = Object.keys(accountsMap);
   const navStockBadge = document.getElementById('navStockCount');
   if (navStockBadge) navStockBadge.textContent = accountKeys.length;
+  const drawerStockBadge = document.getElementById('drawerStockBadge');
+  if (drawerStockBadge) drawerStockBadge.textContent = accountKeys.length;
 
   if (accountKeys.length === 0) {
     container.innerHTML = `
       <div class="empty-state" style="grid-column: 1 / -1;">
         <div class="empty-state-icon">📦</div>
-        <div class="empty-state-title">No assigned accounts yet</div>
-        <p class="text-muted mt-2">When you sell tools with assigned account logins, live slot counters will appear here.</p>
+        <div class="empty-state-title">No assigned accounts in stock yet</div>
+        <p class="text-muted mt-2">Click "+ Add Account to Stock" above to register accounts and choose custom slot capacity, or sell tools with account logins.</p>
       </div>
     `;
     return;
@@ -2478,29 +2520,33 @@ function renderStockAndSlots() {
 
   container.innerHTML = accountKeys.map(k => {
     const acc = accountsMap[k];
-    const isPrivate = String(acc.accountType).toLowerCase().includes('private');
-    const capacity = isPrivate ? 1 : (acc.product.toLowerCase().includes('vpn') || acc.product.toLowerCase().includes('surf') ? 5 : 4);
     const activeSales = acc.sales.filter(s => {
       const d = calculateDaysRemaining(s.expiryDate);
       return d === null || d >= 0;
     });
     const usedSlots = activeSales.length;
+    const capacity = getAccountSlotCapacity(acc.product, acc.login, acc.accountType, usedSlots);
     const freeSlots = Math.max(0, capacity - usedSlots);
     const isFull = freeSlots === 0;
 
     return `
       <div class="stock-card">
         <div class="stock-card-head">
-          <div>
+          <div class="stock-card-info">
             ${getProductBrandBadge(acc.product, acc.accountType)}
             <div class="stock-email-title mt-2">
               <span>${escapeHtml(acc.login)}</span>
               <button class="btn-copy-credential" onclick="quickCopyCredential(this, '${escapeHtml(acc.login)}')">📋</button>
             </div>
           </div>
-          <span class="stock-capacity-badge ${isFull ? 'capacity-full' : 'capacity-available'}">
-            ${isFull ? '🔴 FULL (0 Free)' : `🟢 ${freeSlots} Free Slot${freeSlots === 1 ? '' : 's'}`}
-          </span>
+          <div class="stock-head-badges">
+            <span class="stock-capacity-badge ${isFull ? 'capacity-full' : 'capacity-available'}" title="${usedSlots} of ${capacity} slots used">
+              ${isFull ? `🔴 FULL (${usedSlots}/${capacity})` : `🟢 ${freeSlots} Free (${usedSlots}/${capacity})`}
+            </span>
+            <button type="button" class="btn-edit-slots" onclick="openEditSlotCapacityModal('${escapeHtml(acc.product)}', '${escapeHtml(acc.login)}', '${escapeHtml(acc.accountType)}', ${capacity}, ${usedSlots})" title="Click to customize total allowed members / slots">
+              ⚙️ Edit Slots (${capacity})
+            </button>
+          </div>
         </div>
 
         <div class="stock-slots-list">
@@ -2531,6 +2577,199 @@ function renderStockAndSlots() {
       </div>
     `;
   }).join('');
+}
+
+function openEditSlotCapacityModal(product, login, accountType, currentCapacity, usedSlots) {
+  const modal = document.getElementById('editSlotCapacityModal');
+  if (!modal) return;
+
+  const normKey = `${(product || '').trim().toLowerCase()}___${(login || '').trim().toLowerCase()}`;
+  document.getElementById('editSlotAccountKey').value = normKey;
+  document.getElementById('editSlotProduct').value = product;
+  document.getElementById('editSlotLogin').value = login;
+
+  const badgeEl = document.getElementById('editSlotProductBadge');
+  if (badgeEl) badgeEl.innerHTML = getProductBrandBadge(product, accountType);
+
+  const emailEl = document.getElementById('editSlotEmailDisplay');
+  if (emailEl) emailEl.textContent = login;
+
+  const usageEl = document.getElementById('editSlotCurrentUsage');
+  if (usageEl) {
+    usageEl.textContent = `Currently active members / used slots: ${usedSlots} of ${currentCapacity}`;
+  }
+
+  const input = document.getElementById('editSlotCapacityInput');
+  if (input) {
+    input.value = currentCapacity;
+    input.min = Math.max(1, usedSlots);
+    updateSlotMembersLabel(currentCapacity);
+  }
+
+  const removeSection = document.getElementById('removeStockAccountSection');
+  if (removeSection) {
+    removeSection.style.display = usedSlots === 0 ? 'block' : 'none';
+  }
+
+  openModal('editSlotCapacityModal');
+}
+
+function stepSlotCapacity(delta) {
+  const input = document.getElementById('editSlotCapacityInput');
+  if (!input) return;
+  const minVal = parseInt(input.min, 10) || 1;
+  let val = parseInt(input.value, 10) || minVal;
+  val = Math.max(minVal, Math.min(100, val + delta));
+  input.value = val;
+  updateSlotMembersLabel(val);
+}
+
+function setSlotPreset(num) {
+  const input = document.getElementById('editSlotCapacityInput');
+  if (!input) return;
+  const minVal = parseInt(input.min, 10) || 1;
+  input.value = Math.max(minVal, num);
+  updateSlotMembersLabel(input.value);
+  if (typeof SOUND !== 'undefined' && SOUND.playSuccessTap) SOUND.playSuccessTap();
+}
+
+function updateSlotMembersLabel(num) {
+  const lbl = document.getElementById('editSlotMembersCountLabel');
+  if (lbl) lbl.textContent = `${num} Member${num == 1 ? '' : 's'} / Screen${num == 1 ? '' : 's'}`;
+}
+
+async function handleSaveSlotCapacity(e) {
+  if (e) e.preventDefault();
+  const key = document.getElementById('editSlotAccountKey')?.value;
+  const login = document.getElementById('editSlotLogin')?.value;
+  const product = document.getElementById('editSlotProduct')?.value;
+  const capacityInput = document.getElementById('editSlotCapacityInput');
+  const newCapacity = parseInt(capacityInput?.value, 10);
+
+  if (!key || isNaN(newCapacity) || newCapacity < 1) {
+    showToast('Please enter a valid slot capacity (at least 1)');
+    return;
+  }
+
+  STATE.data.settings = STATE.data.settings || {};
+  STATE.data.settings.accountCapacities = STATE.data.settings.accountCapacities || {};
+  STATE.data.settings.accountCapacities[key] = newCapacity;
+  if (login) {
+    STATE.data.settings.accountCapacities[login.trim().toLowerCase()] = newCapacity;
+  }
+
+  if (Array.isArray(STATE.data.settings.customStockAccounts)) {
+    const matched = STATE.data.settings.customStockAccounts.find(a => 
+      a && a.login && a.login.trim().toLowerCase() === login.trim().toLowerCase() &&
+      (!product || a.product.trim().toLowerCase() === product.trim().toLowerCase())
+    );
+    if (matched) matched.capacity = newCapacity;
+  }
+
+  saveLocalState();
+  closeModal('editSlotCapacityModal');
+  renderStockAndSlots();
+  showToast(`Slot capacity updated to ${newCapacity} members! ✓`);
+
+  triggerAutoSaveSync(true);
+  await pushDirectUpstashRedis();
+}
+
+function handleRemoveCurrentStockAccount() {
+  const login = document.getElementById('editSlotLogin')?.value;
+  const product = document.getElementById('editSlotProduct')?.value;
+  if (!login) return;
+  if (!confirm(`Are you sure you want to remove account "${login}" from Stock?`)) return;
+
+  STATE.data.settings = STATE.data.settings || {};
+  if (Array.isArray(STATE.data.settings.customStockAccounts)) {
+    STATE.data.settings.customStockAccounts = STATE.data.settings.customStockAccounts.filter(a => 
+      !(a.login.trim().toLowerCase() === login.trim().toLowerCase() && 
+        (!product || a.product.trim().toLowerCase() === product.trim().toLowerCase()))
+    );
+  }
+  const normKey = `${(product || '').trim().toLowerCase()}___${login.trim().toLowerCase()}`;
+  if (STATE.data.settings.accountCapacities) {
+    delete STATE.data.settings.accountCapacities[normKey];
+    delete STATE.data.settings.accountCapacities[login.trim().toLowerCase()];
+  }
+
+  saveLocalState();
+  closeModal('editSlotCapacityModal');
+  renderStockAndSlots();
+  showToast('Account removed from stock.');
+  triggerAutoSaveSync(true);
+  pushDirectUpstashRedis();
+}
+
+function openAddStockAccountModal() {
+  const select = document.getElementById('newStockProductSelect');
+  if (select) {
+    const products = STATE.data.products || [];
+    select.innerHTML = products.map(p => {
+      const typeStr = p.type ? ` (${p.type})` : '';
+      return `<option value="${escapeHtml(p.name)}" data-type="${escapeHtml(p.type || 'Shared')}">${escapeHtml(p.name)}${escapeHtml(typeStr)}</option>`;
+    }).join('');
+  }
+
+  const loginInput = document.getElementById('newStockLoginInput');
+  if (loginInput) loginInput.value = '';
+
+  const capInput = document.getElementById('newStockCapacityInput');
+  if (capInput) capInput.value = 5;
+
+  openModal('addStockAccountModal');
+}
+
+async function handleSaveNewStockAccount(e) {
+  if (e) e.preventDefault();
+  const select = document.getElementById('newStockProductSelect');
+  const product = select ? select.value : '';
+  const typeSelect = document.getElementById('newStockTypeSelect');
+  const type = typeSelect ? typeSelect.value : 'Shared';
+  const loginInput = document.getElementById('newStockLoginInput');
+  const login = loginInput ? loginInput.value.trim() : '';
+  const capInput = document.getElementById('newStockCapacityInput');
+  const capacity = parseInt(capInput?.value, 10) || 5;
+
+  if (!product || !login) {
+    showToast('Please enter both Product and Account Login');
+    return;
+  }
+
+  STATE.data.settings = STATE.data.settings || {};
+  STATE.data.settings.customStockAccounts = STATE.data.settings.customStockAccounts || [];
+
+  const existing = STATE.data.settings.customStockAccounts.find(a => 
+    a && a.login && a.login.trim().toLowerCase() === login.toLowerCase() &&
+    a.product.trim().toLowerCase() === product.toLowerCase()
+  );
+  if (existing) {
+    existing.capacity = capacity;
+    existing.accountType = type;
+  } else {
+    STATE.data.settings.customStockAccounts.push({
+      product,
+      login,
+      accountType: type,
+      capacity
+    });
+  }
+
+  STATE.data.settings.accountCapacities = STATE.data.settings.accountCapacities || {};
+  const normKey = `${product.trim().toLowerCase()}___${login.trim().toLowerCase()}`;
+  STATE.data.settings.accountCapacities[normKey] = capacity;
+  STATE.data.settings.accountCapacities[login.trim().toLowerCase()] = capacity;
+
+  saveNewProductEmail(product, login);
+
+  saveLocalState();
+  closeModal('addStockAccountModal');
+  renderStockAndSlots();
+  showToast(`Account "${login}" added to stock with ${capacity} slots! 🎉`);
+
+  triggerAutoSaveSync(true);
+  await pushDirectUpstashRedis();
 }
 
 function openNewSaleWithStock(product, login, type) {
@@ -3288,6 +3527,10 @@ function setupEventListeners() {
   });
 
   // Drawer Action Items
+  document.getElementById('drawerBtnStock')?.addEventListener('click', () => {
+    closeSideDrawer();
+    switchView('stockView');
+  });
   document.getElementById('drawerBtnExcel')?.addEventListener('click', () => {
     closeSideDrawer();
     triggerExcelDownload();
@@ -3539,6 +3782,13 @@ function setupEventListeners() {
   // Employee Management Modal and Form
   document.getElementById('btnOpenNewEmployeeModal')?.addEventListener('click', openNewEmployeeModal);
   document.getElementById('employeeForm')?.addEventListener('submit', handleEmployeeSubmit);
+
+  // Stock & Slots Capacity Forms
+  document.getElementById('editSlotCapacityForm')?.addEventListener('submit', handleSaveSlotCapacity);
+  document.getElementById('addStockAccountForm')?.addEventListener('submit', handleSaveNewStockAccount);
+  document.getElementById('editSlotCapacityInput')?.addEventListener('input', (e) => {
+    updateSlotMembersLabel(e.target.value);
+  });
 
   // Sale Form Submit
   document.getElementById('saleForm')?.addEventListener('submit', handleSaleSubmit);

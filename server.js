@@ -1488,6 +1488,11 @@ app.post('/api/sync', async (req, res) => {
       ...db.settings,
       ...(!isEmployee ? (incomingSettings || {}) : {}),
       businessName: sanitizeBusinessName((!isEmployee ? incomingSettings?.businessName : null) || db.settings?.businessName),
+      accountCapacities: {
+        ...(db.settings?.accountCapacities || {}),
+        ...(incomingSettings?.accountCapacities || {})
+      },
+      customStockAccounts: incomingSettings?.customStockAccounts || db.settings?.customStockAccounts || [],
       lastModified: Date.now(),
       deletedSaleIds: Array.from(deletedSales),
       deletedExpenseIds: Array.from(deletedExpenses),

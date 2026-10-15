@@ -1,6 +1,27 @@
 {
   "sales": [
     {
+      "id": "sale_1792052892405",
+      "date": "2026-10-15",
+      "customerPhone": "+92 343 9088386",
+      "customerName": "",
+      "product": "Nord",
+      "accountType": "Private",
+      "accountLogin": "",
+      "planMonths": 3,
+      "planLabel": "3 Months (90 Days)",
+      "amount": 1600,
+      "paymentStatus": "Paid",
+      "paymentProof": null,
+      "paymentReceivedIn": "Boss JazzCash",
+      "soldBy": "Admin",
+      "employeeId": "admin",
+      "notes": "",
+      "updatedAt": "2026-10-15T08:28:12.405Z",
+      "expiryDate": "2027-01-12",
+      "createdAt": "2026-10-15T08:28:12.405Z"
+    },
+    {
       "id": "sale_1792015612316",
       "date": "2026-10-15",
       "customerPhone": "+92 336 7770245",
@@ -641,13 +662,13 @@
       "planMonths": 1,
       "planLabel": "1 Month (30 Days)",
       "amount": 250,
-      "paymentStatus": "Pending",
+      "paymentStatus": "Paid",
       "paymentProof": null,
       "paymentReceivedIn": "Boss JazzCash",
       "soldBy": "Admin",
       "employeeId": "admin",
       "notes": "",
-      "updatedAt": "2026-10-13T11:48:24.616Z",
+      "updatedAt": "2026-10-15T07:44:53.484Z",
       "expiryDate": "2026-11-11",
       "createdAt": "2026-10-13T11:48:24.616Z"
     },
@@ -767,13 +788,13 @@
       "planMonths": 1,
       "planLabel": "1 Month (30 Days)",
       "amount": 250,
-      "paymentStatus": "Pending",
+      "paymentStatus": "Paid",
       "paymentProof": null,
       "paymentReceivedIn": "Boss JazzCash",
       "soldBy": "Admin",
       "employeeId": "admin",
       "notes": "",
-      "updatedAt": "2026-10-13T09:36:31.416Z",
+      "updatedAt": "2026-10-15T07:44:57.902Z",
       "expiryDate": "2026-11-11",
       "createdAt": "2026-10-13T09:36:31.416Z"
     },
@@ -4401,6 +4422,17 @@
   ],
   "expenses": [
     {
+      "id": "exp_1792052524581",
+      "date": "2026-10-15",
+      "category": "Vendor Purchasing",
+      "description": "Binance Nord and Gemini",
+      "amount": 1000,
+      "assignedTo": "admin",
+      "assignedToName": "Boss (Admin)",
+      "updatedAt": "2026-10-15T08:22:04.581Z",
+      "createdAt": "2026-10-15T08:22:04.581Z"
+    },
+    {
       "id": "exp_1792015593188",
       "date": "2026-10-15",
       "category": "Vendor Purchasing",
@@ -4846,11 +4878,11 @@
       ]
     }
   ],
-  "recycleBin": [],
   "settings": {
     "businessName": "Monkey Tools",
     "currency": "Rs.",
-    "lastModified": 1792049425225,
+    "lastExcelExport": null,
+    "lastModified": 1792055899055,
     "deletedSaleIds": [
       "sale_1790808573942_ktuq",
       "sale_1790891345201_z6tu",
@@ -4882,7 +4914,13 @@
     "deletedExpenseIds": [
       "exp_1790946533413"
     ],
-    "lastExcelExport": null,
+    "productEmails": {
+      "Surfshark": [
+        "testvip@kuromee.com",
+        "abd155@kuromee.com",
+        "abd153@kuromee.com"
+      ]
+    },
     "templateExpiry": "Hello {customer}! Notice from {business}: Your {product} ({account}) expires on {expiry}. Kindly renew to keep uninterrupted access. Thank you!",
     "templatePending": "Hello {customer}! Friendly reminder from {business}: The payment of {currency} {amount} for your {product} ({plan}) is currently pending. Kindly clear the dues at your earliest convenience. Thank you!\n\n📱 JazzCash / EasyPaisa\n\nAccount Number: 03079335948\nAccount Holder: Muhammad Hannan\n(Same number for both Accounts)\n\n🏦 UBL Bank Transfer\n\nAccount Title: Muhammad Hannan\nAccount Number: 0967288558941\nBank Name: United Bank Limited (UBL)",
     "templateWelcome": "Assalam-o-Alaikum {customer}! Thank you for choosing {business}. Here are your {product} ({plan}) details:\nLogin: {account}\nExpiry: {expiry}\nAmount: {currency} {amount}\nHave a great experience!",
@@ -4925,14 +4963,24 @@
       "trash_1792015487940_i3yy",
       "sale_1792015513284"
     ],
-    "productEmails": {
-      "Surfshark": [
-        "abd153@kuromee.com"
-      ]
-    },
     "deletedProductIds": [],
-    "theme": "oled"
+    "theme": "sapphire",
+    "accountCapacities": {
+      "surfshark___abd156@kuromee.com": 10,
+      "abd156@kuromee.com": 10,
+      "surfshark___testvip@kuromee.com": 6,
+      "testvip@kuromee.com": 6
+    },
+    "customStockAccounts": [
+      {
+        "product": "Surfshark",
+        "login": "testvip@kuromee.com",
+        "accountType": "Shared",
+        "capacity": 6
+      }
+    ]
   },
+  "recycleBin": [],
   "employees": [
     {
       "id": "emp_1791761609185_p5ry",
