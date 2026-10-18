@@ -435,22 +435,31 @@ function buildExcelWorkbook(data) {
   const wb = XLSX.utils.book_new();
 
   // 1. Sales Sheet
-  const salesRows = (data.sales || []).map(s => ({
-    'Sale ID': s.id || '',
-    'Date': s.date || '',
-    'Customer Phone': s.customerPhone || '',
-    'Customer Name': s.customerName || '',
-    'Product': s.product || '',
-    'Account Type': s.accountType || '',
-    'Assigned Account (Email/Login)': s.accountLogin || '',
-    'Plan Duration': s.planLabel || `${s.planMonths} Month(s)`,
-    'Plan Months': s.planMonths || '',
-    'Amount (Rs.)': s.amount || 0,
-    'Payment Status': s.paymentStatus || 'Pending',
-    'Expiry Date': s.expiryDate || '',
-    'Notes': s.notes || '',
-    'Created At': s.createdAt || ''
-  }));
+  const salesRows = (data.sales || []).map(s => {
+    const totalAmount = Number(s.amount) || 0;
+    const paidAmount = Number(s.paidAmount !== undefined ? s.paidAmount : (s.paymentStatus === 'Paid' ? totalAmount : 0));
+    const dueAmount = Math.max(0, totalAmount - paidAmount);
+    return {
+      'Sale ID': s.id || '',
+      'Date': s.date || '',
+      'Customer Phone': s.customerPhone || '',
+      'Customer Name': s.customerName || '',
+      'Product': s.product || '',
+      'Account Type': s.accountType || '',
+      'Assigned Account (Email/Login)': s.accountLogin || '',
+      'Plan Duration': s.planLabel || `${s.planMonths} Month(s)`,
+      'Plan Months': s.planMonths || '',
+      'Total Amount (Rs.)': totalAmount,
+      'Paid Amount (Rs.)': paidAmount,
+      'Remaining Due (Rs.)': dueAmount,
+      'Payment Status': s.paymentStatus || 'Pending',
+      'Payment Received In': s.paymentReceivedIn || '',
+      'Sold By': s.soldBy || 'Admin',
+      'Expiry Date': s.expiryDate || '',
+      'Notes': s.notes || '',
+      'Created At': s.createdAt || ''
+    };
+  });
   const wsSales = XLSX.utils.json_to_sheet(salesRows.length ? salesRows : [{ Note: 'No sales records found' }]);
   XLSX.utils.book_append_sheet(wb, wsSales, 'Sales');
 
@@ -831,6 +840,23 @@ app.post('/api/sales', async (req, res) => {
   const expiryDate = calculateExpiry(saleDate, months);
   const saleId = id || ('sale_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6));
 
+  const totalAmount = Number(amount) || 0;
+  let finalStatus = paymentStatus || 'Pending';
+  let finalPaidAmount = req.body.paidAmount !== undefined ? Number(req.body.paidAmount) : undefined;
+  if (finalPaidAmount === undefined || isNaN(finalPaidAmount)) {
+    if (finalStatus === 'Paid') finalPaidAmount = totalAmount;
+    else if (finalStatus === 'Partial') finalPaidAmount = Math.round(totalAmount / 2);
+    else finalPaidAmount = 0;
+  }
+  finalPaidAmount = Math.max(0, finalPaidAmount);
+  if (finalPaidAmount >= totalAmount && totalAmount > 0) {
+    finalStatus = 'Paid';
+  } else if (finalStatus === 'Paid' && finalPaidAmount < totalAmount) {
+    finalPaidAmount = totalAmount;
+  } else if (finalStatus === 'Partial' && finalPaidAmount <= 0) {
+    finalStatus = 'Pending';
+  }
+
   const saleObj = {
     id: saleId,
     date: saleDate,
@@ -841,8 +867,23 @@ app.post('/api/sales', async (req, res) => {
     accountLogin: accountLogin ? accountLogin.trim() : '',
     planMonths: months,
     planLabel: planLabel || `${months} Month(s)`,
-    amount: Number(amount) || 0,
-    paymentStatus: paymentStatus || 'Pending', // Paid, Pending, Unpaid
+    amount: totalAmount,
+    paidAmount: finalPaidAmount,
+    paymentStatus: finalStatus, // Paid, Partial, Pending, Unpaid
+    paymentHistory: Array.isArray(req.body.paymentHistory) ? req.body.paymentHistory : (
+      finalPaidAmount > 0 ? [{
+        id: 'pay_' + Date.now(),
+        date: saleDate,
+        amount: finalPaidAmount,
+        totalPaidAfter: finalPaidAmount,
+        remainingAfter: Math.max(0, totalAmount - finalPaidAmount),
+        paymentReceivedIn: req.body.paymentReceivedIn || 'Boss Account',
+        paymentProof: req.body.paymentProof || null,
+        receivedBy: req.body.soldBy || 'Admin',
+        notes: finalStatus === 'Paid' ? 'Initial Full Payment' : 'Initial Partial/Advance Payment',
+        createdAt: new Date().toISOString()
+      }] : []
+    ),
     soldBy: req.body.soldBy ? String(req.body.soldBy).trim() : 'Admin',
     employeeId: req.body.employeeId ? String(req.body.employeeId).trim() : 'admin',
     paymentProof: req.body.paymentProof || null,
@@ -879,6 +920,18 @@ app.put('/api/sales/:id', async (req, res) => {
   const saleDate = updatedData.date || existing.date;
   const months = Number(updatedData.planMonths || existing.planMonths) || 1;
   const expiryDate = calculateExpiry(saleDate, months);
+  const totalAmount = Number(updatedData.amount !== undefined ? updatedData.amount : existing.amount);
+
+  let finalStatus = updatedData.paymentStatus !== undefined ? updatedData.paymentStatus : existing.paymentStatus;
+  let finalPaid = updatedData.paidAmount !== undefined ? Number(updatedData.paidAmount) : (existing.paidAmount !== undefined ? Number(existing.paidAmount) : (finalStatus === 'Paid' ? totalAmount : 0));
+  if (isNaN(finalPaid)) finalPaid = finalStatus === 'Paid' ? totalAmount : 0;
+  finalPaid = Math.max(0, finalPaid);
+
+  if (finalPaid >= totalAmount && totalAmount > 0) {
+    finalStatus = 'Paid';
+  } else if (finalStatus === 'Paid') {
+    finalPaid = totalAmount;
+  }
 
   db.sales[index] = {
     ...existing,
@@ -886,7 +939,10 @@ app.put('/api/sales/:id', async (req, res) => {
     id,
     date: saleDate,
     planMonths: months,
-    amount: Number(updatedData.amount !== undefined ? updatedData.amount : existing.amount),
+    amount: totalAmount,
+    paidAmount: finalPaid,
+    paymentStatus: finalStatus,
+    paymentHistory: updatedData.paymentHistory !== undefined ? updatedData.paymentHistory : (existing.paymentHistory || []),
     soldBy: updatedData.soldBy !== undefined ? String(updatedData.soldBy).trim() : (existing.soldBy || 'Admin'),
     employeeId: updatedData.employeeId !== undefined ? String(updatedData.employeeId).trim() : (existing.employeeId || 'admin'),
     paymentProof: updatedData.paymentProof !== undefined ? updatedData.paymentProof : existing.paymentProof,
@@ -902,9 +958,9 @@ app.put('/api/sales/:id', async (req, res) => {
 // Quick Update Payment Status
 app.patch('/api/sales/:id/status', async (req, res) => {
   const { id } = req.params;
-  const { paymentStatus, paymentProof, paymentReceivedIn } = req.body;
-  if (!['Paid', 'Pending', 'Unpaid'].includes(paymentStatus)) {
-    return res.status(400).json({ error: 'Status must be Paid, Pending, or Unpaid' });
+  const { paymentStatus, paymentProof, paymentReceivedIn, paidAmount } = req.body;
+  if (!['Paid', 'Partial', 'Pending', 'Unpaid'].includes(paymentStatus)) {
+    return res.status(400).json({ error: 'Status must be Paid, Partial, Pending, or Unpaid' });
   }
 
   const db = readDb();
@@ -913,12 +969,80 @@ app.patch('/api/sales/:id/status', async (req, res) => {
     return res.status(404).json({ error: 'Sale record not found' });
   }
 
+  const totalAmount = Number(sale.amount) || 0;
   sale.paymentStatus = paymentStatus;
+  if (paidAmount !== undefined) {
+    sale.paidAmount = Math.max(0, Number(paidAmount) || 0);
+  } else if (paymentStatus === 'Paid') {
+    sale.paidAmount = totalAmount;
+  } else if (paymentStatus === 'Unpaid' || paymentStatus === 'Pending') {
+    sale.paidAmount = 0;
+  } else if (paymentStatus === 'Partial' && (!sale.paidAmount || sale.paidAmount >= totalAmount)) {
+    sale.paidAmount = Math.round(totalAmount / 2);
+  }
+
   if (paymentProof !== undefined) sale.paymentProof = paymentProof;
   if (paymentReceivedIn !== undefined) sale.paymentReceivedIn = paymentReceivedIn;
   sale.updatedAt = new Date().toISOString();
   await writeDb(db);
   res.json({ success: true, sale });
+});
+
+// Receive Payment / Settle Balance Incrementally
+app.post('/api/sales/:id/receive-payment', async (req, res) => {
+  const { id } = req.params;
+  const {
+    amountPaidNow,
+    paymentProof,
+    paymentReceivedIn,
+    notes,
+    receivedBy,
+    date
+  } = req.body;
+
+  const db = readDb();
+  const sale = db.sales.find(s => s.id === id);
+  if (!sale) {
+    return res.status(404).json({ error: 'Sale record not found' });
+  }
+
+  const payAmount = Number(amountPaidNow) || 0;
+  if (payAmount <= 0) {
+    return res.status(400).json({ error: 'Payment amount must be greater than 0' });
+  }
+
+  const totalAmount = Number(sale.amount) || 0;
+  const prevPaid = Number(sale.paidAmount !== undefined ? sale.paidAmount : (sale.paymentStatus === 'Paid' ? totalAmount : 0));
+  const newPaid = prevPaid + payAmount;
+  const remaining = Math.max(0, totalAmount - newPaid);
+
+  sale.paidAmount = newPaid;
+  if (newPaid >= totalAmount) {
+    sale.paymentStatus = 'Paid';
+  } else {
+    sale.paymentStatus = 'Partial';
+  }
+
+  if (paymentProof) sale.paymentProof = paymentProof;
+  if (paymentReceivedIn) sale.paymentReceivedIn = paymentReceivedIn;
+
+  sale.paymentHistory = sale.paymentHistory || [];
+  sale.paymentHistory.push({
+    id: 'pay_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    date: date || getLocalDateString(),
+    amount: payAmount,
+    totalPaidAfter: newPaid,
+    remainingAfter: remaining,
+    paymentReceivedIn: paymentReceivedIn || sale.paymentReceivedIn || 'Boss Account',
+    paymentProof: paymentProof || null,
+    receivedBy: receivedBy || req.headers['x-user-name'] || 'Admin',
+    notes: notes ? String(notes).trim() : '',
+    createdAt: new Date().toISOString()
+  });
+
+  sale.updatedAt = new Date().toISOString();
+  await writeDb(db);
+  res.json({ success: true, sale, paymentAdded: payAmount, remaining });
 });
 
 // Delete Sale (Moves to Recycle Bin with Mandatory Reason)

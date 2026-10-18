@@ -1219,6 +1219,8 @@ body::before {
   font-weight: 700;
   color: #fff;
   letter-spacing: 0.02em;
+  cursor: default;
+  user-select: text;
 }
 .user-name-tag {
   background: var(--bg-main);
@@ -1227,6 +1229,31 @@ body::before {
   font-size: 12px;
   padding: 2px 8px;
   border-radius: 6px;
+  cursor: default;
+  user-select: text;
+}
+.btn-crm-pill {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+  user-select: none;
+}
+.btn-crm-pill:hover {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: #f59e0b;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
 }
 
 .item-price-tag {
@@ -1312,6 +1339,11 @@ body::before {
   background: var(--danger-bg);
   color: var(--danger-red);
   border: 1px solid var(--danger-border);
+}
+.status-partial {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.45);
 }
 .status-expired {
   background: rgba(239, 68, 68, 0.22);
@@ -1818,7 +1850,7 @@ body::before {
 /* Status Radio Group */
 .status-radio-group {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 .status-radio {
@@ -1834,14 +1866,274 @@ body::before {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
-  transition: all 0.15s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
 }
 .status-radio input { accent-color: var(--gold-accent); }
-.status-radio:hover { border-color: var(--border-subtle); color: #fff; }
-.status-radio:has(input:checked) {
-  border-color: var(--gold-accent);
+.status-radio:hover { border-color: rgba(255, 255, 255, 0.2); color: #fff; transform: translateY(-1px); }
+.status-radio.radio-paid:has(input:checked) {
+  border-color: #10b981;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.2);
+}
+.status-radio.radio-partial:has(input:checked) {
+  border-color: #f59e0b;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.16);
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.2);
+}
+.status-radio.radio-pending:has(input:checked) {
+  border-color: #eab308;
+  color: #fde047;
+  background: rgba(234, 179, 8, 0.15);
+  box-shadow: 0 0 14px rgba(234, 179, 8, 0.2);
+}
+.status-radio.radio-unpaid:has(input:checked) {
+  border-color: #ef4444;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.15);
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.2);
+}
+
+/* Partial Payment Breakdown Card in Sale Form */
+.partial-input-card {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(26, 29, 36, 0.95) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--border-radius-sm);
+  padding: 12px 14px;
+  margin-top: 10px;
+  margin-bottom: 12px;
+  animation: fadeInDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.partial-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.partial-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fbbf24;
+}
+.partial-quick-chips {
+  display: flex;
+  gap: 6px;
+}
+.readonly-balance-pill {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 8px 12px;
+  border-radius: var(--border-radius-sm);
+  color: #fbbf24;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+}
+.partial-progress-wrap {
+  width: 100%;
+}
+.partial-progress-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.partial-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #f59e0b 100%);
+  border-radius: 999px;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Partial Split Display on Sales Cards */
+.partial-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.price-split-row {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+.partial-split-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+.badge-mini {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+.badge-paid-mini {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+.badge-due-mini {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+.partial-card-bar-wrap {
+  margin-top: 8px;
+  margin-bottom: 4px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 6px;
+}
+.partial-card-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+}
+.btn-partial-collect {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.35));
+  border: 1px solid rgba(245, 158, 11, 0.55);
+  color: #fbbf24;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-partial-collect:hover {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #000;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+  transform: translateY(-1px);
+}
+
+/* ==================== RECEIVE PAYMENT MODAL STYLES ==================== */
+.payment-overview-card {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(17, 24, 39, 0.95) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--border-radius-sm);
+  padding: 14px 16px;
+}
+.payment-overview-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.payment-cust-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.payment-numbers-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.pay-num-item {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pay-num-item.highlight-due {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.12);
+}
+.pay-num-label {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pay-num-val {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.receive-quick-actions {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 8px;
+}
+.btn-receive-preset {
+  background: var(--bg-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  padding: 8px 10px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-receive-preset strong {
+  font-family: var(--font-mono);
   color: #fff;
-  background: var(--gold-dim);
+  font-size: 12.5px;
+}
+.btn-receive-preset:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+.btn-receive-preset.active {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbbf24;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+}
+.input-with-currency {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input-currency-prefix {
+  position: absolute;
+  left: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 13px;
+  pointer-events: none;
+}
+.input-with-currency .form-control {
+  padding-left: 42px;
+  font-size: 16px;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .modal-actions {
@@ -2437,7 +2729,7 @@ body::before {
     gap: 8px;
   }
   .status-radio-group {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
   .modal-container {
     padding: 16px 14px;

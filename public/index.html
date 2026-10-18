@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=6.5">
+  <link rel="stylesheet" href="style.css?v=7.1">
 </head>
 <body>
 
@@ -584,9 +584,10 @@
             </select>
             <select id="salesFilterStatus" class="custom-select select-sm">
               <option value="ALL">All Status</option>
-              <option value="Paid">Paid</option>
-              <option value="Pending">Pending</option>
-              <option value="Unpaid">Unpaid</option>
+              <option value="Paid">🟢 Paid</option>
+              <option value="Partial">🟠 Partial (Half Paid)</option>
+              <option value="Pending">🟡 Pending</option>
+              <option value="Unpaid">🔴 Unpaid</option>
               <option value="Expired">🔴 Expired Plans</option>
               <option value="Active">🟢 Active Plans</option>
             </select>
@@ -597,8 +598,9 @@
         <div class="quick-filter-chips-bar" id="quickFilterChipsBar">
           <button type="button" class="filter-chip active" data-qfilter="ALL">✨ All Sales</button>
           <button type="button" class="filter-chip" data-qfilter="TODAY">🔥 Today</button>
-          <button type="button" class="filter-chip" data-qfilter="EXPIRING_3D">⏰ Expiring Soon (3d)</button>
+          <button type="button" class="filter-chip" data-qfilter="PARTIAL">🟠 Partial Dues</button>
           <button type="button" class="filter-chip" data-qfilter="PENDING">⏳ Pending Wasooli</button>
+          <button type="button" class="filter-chip" data-qfilter="EXPIRING_3D">⏰ Expiring Soon (3d)</button>
           <button type="button" class="filter-chip" data-qfilter="PRIVATE">👑 Private Plans</button>
           <button type="button" class="filter-chip" data-qfilter="SHARED">👥 Shared Plans</button>
         </div>
@@ -1207,6 +1209,10 @@
               <input type="radio" name="saleStatus" value="Paid">
               <span>Paid</span>
             </label>
+            <label class="status-radio radio-partial">
+              <input type="radio" name="saleStatus" value="Partial">
+              <span>Partial / Half</span>
+            </label>
             <label class="status-radio radio-pending">
               <input type="radio" name="saleStatus" value="Pending" checked>
               <span>Pending</span>
@@ -1215,6 +1221,37 @@
               <input type="radio" name="saleStatus" value="Unpaid">
               <span>Unpaid</span>
             </label>
+          </div>
+        </div>
+
+        <!-- Partial / Advance Payment Breakdown Box (Smooth Expand) -->
+        <div id="salePartialWrap" class="partial-input-card" style="display:none;">
+          <div class="partial-card-header">
+            <div class="partial-card-title">
+              <span>💰 Partial Payment / Advance Details</span>
+              <span class="badge-amber" id="salePartialPercentBadge">50% Advance</span>
+            </div>
+            <div class="partial-quick-chips">
+              <button type="button" class="btn-chip" id="btnSalePartialHalf">50% Half</button>
+              <button type="button" class="btn-chip" id="btnSalePartialClear">Full</button>
+            </div>
+          </div>
+
+          <div class="form-row mt-2">
+            <div class="form-group flex-1">
+              <label for="salePaidAmountInput">Advance / Paid Now (Rs.) <span class="text-gold">*</span></label>
+              <input type="number" id="salePaidAmountInput" class="form-control font-mono font-bold" min="0" placeholder="e.g. 500">
+            </div>
+            <div class="form-group flex-1">
+              <label>Remaining Due Balance (Rs.)</label>
+              <div id="saleRemainingDisplay" class="readonly-balance-pill font-mono">Rs. 0</div>
+            </div>
+          </div>
+
+          <div class="partial-progress-wrap mt-2">
+            <div class="partial-progress-track">
+              <div id="salePartialBarFill" class="partial-progress-fill" style="width: 50%;"></div>
+            </div>
           </div>
         </div>
 
@@ -1468,9 +1505,10 @@
         </div>
 
         <label class="form-label" style="margin-bottom: 6px;">Select Message Type:</label>
-        <div class="wa-type-tabs" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 12px;">
+        <div class="wa-type-tabs" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px;">
           <button type="button" class="wa-tab-btn active" data-watype="expiry">⏰ Expiry Reminder</button>
           <button type="button" class="wa-tab-btn" data-watype="pending">⏳ Pending Payment</button>
+          <button type="button" class="wa-tab-btn" data-watype="partial">🟠 Remaining Balance</button>
           <button type="button" class="wa-tab-btn" data-watype="welcome">📦 Credentials Delivery</button>
           <button type="button" class="wa-tab-btn" data-watype="paid">✅ Payment Received</button>
         </div>
@@ -1639,6 +1677,122 @@
           <button type="button" class="btn btn-outline" data-close-modal="quickMarkPaidModal">Cancel</button>
           <button type="submit" id="btnConfirmQuickMarkPaid" class="btn btn-gold flex-1">
             ✓ Confirm Paid
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: RECEIVE PAYMENT / SETTLE BALANCE ==================== -->
+  <div id="receivePaymentModal" class="modal-overlay">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <div class="flex items-center gap-2">
+          <div class="modal-icon-badge" style="background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.35); color: #f59e0b;">
+            💳
+          </div>
+          <div>
+            <h3 class="modal-title">Receive Payment / Dues</h3>
+            <p class="modal-subtitle">Customer advance or remaining balance entry</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" data-close-modal="receivePaymentModal">&times;</button>
+      </div>
+
+      <form id="receivePaymentForm" class="modal-form">
+        <input type="hidden" id="receivePaymentSaleId" value="">
+
+        <!-- Customer & Order Financial Summary Card -->
+        <div class="payment-overview-card mb-3">
+          <div class="payment-overview-top">
+            <div class="payment-cust-info">
+              <span class="font-bold text-white" id="receiveCustName">Customer</span>
+              <span class="text-muted font-mono" id="receiveCustPhone" style="font-size: 11.5px;">+92...</span>
+            </div>
+            <div class="text-right">
+              <span class="badge-staff staff-admin" id="receiveProductBadge">Product</span>
+            </div>
+          </div>
+
+          <div class="payment-numbers-grid">
+            <div class="pay-num-item">
+              <span class="pay-num-label">Total Amount</span>
+              <span class="pay-num-val" id="receiveTotalAmount">Rs. 0</span>
+            </div>
+            <div class="pay-num-item">
+              <span class="pay-num-label">Already Paid</span>
+              <span class="pay-num-val text-green" id="receiveAlreadyPaid">Rs. 0</span>
+            </div>
+            <div class="pay-num-item highlight-due">
+              <span class="pay-num-label">Remaining Due</span>
+              <span class="pay-num-val text-amber font-bold" id="receiveRemainingDue">Rs. 0</span>
+            </div>
+          </div>
+
+          <div class="partial-progress-wrap mt-2">
+            <div class="partial-progress-track">
+              <div id="receiveProgressBar" class="partial-progress-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Action Presets -->
+        <div class="receive-quick-actions mb-3">
+          <button type="button" class="btn-receive-preset active" id="btnPresetFullDue">
+            <span>✓ Clear Full Remaining</span>
+            <strong id="btnPresetFullDueVal">Rs. 0</strong>
+          </button>
+          <button type="button" class="btn-receive-preset" id="btnPresetCustom">
+            <span>✏️ Custom Partial Amount</span>
+          </button>
+        </div>
+
+        <!-- Payment Amount Input -->
+        <div class="form-group">
+          <label for="receiveAmountInput">Amount Receiving Now (Rs.) <span class="text-gold">*</span></label>
+          <div class="input-with-currency">
+            <span class="input-currency-prefix">Rs.</span>
+            <input type="number" id="receiveAmountInput" class="form-control font-mono font-bold" min="1" required placeholder="500">
+          </div>
+          <small id="receiveOutcomeHint" class="form-hint text-emerald mt-1">✨ This will fully settle the account as Paid.</small>
+        </div>
+
+        <!-- Receiving Account -->
+        <div class="form-group">
+          <label for="receivePaymentAccountSelect">Payment Received In Account <span class="text-gold">*</span></label>
+          <select id="receivePaymentAccountSelect" class="form-control">
+            <option value="Boss JazzCash">Boss JazzCash</option>
+            <option value="Boss EasyPaisa">Boss EasyPaisa</option>
+            <option value="Boss Bank">Boss Bank</option>
+          </select>
+        </div>
+
+        <!-- Payment Proof Screenshot -->
+        <div class="form-group">
+          <div class="label-with-actions">
+            <label>Payment Proof Screenshot <span id="receiveProofBadge" class="badge-opt">(Optional)</span></label>
+          </div>
+          <input type="file" id="receiveProofFileInput" accept="image/*" class="form-control" style="font-size: 12px;">
+          <input type="hidden" id="receiveProofBase64" value="">
+          <div id="receiveProofPreviewWrap" class="proof-preview-wrap mt-2" style="display: none;">
+            <img id="receiveProofPreviewImg" src="" alt="Proof Preview" class="proof-thumbnail">
+            <div class="proof-preview-meta">
+              <span class="text-green font-bold" style="font-size: 12px;">✓ Screenshot Attached</span>
+              <button type="button" id="btnRemoveReceiveProof" class="btn-xs btn-outline text-rose">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes / TID -->
+        <div class="form-group">
+          <label for="receiveNotesInput">Payment Note / TID <span class="text-muted">(Optional)</span></label>
+          <input type="text" id="receiveNotesInput" class="form-control" placeholder="e.g. EasyPaisa TID: 10482937">
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" data-close-modal="receivePaymentModal">Cancel</button>
+          <button type="submit" id="btnSubmitReceivePayment" class="btn btn-gold flex-1">
+            <span>Save &amp; Confirm Payment</span>
           </button>
         </div>
       </form>
@@ -1922,6 +2076,6 @@
   <!-- Notification Toast -->
   <div id="toastNotification" class="toast"></div>
 
-  <script src="app.js?v=5.6"></script>
+  <script src="app.js?v=7.1"></script>
 </body>
 </html>

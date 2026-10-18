@@ -49,6 +49,7 @@ function sanitizeBusinessName(name) {
 const DEFAULT_TEMPLATES = {
   expiry: 'Hello {customer}! Notice from {business}: Your {product} ({account}) expires on {expiry}. Kindly renew to keep uninterrupted access. Thank you!',
   pending: 'Hello {customer}! Friendly reminder from {business}: The payment of {currency} {amount} for your {product} ({plan}) is currently pending. Kindly clear the dues at your earliest convenience. Thank you!',
+  partial: 'Assalam-o-Alaikum {customer}! Thank you for choosing {business}.\nYour {product} ({plan}) order update:\nTotal Amount: {currency} {amount}\nReceived / Advance: {currency} {paid}\nRemaining Due Balance: {currency} {due}\nKindly clear the remaining balance at your earliest convenience. JazakAllah!',
   welcome: 'Assalam-o-Alaikum {customer}! Thank you for choosing {business}. Here are your {product} ({plan}) details:\nLogin: {account}\nExpiry: {expiry}\nAmount: {currency} {amount}\nHave a great experience!',
   paid: 'Dear {customer}, we have received your payment of {currency} {amount} for {product} ({plan}). Thank you for trusting {business}!'
 };
@@ -1872,8 +1873,12 @@ function renderKPIs() {
   const totalExpense = filteredExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   const netProfit = totalRevenue - totalExpense;
 
-  const filteredPendingSales = filteredSales.filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid');
-  const filteredPendingTotal = filteredPendingSales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+  const filteredPendingSales = filteredSales.filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid' || s.paymentStatus === 'Partial');
+  const filteredPendingTotal = filteredPendingSales.reduce((sum, s) => {
+    const tot = Number(s.amount) || 0;
+    const pd = Number(s.paidAmount !== undefined ? s.paidAmount : (s.paymentStatus === 'Paid' ? tot : 0));
+    return sum + Math.max(0, tot - pd);
+  }, 0);
 
   document.getElementById('kpiRevenue').textContent = totalRevenue.toLocaleString('en-US');
   document.getElementById('kpiExpense').textContent = totalExpense.toLocaleString('en-US');
@@ -2090,8 +2095,10 @@ function renderSales() {
         const d = calculateDaysRemaining(s.expiryDate);
         return d !== null && d >= 0 && d <= 3;
       });
+    } else if (STATE.quickFilter === 'PARTIAL') {
+      list = list.filter(s => s.paymentStatus === 'Partial');
     } else if (STATE.quickFilter === 'PENDING') {
-      list = list.filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid');
+      list = list.filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid' || s.paymentStatus === 'Partial');
     } else if (STATE.quickFilter === 'PRIVATE') {
       list = list.filter(s => String(s.accountType).toLowerCase().includes('private'));
     } else if (STATE.quickFilter === 'SHARED') {
@@ -2235,6 +2242,18 @@ function quickCopySaleReceipt(saleOrId) {
   const settings = STATE.data.settings || {};
   const bizName = sanitizeBusinessName(settings.businessName) || 'MONKEY TOOLS';
 
+  const totalAmount = Number(sale.amount) || 0;
+  const paidAmount = Number(sale.paidAmount !== undefined ? sale.paidAmount : (sale.paymentStatus === 'Paid' ? totalAmount : 0));
+  const dueAmount = Math.max(0, totalAmount - paidAmount);
+
+  let statusText = sale.paymentStatus;
+  if (sale.paymentStatus === 'Paid') {
+    statusText = 'Paid ✓';
+  } else if (sale.paymentStatus === 'Partial') {
+    const pct = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
+    statusText = `Partial (${pct}% Paid)`;
+  }
+
   const receipt = [
     `⭐ *${bizName.toUpperCase()} — ORDER RECEIPT* ⭐`,
     `━━━━━━━━━━━━━━━━━━━━━━`,
@@ -2245,8 +2264,10 @@ function quickCopySaleReceipt(saleOrId) {
     sale.accountLogin ? `🔑 *Login:* ${sale.accountLogin}` : null,
     `📅 *Date:* ${formatDateDisplay(sale.date)}`,
     `⏰ *Expiry Date:* ${formatDateDisplay(sale.expiryDate)}`,
-    `💰 *Amount:* Rs. ${(sale.amount || 0).toLocaleString('en-US')}`,
-    `💳 *Status:* ${sale.paymentStatus === 'Paid' ? 'Paid ✓' : sale.paymentStatus}`,
+    `💰 *Total Amount:* Rs. ${totalAmount.toLocaleString('en-US')}`,
+    sale.paymentStatus === 'Partial' ? `💵 *Advance / Paid:* Rs. ${paidAmount.toLocaleString('en-US')}` : null,
+    (sale.paymentStatus === 'Partial' || sale.paymentStatus === 'Pending' || sale.paymentStatus === 'Unpaid') ? `⚠️ *Remaining Due:* Rs. ${dueAmount.toLocaleString('en-US')}` : null,
+    `💳 *Status:* ${statusText}`,
     `━━━━━━━━━━━━━━━━━━━━━━`,
     `🙏 Thank you for choosing ${bizName}!`
   ].filter(Boolean).join('\n');
@@ -2272,15 +2293,30 @@ function quickSetSaleStatus(saleId, newStatus, event) {
   const sale = (STATE.data.sales || []).find(s => s.id === saleId);
   if (!sale) return;
 
+  const totalAmount = Number(sale.amount) || 0;
   const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
+
+  if (newStatus === 'Partial') {
+    const currentPaid = Number(sale.paidAmount) || 0;
+    if (currentPaid <= 0 || currentPaid >= totalAmount) {
+      openReceivePaymentModal(saleId);
+      return;
+    }
+  }
+
   if (isEmployee && newStatus === 'Paid' && !sale.paymentProof) {
-    openQuickMarkPaid(saleId);
+    openReceivePaymentModal(saleId);
     return;
   }
 
   if (sale.paymentStatus === newStatus) return;
 
   sale.paymentStatus = newStatus;
+  if (newStatus === 'Paid') {
+    sale.paidAmount = totalAmount;
+  } else if (newStatus === 'Pending' || newStatus === 'Unpaid') {
+    sale.paidAmount = 0;
+  }
   sale.updatedAt = new Date().toISOString();
 
   if (newStatus === 'Paid') {
@@ -2297,7 +2333,14 @@ function quickSetSaleStatus(saleId, newStatus, event) {
 
 function renderSaleCardHtml(s) {
   const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
-  const statusClass = s.paymentStatus === 'Paid' ? 'status-paid' : (s.paymentStatus === 'Pending' ? 'status-pending' : 'status-unpaid');
+  const totalAmount = Number(s.amount) || 0;
+  const isPaid = s.paymentStatus === 'Paid';
+  const isPartial = s.paymentStatus === 'Partial';
+  const paidAmount = Number(s.paidAmount !== undefined ? s.paidAmount : (isPaid ? totalAmount : 0));
+  const dueAmount = Math.max(0, totalAmount - paidAmount);
+  const paidPercent = totalAmount > 0 ? Math.min(100, Math.round((paidAmount / totalAmount) * 100)) : 0;
+
+  const statusClass = isPaid ? 'status-paid' : (isPartial ? 'status-partial' : (s.paymentStatus === 'Pending' ? 'status-pending' : 'status-unpaid'));
   const daysLeft = calculateDaysRemaining(s.expiryDate);
   const isExpired = daysLeft !== null && daysLeft < 0;
   const isExpiresToday = daysLeft === 0;
@@ -2306,20 +2349,31 @@ function renderSaleCardHtml(s) {
   const cleanPhone = cleanPhoneForCall(s.customerPhone);
 
   return `
-    <div class="item-card ${isExpired ? 'is-expired' : ''}" data-sale-id="${s.id}">
+    <div class="item-card ${isExpired ? 'is-expired' : ''} ${isPartial ? 'is-partial' : ''}" data-sale-id="${s.id}">
       <div class="item-card-header">
         <div class="item-user-info">
-          <span class="user-phone-badge" onclick="openCustomerCrm('${escapeHtml(s.customerPhone)}', '${escapeHtml(s.customerName || '')}')" style="cursor:pointer;" title="Click to view Customer CRM Profile">
-            👤 ${formatPhone(s.customerPhone)}
+          <span class="user-phone-badge">
+            📱 ${formatPhone(s.customerPhone)}
           </span>
-          ${s.customerName ? `<span class="user-name-tag" onclick="openCustomerCrm('${escapeHtml(s.customerPhone)}', '${escapeHtml(s.customerName || '')}')" style="cursor:pointer;" title="Click to view Customer CRM Profile">${escapeHtml(s.customerName)}</span>` : ''}
+          ${s.customerName ? `<span class="user-name-tag">${escapeHtml(s.customerName)}</span>` : ''}
+          <button type="button" class="btn-crm-pill" onclick="openCustomerCrm('${escapeHtml(s.customerPhone)}', '${escapeHtml(s.customerName || '')}')" title="Customer History &amp; CRM Profile">
+            <span>👤 Profile</span>
+          </button>
           <a href="tel:${cleanPhone}" class="user-phone-link" title="Direct Phone Call">📞</a>
           <span class="badge-staff ${soldBy === 'Admin' ? 'staff-admin' : 'staff-ali'}">👤 ${escapeHtml(soldBy)}</span>
           ${isExpired ? `<span class="badge-expired-header">🔴 Expired</span>` : (isExpiresToday ? `<span class="badge-urgent-pill">⚠️ Expires Today</span>` : '')}
         </div>
-        <div class="item-price-tag">
-          <span class="currency-sm">Rs.</span>
-          <span class="amount-text">${(s.amount || 0).toLocaleString('en-US')}</span>
+        <div class="item-price-tag ${isPartial ? 'partial-price' : ''}">
+          <div class="price-split-row">
+            <span class="currency-sm">Rs.</span>
+            <span class="amount-text">${totalAmount.toLocaleString('en-US')}</span>
+          </div>
+          ${isPartial ? `
+            <div class="partial-split-badges">
+              <span class="badge-mini badge-paid-mini" title="Advance Received">✓ ${paidAmount.toLocaleString()}</span>
+              <span class="badge-mini badge-due-mini" title="Remaining Due">⏳ Due ${dueAmount.toLocaleString()}</span>
+            </div>
+          ` : ''}
         </div>
       </div>
 
@@ -2349,6 +2403,18 @@ function renderSaleCardHtml(s) {
         </div>
       </div>
 
+      ${isPartial ? `
+        <div class="partial-card-bar-wrap">
+          <div class="partial-card-bar-labels">
+            <span>Advance: <strong class="text-green">Rs. ${paidAmount.toLocaleString()}</strong> (${paidPercent}%)</span>
+            <span>Remaining Due: <strong class="text-amber">Rs. ${dueAmount.toLocaleString()}</strong></span>
+          </div>
+          <div class="partial-progress-track">
+            <div class="partial-progress-fill" style="width: ${paidPercent}%;"></div>
+          </div>
+        </div>
+      ` : ''}
+
       ${s.notes ? `<div class="detail-item mb-3"><span class="detail-label">Notes:</span> <span class="detail-value text-muted">${escapeHtml(s.notes)}</span></div>` : ''}
 
       <div class="item-actions-bar">
@@ -2357,6 +2423,7 @@ function renderSaleCardHtml(s) {
           <div class="interactive-status-badge-wrap" title="1-Click change status">
             <select class="status-badge-select ${statusClass}" onchange="quickSetSaleStatus('${s.id}', this.value, event)">
               <option value="Paid" ${s.paymentStatus === 'Paid' ? 'selected' : ''}>🟢 Paid</option>
+              <option value="Partial" ${s.paymentStatus === 'Partial' ? 'selected' : ''}>🟠 Partial</option>
               <option value="Pending" ${s.paymentStatus === 'Pending' ? 'selected' : ''}>🟡 Pending</option>
               <option value="Unpaid" ${s.paymentStatus === 'Unpaid' ? 'selected' : ''}>🔴 Unpaid</option>
             </select>
@@ -2366,9 +2433,15 @@ function renderSaleCardHtml(s) {
             <button type="button" class="btn-proof-preview" onclick="openViewPaymentProof('${s.id}')">📷 Proof (${escapeHtml(s.paymentReceivedIn || 'Boss')})</button>
           ` : ''}
           ${isExpired ? `<span class="status-badge status-expired">❌ Expired</span>` : ''}
-          ${s.paymentStatus !== 'Paid' ? `
-            <button class="btn btn-xs btn-gold" onclick="openQuickMarkPaid('${s.id}')">✓ Mark Paid</button>
-          ` : ''}
+          ${isPartial ? `
+            <button type="button" class="btn-partial-collect" onclick="openReceivePaymentModal('${s.id}')">
+              💳 Receive Balance (Rs. ${dueAmount.toLocaleString()})
+            </button>
+          ` : (!isPaid ? `
+            <button type="button" class="btn btn-xs btn-gold" onclick="openReceivePaymentModal('${s.id}')">
+              ✓ Collect / Mark Paid
+            </button>
+          ` : '')}
         </div>
 
         <div class="item-btn-group">
@@ -2469,7 +2542,7 @@ function renderPendingPayments() {
   const period = STATE.currentPeriod;
   const pendingSales = (STATE.data.sales || [])
     .filter(s => isDateInPeriod(s.date, period))
-    .filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid');
+    .filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid' || s.paymentStatus === 'Partial');
 
   if (pendingSales.length === 0) {
     container.innerHTML = `
@@ -2603,9 +2676,8 @@ function renderStockAndSlots() {
               <div class="slot-item slot-occupied">
                 <div class="slot-customer-info">
                   <span>👤 Slot ${idx + 1}:</span>
-                  <a href="javascript:void(0)" onclick="openCustomerCrm('${escapeHtml(s.customerPhone)}', '${escapeHtml(s.customerName || '')}')" class="text-gold" style="text-decoration:none;">
-                    ${formatPhone(s.customerPhone)}
-                  </a>
+                  <span class="text-white font-mono font-bold" style="cursor:default; user-select:text;">${formatPhone(s.customerPhone)}</span>
+                  <button type="button" class="btn-crm-pill" style="padding:1px 6px; font-size:10.5px;" onclick="openCustomerCrm('${escapeHtml(s.customerPhone)}', '${escapeHtml(s.customerName || '')}')" title="Customer History &amp; CRM Profile">👤 Profile</button>
                 </div>
                 <div class="slot-expiry-info" style="display:flex;align-items:center;gap:6px;">
                   ${formatDaysBadge(days)}
@@ -2842,8 +2914,12 @@ function openCustomerCrm(customerPhone, customerName) {
 
   const totalSpent = custSales.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
   const pendingDue = custSales
-    .filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid')
-    .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+    .filter(s => s.paymentStatus === 'Pending' || s.paymentStatus === 'Unpaid' || s.paymentStatus === 'Partial')
+    .reduce((sum, s) => {
+      const tot = Number(s.amount) || 0;
+      const pd = Number(s.paidAmount !== undefined ? s.paidAmount : (s.paymentStatus === 'Paid' ? tot : 0));
+      return sum + Math.max(0, tot - pd);
+    }, 0);
 
   const activePlans = custSales.filter(s => {
     const d = calculateDaysRemaining(s.expiryDate);
@@ -3146,7 +3222,10 @@ function formatCustomTemplate(template, sale) {
   const account = sale.accountLogin || '';
   const plan = sale.planLabel || (sale.planMonths ? `${sale.planMonths} Month` : '');
   const expiry = sale.expiryDate ? formatDateDisplay(sale.expiryDate) : '';
-  const amount = (sale.amount || 0).toLocaleString('en-US');
+  const totalAmount = Number(sale.amount) || 0;
+  const paidAmount = Number(sale.paidAmount !== undefined ? sale.paidAmount : (sale.paymentStatus === 'Paid' ? totalAmount : 0));
+  const dueAmount = Math.max(0, totalAmount - paidAmount);
+  const amount = totalAmount.toLocaleString('en-US');
   const date = sale.date ? formatDateDisplay(sale.date) : '';
 
   return template
@@ -3154,11 +3233,21 @@ function formatCustomTemplate(template, sale) {
     .replace(/\{business\}/gi, business)
     .replace(/\{currency\}/gi, currency)
     .replace(/\{amount\}/gi, amount)
+    .replace(/\{paid\}/gi, paidAmount.toLocaleString('en-US'))
+    .replace(/\{due\}/gi, dueAmount.toLocaleString('en-US'))
     .replace(/\{product\}/gi, product)
     .replace(/\{account\}/gi, account)
     .replace(/\{plan\}/gi, plan)
     .replace(/\{expiry\}/gi, expiry)
     .replace(/\{date\}/gi, date);
+}
+
+function composePartialWhatsAppMessage(sale) {
+  const settings = STATE.data.settings || {};
+  const tpl = (settings.templatePartial && settings.templatePartial.trim())
+    ? settings.templatePartial
+    : DEFAULT_TEMPLATES.partial;
+  return formatCustomTemplate(tpl, sale);
 }
 
 function composePendingWhatsAppMessage(sale) {
@@ -3209,6 +3298,8 @@ function openWhatsAppPickerModal(saleId, preferredType = null) {
 
   if (preferredType) {
     currentWaType = preferredType;
+  } else if (sale.paymentStatus === 'Partial') {
+    currentWaType = 'partial';
   } else if (sale.paymentStatus !== 'Paid') {
     currentWaType = 'pending';
   } else {
@@ -3224,8 +3315,18 @@ function openWhatsAppPickerModal(saleId, preferredType = null) {
   const detEl = document.getElementById('waModalDetails');
   const phoneEl = document.getElementById('waModalPhone');
 
+  const totalAmount = Number(sale.amount) || 0;
+  const paidAmount = Number(sale.paidAmount !== undefined ? sale.paidAmount : (sale.paymentStatus === 'Paid' ? totalAmount : 0));
+  const dueAmount = Math.max(0, totalAmount - paidAmount);
+
   if (nameEl) nameEl.textContent = sale.customerName || 'Customer';
-  if (detEl) detEl.textContent = `${sale.product} (${sale.planLabel || sale.planMonths + 'M'}) · Rs. ${(sale.amount || 0).toLocaleString('en-US')}`;
+  if (detEl) {
+    if (sale.paymentStatus === 'Partial') {
+      detEl.textContent = `${sale.product} (${sale.planLabel || sale.planMonths + 'M'}) · Paid: Rs. ${paidAmount.toLocaleString()} · Due: Rs. ${dueAmount.toLocaleString()}`;
+    } else {
+      detEl.textContent = `${sale.product} (${sale.planLabel || sale.planMonths + 'M'}) · Rs. ${totalAmount.toLocaleString('en-US')}`;
+    }
+  }
   if (phoneEl) phoneEl.textContent = sale.customerPhone || 'No Phone';
 
   updateWaTabsUI();
@@ -3250,6 +3351,8 @@ function updateWaPreviewText() {
   if (currentWaType === 'expiry') {
     const days = calculateDaysRemaining(currentWaSale.expiryDate);
     text = composeExpiryWhatsAppMessage(currentWaSale, days === 1, days === 0, days < 0);
+  } else if (currentWaType === 'partial') {
+    text = composePartialWhatsAppMessage(currentWaSale);
   } else if (currentWaType === 'pending') {
     text = composePendingWhatsAppMessage(currentWaSale);
   } else if (currentWaType === 'welcome') {
@@ -3822,12 +3925,89 @@ function setupEventListeners() {
     document.getElementById('saleProofPreviewWrap').style.display = 'none';
   });
 
-  // Toggle proof requirement badge based on selected status
+  // Toggle proof requirement badge & partial payment box based on selected status
   document.querySelectorAll('input[name="saleStatus"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
       updateSaleProofBadge(e.target.value === 'Paid');
+      updateSalePartialUI();
     });
   });
+
+  // Partial Payment Inputs in Sale Modal
+  document.getElementById('salePaidAmountInput')?.addEventListener('input', updateSalePartialUI);
+  document.getElementById('saleAmountInput')?.addEventListener('input', () => {
+    updateSalePartialUI();
+    updateLiveExpiryPreview();
+  });
+  document.getElementById('btnSalePartialHalf')?.addEventListener('click', () => {
+    const totalAmount = Number(document.getElementById('saleAmountInput')?.value) || 0;
+    const paidInput = document.getElementById('salePaidAmountInput');
+    if (paidInput) {
+      paidInput.value = Math.round(totalAmount / 2);
+      updateSalePartialUI();
+    }
+  });
+  document.getElementById('btnSalePartialClear')?.addEventListener('click', () => {
+    const totalAmount = Number(document.getElementById('saleAmountInput')?.value) || 0;
+    const paidInput = document.getElementById('salePaidAmountInput');
+    if (paidInput) {
+      paidInput.value = totalAmount;
+      updateSalePartialUI();
+    }
+  });
+
+  // Receive Payment Modal Listeners
+  document.getElementById('btnPresetFullDue')?.addEventListener('click', () => {
+    document.getElementById('btnPresetFullDue')?.classList.add('active');
+    document.getElementById('btnPresetCustom')?.classList.remove('active');
+    const sale = (STATE.data.sales || []).find(s => s.id === currentReceiveSaleId);
+    if (sale) {
+      const tot = Number(sale.amount) || 0;
+      const pd = Number(sale.paidAmount !== undefined ? sale.paidAmount : (sale.paymentStatus === 'Paid' ? tot : 0));
+      const rem = Math.max(0, tot - pd);
+      const input = document.getElementById('receiveAmountInput');
+      if (input) input.value = rem > 0 ? rem : tot;
+      updateReceiveModalHints();
+    }
+  });
+
+  document.getElementById('btnPresetCustom')?.addEventListener('click', () => {
+    document.getElementById('btnPresetCustom')?.classList.add('active');
+    document.getElementById('btnPresetFullDue')?.classList.remove('active');
+    const input = document.getElementById('receiveAmountInput');
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  });
+
+  document.getElementById('receiveAmountInput')?.addEventListener('input', () => {
+    document.getElementById('btnPresetCustom')?.classList.add('active');
+    document.getElementById('btnPresetFullDue')?.classList.remove('active');
+    updateReceiveModalHints();
+  });
+
+  document.getElementById('receiveProofFileInput')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        const compressed = await compressImageFile(file);
+        document.getElementById('receiveProofBase64').value = compressed;
+        document.getElementById('receiveProofPreviewImg').src = compressed;
+        document.getElementById('receiveProofPreviewWrap').style.display = 'flex';
+      } catch (err) {
+        alert('Failed to process screenshot: ' + err.message);
+      }
+    }
+  });
+
+  document.getElementById('btnRemoveReceiveProof')?.addEventListener('click', () => {
+    document.getElementById('receiveProofFileInput').value = '';
+    document.getElementById('receiveProofBase64').value = '';
+    document.getElementById('receiveProofPreviewWrap').style.display = 'none';
+  });
+
+  document.getElementById('receivePaymentForm')?.addEventListener('submit', handleReceivePaymentSubmit);
 
   // Quick Mark Paid Form and File Input
   document.getElementById('quickProofFileInput')?.addEventListener('change', async (e) => {
@@ -4112,6 +4292,46 @@ function updateSaleProofBadge(isPaid) {
 window.updateSaleProofBadge = updateSaleProofBadge;
 window.openSaleModal = openSaleModal;
 
+function updateSalePartialUI() {
+  const wrap = document.getElementById('salePartialWrap');
+  if (!wrap) return;
+
+  let selectedStatus = 'Pending';
+  document.getElementsByName('saleStatus').forEach(r => {
+    if (r.checked) selectedStatus = r.value;
+  });
+
+  if (selectedStatus !== 'Partial') {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  wrap.style.display = 'block';
+
+  const totalAmount = Number(document.getElementById('saleAmountInput')?.value) || 0;
+  const paidInput = document.getElementById('salePaidAmountInput');
+  let paidAmount = Number(paidInput?.value);
+
+  if (paidInput && (paidInput.value === '' || isNaN(paidAmount))) {
+    paidAmount = Math.round(totalAmount / 2);
+    paidInput.value = paidAmount;
+  }
+
+  paidAmount = Math.max(0, paidAmount);
+  const remaining = Math.max(0, totalAmount - paidAmount);
+  const pct = totalAmount > 0 ? Math.min(100, Math.round((paidAmount / totalAmount) * 100)) : 0;
+
+  const remEl = document.getElementById('saleRemainingDisplay');
+  if (remEl) remEl.textContent = `Rs. ${remaining.toLocaleString()}`;
+
+  const badgeEl = document.getElementById('salePartialPercentBadge');
+  if (badgeEl) badgeEl.textContent = `${pct}% Advance (Rs. ${paidAmount.toLocaleString()})`;
+
+  const barEl = document.getElementById('salePartialBarFill');
+  if (barEl) barEl.style.width = `${pct}%`;
+}
+window.updateSalePartialUI = updateSalePartialUI;
+
 function openSaleModal() {
   document.getElementById('saleEditId').value = '';
   document.getElementById('saleModalTitle').textContent = 'New Sale Entry';
@@ -4129,6 +4349,12 @@ function openSaleModal() {
   const previewWrap = document.getElementById('saleProofPreviewWrap');
   if (previewWrap) previewWrap.style.display = 'none';
   updateSaleProofBadge(false);
+
+  // Reset partial payment UI
+  const partialWrap = document.getElementById('salePartialWrap');
+  if (partialWrap) partialWrap.style.display = 'none';
+  const paidInput = document.getElementById('salePaidAmountInput');
+  if (paidInput) paidInput.value = '';
 
   const accountSelect = document.getElementById('salePaymentReceivedInSelect');
   if (accountSelect) accountSelect.value = 'Boss JazzCash';
@@ -4181,6 +4407,15 @@ function openEditSale(id) {
     if (previewWrap) previewWrap.style.display = 'none';
   }
   updateSaleProofBadge(sale.paymentStatus === 'Paid');
+
+  // Partial Payment box setup
+  const totalAmount = Number(sale.amount) || 0;
+  const paidInput = document.getElementById('salePaidAmountInput');
+  if (paidInput) {
+    const existingPaid = sale.paidAmount !== undefined ? sale.paidAmount : (sale.paymentStatus === 'Paid' ? totalAmount : Math.round(totalAmount / 2));
+    paidInput.value = existingPaid;
+  }
+  updateSalePartialUI();
 
   const accountSelect = document.getElementById('salePaymentReceivedInSelect');
   if (accountSelect) accountSelect.value = sale.paymentReceivedIn || 'Boss JazzCash';
@@ -4244,6 +4479,24 @@ async function handleSaleSubmit(e) {
     if (r.checked) paymentStatus = r.value;
   });
 
+  let paidAmount = 0;
+  if (paymentStatus === 'Paid') {
+    paidAmount = amount;
+  } else if (paymentStatus === 'Partial') {
+    paidAmount = Number(document.getElementById('salePaidAmountInput')?.value) || 0;
+    if (paidAmount <= 0) {
+      alert('⚠️ Please enter the Advance / Paid Amount for Partial payment.');
+      document.getElementById('salePaidAmountInput')?.focus();
+      return;
+    }
+    if (paidAmount >= amount && amount > 0) {
+      paymentStatus = 'Paid';
+      paidAmount = amount;
+    }
+  } else {
+    paidAmount = 0;
+  }
+
   const existingSale = editId ? STATE.data.sales.find(s => s.id === editId) : null;
   const attachedProof = document.getElementById('saleProofBase64').value.trim() || existingSale?.paymentProof || null;
   const paymentReceivedIn = document.getElementById('salePaymentReceivedInSelect')?.value || 'Boss JazzCash';
@@ -4270,6 +4523,7 @@ async function handleSaleSubmit(e) {
     planMonths,
     planLabel,
     amount,
+    paidAmount,
     paymentStatus,
     paymentProof: attachedProof,
     paymentReceivedIn,
@@ -4283,6 +4537,20 @@ async function handleSaleSubmit(e) {
   const saleItem = {
     id: saleId,
     ...payload,
+    paymentHistory: existingSale?.paymentHistory || (
+      paidAmount > 0 ? [{
+        id: 'pay_' + Date.now(),
+        date,
+        amount: paidAmount,
+        totalPaidAfter: paidAmount,
+        remainingAfter: Math.max(0, amount - paidAmount),
+        paymentReceivedIn,
+        paymentProof: attachedProof,
+        receivedBy: soldBy,
+        notes: paymentStatus === 'Paid' ? 'Initial Full Payment' : 'Initial Partial Payment',
+        createdAt: new Date().toISOString()
+      }] : []
+    ),
     expiryDate: calculateExpiry(date, planMonths),
     createdAt: editId ? (existingSale?.createdAt || new Date().toISOString()) : new Date().toISOString()
   };
@@ -4301,7 +4569,7 @@ async function handleSaleSubmit(e) {
   saveLocalState();
   closeModal('saleModal');
   showToast(editId ? 'Sale updated successfully! 💾' : 'New sale added & auto-saved! 🎉');
-  if (paymentStatus === 'Paid' || !editId) {
+  if (paymentStatus === 'Paid' || paymentStatus === 'Partial' || !editId) {
     SOUND.playCashChime();
   } else {
     SOUND.playSuccessTap();
@@ -4312,47 +4580,168 @@ async function handleSaleSubmit(e) {
   triggerAutoSaveSync(true);
 }
 
-// Quick Mark Paid with Mandatory Screenshot Proof
-function openQuickMarkPaid(id) {
+// ==================== RECEIVE PAYMENT / SETTLE BALANCE CONTROLLER ====================
+let currentReceiveSaleId = null;
+
+function openReceivePaymentModal(id) {
   const sale = (STATE.data.sales || []).find(s => s.id === id);
   if (!sale) return;
 
-  document.getElementById('quickMarkPaidSaleId').value = id;
-  document.getElementById('quickProofFileInput').value = '';
-  document.getElementById('quickProofBase64').value = '';
-  const previewWrap = document.getElementById('quickProofPreviewWrap');
+  currentReceiveSaleId = id;
+  const totalAmount = Number(sale.amount) || 0;
+  const isPaid = sale.paymentStatus === 'Paid';
+  const alreadyPaid = Number(sale.paidAmount !== undefined ? sale.paidAmount : (isPaid ? totalAmount : 0));
+  const remainingDue = Math.max(0, totalAmount - alreadyPaid);
+  const paidPercent = totalAmount > 0 ? Math.min(100, Math.round((alreadyPaid / totalAmount) * 100)) : 0;
+
+  document.getElementById('receivePaymentSaleId').value = id;
+  const nameEl = document.getElementById('receiveCustName');
+  if (nameEl) nameEl.textContent = sale.customerName || 'Customer';
+  const phoneEl = document.getElementById('receiveCustPhone');
+  if (phoneEl) phoneEl.textContent = formatPhone(sale.customerPhone);
+  const prodBadge = document.getElementById('receiveProductBadge');
+  if (prodBadge) prodBadge.textContent = `${sale.product} (${sale.planLabel || sale.planMonths + 'M'})`;
+
+  document.getElementById('receiveTotalAmount').textContent = `Rs. ${totalAmount.toLocaleString()}`;
+  document.getElementById('receiveAlreadyPaid').textContent = `Rs. ${alreadyPaid.toLocaleString()}`;
+  document.getElementById('receiveRemainingDue').textContent = `Rs. ${remainingDue.toLocaleString()}`;
+  document.getElementById('btnPresetFullDueVal').textContent = `Rs. ${remainingDue.toLocaleString()}`;
+
+  const barEl = document.getElementById('receiveProgressBar');
+  if (barEl) barEl.style.width = `${paidPercent}%`;
+
+  const amountInput = document.getElementById('receiveAmountInput');
+  if (amountInput) {
+    amountInput.value = remainingDue > 0 ? remainingDue : totalAmount;
+  }
+
+  // Reset preset button styling
+  document.getElementById('btnPresetFullDue')?.classList.add('active');
+  document.getElementById('btnPresetCustom')?.classList.remove('active');
+
+  // Reset proof
+  document.getElementById('receiveProofFileInput').value = '';
+  document.getElementById('receiveProofBase64').value = '';
+  const previewWrap = document.getElementById('receiveProofPreviewWrap');
   if (previewWrap) previewWrap.style.display = 'none';
-  const accountSelect = document.getElementById('quickPaymentReceivedInSelect');
-  if (accountSelect) accountSelect.value = 'Boss JazzCash';
+
+  const accountSelect = document.getElementById('receivePaymentAccountSelect');
+  if (accountSelect) accountSelect.value = sale.paymentReceivedIn || 'Boss JazzCash';
+
+  const notesInput = document.getElementById('receiveNotesInput');
+  if (notesInput) notesInput.value = '';
+
+  updateReceiveModalHints();
+
+  openModal('receivePaymentModal');
+  setTimeout(() => {
+    amountInput?.focus();
+    amountInput?.select();
+  }, 50);
+}
+window.openReceivePaymentModal = openReceivePaymentModal;
+
+function updateReceiveModalHints() {
+  const sale = (STATE.data.sales || []).find(s => s.id === currentReceiveSaleId);
+  if (!sale) return;
+
+  const totalAmount = Number(sale.amount) || 0;
+  const alreadyPaid = Number(sale.paidAmount !== undefined ? sale.paidAmount : (sale.paymentStatus === 'Paid' ? totalAmount : 0));
+  const remainingDue = Math.max(0, totalAmount - alreadyPaid);
+  const amountInput = document.getElementById('receiveAmountInput');
+  const amountNow = Number(amountInput?.value) || 0;
+  const hintEl = document.getElementById('receiveOutcomeHint');
+
+  if (!hintEl) return;
+
+  if (amountNow >= remainingDue && remainingDue > 0) {
+    hintEl.textContent = '🎉 This will clear the remaining balance completely (Status: Paid)';
+    hintEl.className = 'form-hint text-green font-bold mt-1';
+  } else if (amountNow > 0 && amountNow < remainingDue) {
+    const newRemaining = remainingDue - amountNow;
+    hintEl.textContent = `⏳ Remaining balance after this payment will be Rs. ${newRemaining.toLocaleString()} (Status: Partial)`;
+    hintEl.className = 'form-hint text-amber font-bold mt-1';
+  } else {
+    hintEl.textContent = 'Enter the amount customer is paying now';
+    hintEl.className = 'form-hint text-muted mt-1';
+  }
+}
+
+async function handleReceivePaymentSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('receivePaymentSaleId').value;
+  const sale = (STATE.data.sales || []).find(s => s.id === id);
+  if (!sale) return;
+
+  const amountInput = document.getElementById('receiveAmountInput');
+  const amountNow = Number(amountInput?.value) || 0;
+  if (amountNow <= 0) {
+    alert('Please enter a valid payment amount greater than 0.');
+    amountInput?.focus();
+    return;
+  }
+
+  const proof = document.getElementById('receiveProofBase64').value.trim();
+  const account = document.getElementById('receivePaymentAccountSelect').value;
+  const notes = document.getElementById('receiveNotesInput').value.trim();
 
   const isEmployee = STATE.currentUser && STATE.currentUser.role === 'employee';
-  const quickBadge = document.getElementById('quickProofBadge');
-  const quickInput = document.getElementById('quickProofFileInput');
-  if (quickBadge) {
-    if (isEmployee) {
-      quickBadge.textContent = '* Mandatory for Staff';
-      quickBadge.className = 'badge-req';
-      quickBadge.style.color = '#ef4444';
-    } else {
-      quickBadge.textContent = '(Optional for Boss)';
-      quickBadge.className = 'badge-opt';
-      quickBadge.style.color = 'var(--text-muted)';
-    }
-  }
-  if (quickInput) {
-    if (isEmployee) {
-      quickInput.setAttribute('required', 'required');
-    } else {
-      quickInput.removeAttribute('required');
-    }
+  if (isEmployee && !proof && !sale.paymentProof) {
+    alert('⚠️ PAYMENT PROOF IS MANDATORY FOR STAFF!\n\nPlease attach JazzCash / EasyPaisa / Bank transfer screenshot before saving payment.');
+    document.getElementById('receiveProofFileInput')?.focus();
+    return;
   }
 
-  document.getElementById('quickMarkPaidSummary').innerHTML = `
-    <div><strong>Customer:</strong> ${formatPhone(sale.customerPhone)} ${sale.customerName ? `(${escapeHtml(sale.customerName)})` : ''}</div>
-    <div><strong>Product:</strong> ${escapeHtml(sale.product)} (${escapeHtml(sale.planLabel || sale.planMonths + ' Mos')}) · <strong>Rs. ${(sale.amount || 0).toLocaleString()}</strong></div>
-    <div><strong>Sold By:</strong> ${escapeHtml(sale.soldBy || 'Admin')}</div>
-  `;
-  openModal('quickMarkPaidModal');
+  const totalAmount = Number(sale.amount) || 0;
+  const prevPaid = Number(sale.paidAmount !== undefined ? sale.paidAmount : (sale.paymentStatus === 'Paid' ? totalAmount : 0));
+  const newPaid = prevPaid + amountNow;
+  const newStatus = (newPaid >= totalAmount) ? 'Paid' : 'Partial';
+
+  sale.paidAmount = newPaid;
+  sale.paymentStatus = newStatus;
+  if (proof) sale.paymentProof = proof;
+  if (account) sale.paymentReceivedIn = account;
+  sale.updatedAt = new Date().toISOString();
+
+  sale.paymentHistory = sale.paymentHistory || [];
+  sale.paymentHistory.push({
+    id: 'pay_' + Date.now(),
+    date: getLocalTodayDateString(),
+    amount: amountNow,
+    totalPaidAfter: newPaid,
+    remainingAfter: Math.max(0, totalAmount - newPaid),
+    paymentReceivedIn: account,
+    paymentProof: proof || null,
+    notes: notes,
+    receivedBy: STATE.currentUser.name || 'Admin',
+    createdAt: new Date().toISOString()
+  });
+
+  saveLocalState();
+  closeModal('receivePaymentModal');
+  SOUND.playCashChime();
+  showToast(`Payment of Rs. ${amountNow.toLocaleString()} saved! (Status: ${newStatus}) ✓`);
+  renderApp();
+  triggerAutoSaveSync(true);
+
+  // Sync to API backend
+  fetch(`/api/sales/${encodeURIComponent(id)}/receive-payment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      amountPaidNow: amountNow,
+      paymentProof: proof,
+      paymentReceivedIn: account,
+      notes,
+      receivedBy: STATE.currentUser.name || 'Admin',
+      date: getLocalTodayDateString()
+    })
+  }).catch(err => console.warn('Receive payment sync notice:', err));
+}
+
+// Quick Mark Paid with Mandatory Screenshot Proof
+function openQuickMarkPaid(id) {
+  openReceivePaymentModal(id);
 }
 
 async function handleConfirmQuickMarkPaid(e) {
