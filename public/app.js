@@ -3929,6 +3929,13 @@ function setupEventListeners() {
   document.querySelectorAll('input[name="saleStatus"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
       updateSaleProofBadge(e.target.value === 'Paid');
+      if (e.target.value === 'Partial') {
+        const paidInput = document.getElementById('salePaidAmountInput');
+        const totalAmount = Number(document.getElementById('saleAmountInput')?.value) || 0;
+        if (paidInput && !paidInput.value.trim() && totalAmount > 0) {
+          paidInput.value = Math.round(totalAmount / 2);
+        }
+      }
       updateSalePartialUI();
     });
   });
@@ -4310,14 +4317,9 @@ function updateSalePartialUI() {
 
   const totalAmount = Number(document.getElementById('saleAmountInput')?.value) || 0;
   const paidInput = document.getElementById('salePaidAmountInput');
-  let paidAmount = Number(paidInput?.value);
+  const rawVal = paidInput ? paidInput.value.trim() : '';
+  const paidAmount = rawVal === '' ? 0 : Math.max(0, Number(rawVal) || 0);
 
-  if (paidInput && (paidInput.value === '' || isNaN(paidAmount))) {
-    paidAmount = Math.round(totalAmount / 2);
-    paidInput.value = paidAmount;
-  }
-
-  paidAmount = Math.max(0, paidAmount);
   const remaining = Math.max(0, totalAmount - paidAmount);
   const pct = totalAmount > 0 ? Math.min(100, Math.round((paidAmount / totalAmount) * 100)) : 0;
 
