@@ -670,17 +670,22 @@ body::before {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  padding-top: calc(64px + env(safe-area-inset-top, 0px));
   padding-bottom: 80px; /* Space for mobile bottom bar */
 }
 
 .app-header {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 100;
-  background: rgba(14, 17, 23, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 500;
+  background: rgba(14, 17, 23, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-subtle);
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .header-content {
@@ -2529,6 +2534,12 @@ body::before {
     flex-shrink: 0;
   }
   /* ===== Header Mobile Bulletproof Layout ===== */
+  .app-root {
+    padding-top: calc(54px + env(safe-area-inset-top, 0px));
+  }
+  .app-header {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
   .header-content {
     padding: 8px 10px;
     gap: 8px;
@@ -2542,10 +2553,13 @@ body::before {
     overflow: hidden;
   }
   .btn-hamburger {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     border-radius: 8px;
     flex-shrink: 0;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
   }
   .header-brand-wrap {
     gap: 6px;
@@ -3384,7 +3398,7 @@ body::before {
 }
 
 .drawer-header {
-  padding: 16px 16px 12px;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
