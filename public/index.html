@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=7.2">
+  <link rel="stylesheet" href="style.css?v=7.3">
 </head>
 <body>
 
@@ -356,6 +356,15 @@
             <span class="drawer-nav-sub">Renewals &amp; pending customer payments</span>
           </div>
           <span id="drawerRemindersBadge" class="drawer-pill-badge" style="display:none;">0</span>
+        <button type="button" class="drawer-nav-item admin-only-feature" id="drawerBtnSurfsharkExpiry">
+          <div class="drawer-icon-wrap" style="color:#06b6d4; background:rgba(6,182,212,0.12);">
+            <span style="font-size:16px;">🦈</span>
+          </div>
+          <div class="drawer-nav-text">
+            <span class="drawer-nav-label">Surfshark Expiry Tracker</span>
+            <span class="drawer-nav-sub">Check expirations &amp; remove devices</span>
+          </div>
+          <span id="drawerSurfsharkExpiryBadge" class="drawer-pill-badge" style="display:none; background:#ef4444; color:#fff;">0</span>
         </button>
 
         <button type="button" class="drawer-nav-item admin-only-feature" id="drawerBtnStaff">
@@ -712,15 +721,139 @@
 
       <!-- ==================== VIEW 5: ADMIN PANEL ==================== -->
       <section id="adminView" class="view-panel">
-        <div class="view-header">
+        <div class="view-header flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 class="view-title">Admin Management Panel</h2>
             <p class="view-subtitle">Products catalog, Plans, Prices, Excel Backend &amp; Security</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline text-gold" onclick="document.getElementById('adminSurfsharkExpiryCard')?.scrollIntoView({ behavior: 'smooth' })">
+              🦈 Surfshark Expiry (<span id="adminHeaderSurfsharkDueBadge">0</span>)
+            </button>
           </div>
         </div>
 
         <!-- Admin Cards Grid -->
         <div class="admin-grid">
+
+          <!-- ==================== SURFSHARK EXPIRY TRACKER (DEDICATED SECTION) ==================== -->
+          <div class="admin-card admin-card-full" id="adminSurfsharkExpiryCard">
+            <div class="admin-card-header flex flex-wrap items-center justify-between gap-3">
+              <div class="admin-card-title">
+                <span class="surfshark-logo-badge">🦈</span>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span style="font-size: 16px; font-weight: 700; color: #fff;">Surfshark Expiry Tracker</span>
+                    <span class="badge-cyan" id="surfsharkActiveCountBadge">0 Active</span>
+                  </div>
+                  <p class="admin-card-desc mb-0" style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                    Daily customer renewals &amp; device removal tracker. Check expirations daily and remove expired users from Surfshark accounts.
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" class="btn btn-gold btn-xs" onclick="openSaleModalForSurfshark()">
+                  + Add Surfshark Sale
+                </button>
+                <button type="button" class="btn btn-outline btn-xs" onclick="renderSurfsharkExpiryTracker()" title="Refresh List">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                  <span>Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- KPI Summary Counters -->
+            <div class="surfshark-kpi-grid">
+              <div class="surfshark-kpi-card urgent cursor-pointer" id="kpiSurfsharkExpired" onclick="setSurfsharkFilter('EXPIRED_OR_TODAY')" title="Click to view Expired &amp; Due Today">
+                <div class="surfshark-kpi-icon">🚨</div>
+                <div class="surfshark-kpi-data">
+                  <div class="surfshark-kpi-val text-rose" id="countSurfsharkExpiredToday">0</div>
+                  <div class="surfshark-kpi-label">Expired / Due Today (Remove Now!)</div>
+                </div>
+              </div>
+              <div class="surfshark-kpi-card warning cursor-pointer" id="kpiSurfsharkExpiringSoon" onclick="setSurfsharkFilter('EXPIRING_3D')" title="Click to view Expiring in 3 Days">
+                <div class="surfshark-kpi-icon">⏰</div>
+                <div class="surfshark-kpi-data">
+                  <div class="surfshark-kpi-val text-amber" id="countSurfsharkExpiring3D">0</div>
+                  <div class="surfshark-kpi-label">Expiring in 3 Days (Upcoming)</div>
+                </div>
+              </div>
+              <div class="surfshark-kpi-card success cursor-pointer" id="kpiSurfsharkActive" onclick="setSurfsharkFilter('ACTIVE')" title="Click to view All Active">
+                <div class="surfshark-kpi-icon">🟢</div>
+                <div class="surfshark-kpi-data">
+                  <div class="surfshark-kpi-val text-green" id="countSurfsharkActiveTotal">0</div>
+                  <div class="surfshark-kpi-label">Active Customer Slots</div>
+                </div>
+              </div>
+              <div class="surfshark-kpi-card muted cursor-pointer" id="kpiSurfsharkRemoved" onclick="setSurfsharkFilter('REMOVED')" title="Click to view Already Removed">
+                <div class="surfshark-kpi-icon">✅</div>
+                <div class="surfshark-kpi-data">
+                  <div class="surfshark-kpi-val text-muted" id="countSurfsharkRemovedTotal">0</div>
+                  <div class="surfshark-kpi-label">Marked Removed from Device</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Filter & Search Bar -->
+            <div class="surfshark-filter-toolbar">
+              <!-- Filter Tabs -->
+              <div class="surfshark-tabs">
+                <button type="button" class="surfshark-tab active" data-sfilter="EXPIRED_OR_TODAY" onclick="setSurfsharkFilter('EXPIRED_OR_TODAY')">
+                  🚨 Needs Removal (<span id="tabCountNeedsRemoval">0</span>)
+                </button>
+                <button type="button" class="surfshark-tab" data-sfilter="EXPIRING_3D" onclick="setSurfsharkFilter('EXPIRING_3D')">
+                  ⏰ Expiring in 3 Days (<span id="tabCountExpiring3D">0</span>)
+                </button>
+                <button type="button" class="surfshark-tab" data-sfilter="ACTIVE" onclick="setSurfsharkFilter('ACTIVE')">
+                  🟢 All Active (<span id="tabCountActive">0</span>)
+                </button>
+                <button type="button" class="surfshark-tab" data-sfilter="REMOVED" onclick="setSurfsharkFilter('REMOVED')">
+                  ✅ Removed (<span id="tabCountRemoved">0</span>)
+                </button>
+                <button type="button" class="surfshark-tab" data-sfilter="ALL" onclick="setSurfsharkFilter('ALL')">
+                  ✨ All Surfshark (<span id="tabCountAll">0</span>)
+                </button>
+              </div>
+
+              <!-- Search & Account Select -->
+              <div class="surfshark-controls">
+                <div class="surfshark-search-box">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  <input type="search" id="surfsharkSearchInput" placeholder="Search phone, email, date..." class="surfshark-search-input" autocomplete="off">
+                  <button type="button" id="btnClearSurfsharkSearch" class="btn-clear-search" style="display:none;" onclick="clearSurfsharkSearch()">&times;</button>
+                </div>
+                <select id="surfsharkFilterAccountSelect" class="custom-select select-sm surfshark-account-select" onchange="onSurfsharkAccountChange(this.value)">
+                  <option value="ALL">📧 All Login Accounts</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Table Container (Horizontal Scrollable on Mobile) -->
+            <div class="surfshark-table-container">
+              <table class="surfshark-expiry-table" id="surfsharkExpiryTable">
+                <thead>
+                  <tr>
+                    <th>Date Added</th>
+                    <th>Plan</th>
+                    <th>Customer Phone</th>
+                    <th>Login Account / Email</th>
+                    <th>Price</th>
+                    <th style="min-width: 170px;">Expiry Date &amp; Status</th>
+                    <th style="text-align: right; min-width: 150px;">Action / Removal</th>
+                  </tr>
+                </thead>
+                <tbody id="surfsharkExpiryTableBody">
+                  <!-- Dynamically populated rows -->
+                </tbody>
+              </table>
+            </div>
+
+            <div id="surfsharkEmptyState" class="empty-state" style="display:none; padding: 25px 15px;">
+              <div class="empty-state-icon">🎉</div>
+              <div class="empty-state-title" id="surfsharkEmptyTitle">No accounts match this filter</div>
+              <p class="text-muted" style="font-size: 12px; margin-top: 4px;" id="surfsharkEmptySubtitle">All clear! No pending expirations or device removals required.</p>
+            </div>
+          </div>
 
           <!-- 0. Staff & Employee Management (Instant Creation & Daily Commission) -->
           <div class="admin-card" id="adminEmployeesCard">

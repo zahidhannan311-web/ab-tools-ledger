@@ -3484,6 +3484,7 @@ function renderAdminCatalog() {
   // Always render Staff List and Settings/Templates when Admin Panel is viewed
   renderAdminEmployees();
   syncSettingsFormUI();
+  renderSurfsharkExpiryTracker();
 
   const container = document.getElementById('adminProductsCatalog');
   if (!container) return;
@@ -3701,6 +3702,23 @@ function setupEventListeners() {
     closeSideDrawer();
     switchView('remindersView');
   });
+  document.getElementById('drawerBtnSurfsharkExpiry')?.addEventListener('click', () => {
+    closeSideDrawer();
+    switchView('adminView');
+    setTimeout(() => {
+      const el = document.getElementById('adminSurfsharkExpiryCard');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.style.transition = 'box-shadow 0.4s ease, border-color 0.4s ease';
+        el.style.borderColor = '#06b6d4';
+        el.style.boxShadow = '0 0 25px rgba(6, 182, 212, 0.45)';
+        setTimeout(() => {
+          el.style.borderColor = '';
+          el.style.boxShadow = '';
+        }, 1600);
+      }
+    }, 120);
+  });
   document.getElementById('drawerBtnStaff')?.addEventListener('click', () => {
     closeSideDrawer();
     switchView('adminView');
@@ -3897,6 +3915,14 @@ function setupEventListeners() {
       salesSearchInput.focus();
     }
     renderSales();
+  });
+
+  // Surfshark Expiry Search Input
+  document.getElementById('surfsharkSearchInput')?.addEventListener('input', (e) => {
+    currentSurfsharkSearch = e.target.value.trim();
+    const clearBtn = document.getElementById('btnClearSurfsharkSearch');
+    if (clearBtn) clearBtn.style.display = currentSurfsharkSearch ? 'inline-flex' : 'none';
+    renderSurfsharkExpiryTracker();
   });
 
   document.getElementById('salesFilterStaff')?.addEventListener('change', renderSales);
@@ -5118,6 +5144,343 @@ async function deleteEmployee(id) {
     console.error('Delete employee error:', e);
   }
 }
+
+// ==================== SURFSHARK EXPIRY TRACKER (ADMIN PANEL) ====================
+let currentSurfsharkFilter = 'EXPIRED_OR_TODAY'; // 'EXPIRED_OR_TODAY', 'EXPIRING_3D', 'ACTIVE', 'REMOVED', 'ALL'
+let currentSurfsharkAccount = 'ALL';
+let currentSurfsharkSearch = '';
+
+function setSurfsharkFilter(filter) {
+  currentSurfsharkFilter = filter;
+  document.querySelectorAll('.surfshark-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-sfilter') === filter);
+  });
+  renderSurfsharkExpiryTracker();
+}
+window.setSurfsharkFilter = setSurfsharkFilter;
+
+function onSurfsharkAccountChange(account) {
+  currentSurfsharkAccount = account;
+  renderSurfsharkExpiryTracker();
+}
+window.onSurfsharkAccountChange = onSurfsharkAccountChange;
+
+function clearSurfsharkSearch() {
+  const input = document.getElementById('surfsharkSearchInput');
+  if (input) input.value = '';
+  currentSurfsharkSearch = '';
+  const clearBtn = document.getElementById('btnClearSurfsharkSearch');
+  if (clearBtn) clearBtn.style.display = 'none';
+  renderSurfsharkExpiryTracker();
+}
+window.clearSurfsharkSearch = clearSurfsharkSearch;
+
+function openSaleModalForSurfshark() {
+  openSaleModal();
+  const prodSelect = document.getElementById('saleProductSelect');
+  if (prodSelect) {
+    // Find option that matches Surfshark
+    for (let i = 0; i < prodSelect.options.length; i++) {
+      if (prodSelect.options[i].value.toLowerCase().includes('surfshark')) {
+        prodSelect.selectedIndex = i;
+        break;
+      }
+    }
+    onProductOrTypeChange();
+  }
+}
+window.openSaleModalForSurfshark = openSaleModalForSurfshark;
+
+function toggleSurfsharkAccountRemoved(saleId, setRemoved) {
+  const sale = (STATE.data.sales || []).find(s => s.id === saleId);
+  if (!sale) return;
+
+  sale.accountRemoved = !!setRemoved;
+  if (setRemoved) {
+    sale.accountRemovedAt = new Date().toISOString();
+  } else {
+    delete sale.accountRemovedAt;
+  }
+
+  saveLocalState();
+  renderSurfsharkExpiryTracker();
+  triggerAutoSaveSync(true);
+
+  if (setRemoved) {
+    showToast(`✅ ${formatPhone(sale.customerPhone)} marked as Removed from Surfshark!`);
+  } else {
+    showToast(`Restored ${formatPhone(sale.customerPhone)} to Active list.`);
+  }
+
+  // Also sync to server
+  fetch(`/api/sales/${encodeURIComponent(saleId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(sale)
+  }).catch(e => console.warn('Surfshark removal sync notice:', e));
+}
+window.toggleSurfsharkAccountRemoved = toggleSurfsharkAccountRemoved;
+
+function renderSurfsharkExpiryTracker() {
+  const tbody = document.getElementById('surfsharkExpiryTableBody');
+  const emptyState = document.getElementById('surfsharkEmptyState');
+  const table = document.getElementById('surfsharkExpiryTable');
+  if (!tbody) return;
+
+  const allSales = STATE.data.sales || [];
+  // Filter for Surfshark sales only (case-insensitive check)
+  const surfsharkSales = allSales.filter(s => {
+    const prod = String(s.product || '').toLowerCase();
+    return prod.includes('surfshark');
+  });
+
+  // Calculate counts for badges & KPIs
+  let countNeedsRemoval = 0; // expired or expires today, and NOT removed
+  let countExpiring3D = 0;    // expires in 1-3 days, and NOT removed
+  let countActive = 0;        // days >= 0, and NOT removed
+  let countRemoved = 0;       // accountRemoved === true
+
+  surfsharkSales.forEach(s => {
+    const days = calculateDaysRemaining(s.expiryDate);
+    const isRemoved = !!s.accountRemoved;
+
+    if (isRemoved) {
+      countRemoved++;
+    } else {
+      if (days !== null && days <= 0) {
+        countNeedsRemoval++;
+      } else if (days !== null && days > 0 && days <= 3) {
+        countExpiring3D++;
+      }
+      if (days === null || days >= 0) {
+        countActive++;
+      }
+    }
+  });
+
+  // Update KPI counters
+  const elNeed = document.getElementById('countSurfsharkExpiredToday');
+  if (elNeed) elNeed.textContent = countNeedsRemoval;
+  const el3D = document.getElementById('countSurfsharkExpiring3D');
+  if (el3D) el3D.textContent = countExpiring3D;
+  const elAct = document.getElementById('countSurfsharkActiveTotal');
+  if (elAct) elAct.textContent = countActive;
+  const elRem = document.getElementById('countSurfsharkRemovedTotal');
+  if (elRem) elRem.textContent = countRemoved;
+
+  // Update Tab counts
+  const tabNeed = document.getElementById('tabCountNeedsRemoval');
+  if (tabNeed) tabNeed.textContent = countNeedsRemoval;
+  const tab3D = document.getElementById('tabCountExpiring3D');
+  if (tab3D) tab3D.textContent = countExpiring3D;
+  const tabAct = document.getElementById('tabCountActive');
+  if (tabAct) tabAct.textContent = countActive;
+  const tabRem = document.getElementById('tabCountRemoved');
+  if (tabRem) tabRem.textContent = countRemoved;
+  const tabAll = document.getElementById('tabCountAll');
+  if (tabAll) tabAll.textContent = surfsharkSales.length;
+
+  const activeBadge = document.getElementById('surfsharkActiveCountBadge');
+  if (activeBadge) activeBadge.textContent = `${countActive} Active`;
+
+  const drawerBadge = document.getElementById('drawerSurfsharkExpiryBadge');
+  if (drawerBadge) {
+    drawerBadge.textContent = countNeedsRemoval;
+    drawerBadge.style.display = countNeedsRemoval > 0 ? 'inline-flex' : 'none';
+  }
+  const headerDueBadge = document.getElementById('adminHeaderSurfsharkDueBadge');
+  if (headerDueBadge) headerDueBadge.textContent = countNeedsRemoval;
+
+  // Populate account select dropdown if not already populated with all unique emails
+  const accountSelect = document.getElementById('surfsharkFilterAccountSelect');
+  if (accountSelect) {
+    const uniqueEmails = [...new Set(surfsharkSales.map(s => (s.accountLogin || '').trim()).filter(Boolean))].sort();
+    const currentVal = accountSelect.value || currentSurfsharkAccount || 'ALL';
+    accountSelect.innerHTML = `<option value="ALL">📧 All Login Accounts (${uniqueEmails.length})</option>` +
+      uniqueEmails.map(email => {
+        const count = surfsharkSales.filter(s => (s.accountLogin || '').trim() === email && !s.accountRemoved).length;
+        return `<option value="${escapeHtml(email)}">${escapeHtml(email)} (${count} users)</option>`;
+      }).join('');
+    accountSelect.value = uniqueEmails.includes(currentVal) ? currentVal : 'ALL';
+  }
+
+  // Filter list
+  let filtered = [...surfsharkSales];
+
+  // 1. Account Filter
+  if (currentSurfsharkAccount && currentSurfsharkAccount !== 'ALL') {
+    filtered = filtered.filter(s => (s.accountLogin || '').trim().toLowerCase() === currentSurfsharkAccount.toLowerCase());
+  }
+
+  // 2. Search Filter
+  const searchInput = document.getElementById('surfsharkSearchInput');
+  const searchVal = (searchInput?.value || currentSurfsharkSearch || '').trim().toLowerCase();
+  if (searchVal) {
+    filtered = filtered.filter(s => {
+      const phone = String(s.customerPhone || '').toLowerCase();
+      const name = String(s.customerName || '').toLowerCase();
+      const login = String(s.accountLogin || '').toLowerCase();
+      const date = String(s.date || '').toLowerCase();
+      const exp = String(s.expiryDate || '').toLowerCase();
+      return phone.includes(searchVal) || name.includes(searchVal) || login.includes(searchVal) || date.includes(searchVal) || exp.includes(searchVal);
+    });
+  }
+
+  // 3. Status Tab Filter
+  if (currentSurfsharkFilter === 'EXPIRED_OR_TODAY') {
+    filtered = filtered.filter(s => {
+      if (s.accountRemoved) return false;
+      const days = calculateDaysRemaining(s.expiryDate);
+      return days !== null && days <= 0;
+    });
+  } else if (currentSurfsharkFilter === 'EXPIRING_3D') {
+    filtered = filtered.filter(s => {
+      if (s.accountRemoved) return false;
+      const days = calculateDaysRemaining(s.expiryDate);
+      return days !== null && days > 0 && days <= 3;
+    });
+  } else if (currentSurfsharkFilter === 'ACTIVE') {
+    filtered = filtered.filter(s => {
+      if (s.accountRemoved) return false;
+      const days = calculateDaysRemaining(s.expiryDate);
+      return days === null || days >= 0;
+    });
+  } else if (currentSurfsharkFilter === 'REMOVED') {
+    filtered = filtered.filter(s => !!s.accountRemoved);
+  }
+  // 'ALL' keeps everything
+
+  // Sort by Expiry Date:
+  // Needs removal / earliest expiry at the very top!
+  filtered.sort((a, b) => {
+    // Non-removed before removed
+    if (!!a.accountRemoved !== !!b.accountRemoved) {
+      return a.accountRemoved ? 1 : -1;
+    }
+    const daysA = calculateDaysRemaining(a.expiryDate) ?? 99999;
+    const daysB = calculateDaysRemaining(b.expiryDate) ?? 99999;
+    return daysA - daysB;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    if (table) table.style.display = 'none';
+    if (emptyState) {
+      emptyState.style.display = 'block';
+      const emptyTitle = document.getElementById('surfsharkEmptyTitle');
+      const emptySub = document.getElementById('surfsharkEmptySubtitle');
+      if (currentSurfsharkFilter === 'EXPIRED_OR_TODAY') {
+        if (emptyTitle) emptyTitle.textContent = '🎉 All Clear! No Expired Users';
+        if (emptySub) emptySub.textContent = 'Awesome! There are no expired Surfshark accounts waiting for device removal today.';
+      } else {
+        if (emptyTitle) emptyTitle.textContent = 'No records found';
+        if (emptySub) emptySub.textContent = 'No Surfshark sales match your current search or filter criteria.';
+      }
+    }
+    return;
+  }
+
+  if (table) table.style.display = 'table';
+  if (emptyState) emptyState.style.display = 'none';
+
+  tbody.innerHTML = filtered.map(s => {
+    const days = calculateDaysRemaining(s.expiryDate);
+    const isRemoved = !!s.accountRemoved;
+
+    let rowClass = '';
+    let expiryDateClass = 'text-primary';
+    let expiryBadgeHtml = '';
+
+    if (isRemoved) {
+      rowClass = 'row-removed';
+      expiryDateClass = 'text-muted';
+      expiryBadgeHtml = `<span class="badge-removed-pill">✅ Removed from Device</span>`;
+    } else if (days !== null && days < 0) {
+      rowClass = 'row-expired';
+      expiryDateClass = 'text-rose font-bold';
+      expiryBadgeHtml = `<span class="badge-danger-pill">🔴 Expired (${Math.abs(days)}d ago)</span>`;
+    } else if (days === 0) {
+      rowClass = 'row-urgent';
+      expiryDateClass = 'text-rose font-bold';
+      expiryBadgeHtml = `<span class="badge-urgent-pill">🚨 EXPIRES TODAY!</span>`;
+    } else if (days === 1) {
+      rowClass = 'row-warning';
+      expiryDateClass = 'text-amber font-bold';
+      expiryBadgeHtml = `<span class="badge-warning-pill">⚠️ Tomorrow</span>`;
+    } else if (days <= 3) {
+      rowClass = 'row-amber';
+      expiryDateClass = 'text-amber font-bold';
+      expiryBadgeHtml = `<span class="badge-amber-pill">⏳ In ${days} days</span>`;
+    } else {
+      expiryDateClass = 'text-green';
+      expiryBadgeHtml = `<span class="badge-success-pill">🟢 Active (${days}d left)</span>`;
+    }
+
+    const cleanPhone = String(s.customerPhone || '').replace(/\D/g, '');
+    const planText = s.planLabel || (s.planMonths ? `${s.planMonths} Month${s.planMonths > 1 ? 's' : ''}` : '1 Month');
+
+    return `
+      <tr class="${rowClass}">
+        <td>
+          <span class="font-mono" style="font-size:12.5px;">${formatDateDisplay(s.date) || s.date}</span>
+        </td>
+        <td>
+          <span class="badge-plan">${escapeHtml(planText)}</span>
+        </td>
+        <td>
+          <div class="table-phone-cell font-mono">
+            <button type="button" class="btn-copy-chip" title="Copy Phone" onclick="navigator.clipboard.writeText('${escapeHtml(s.customerPhone)}'); showToast('Copied phone: ${escapeHtml(s.customerPhone)}');">
+              📋
+            </button>
+            <a href="https://wa.me/${cleanPhone}" target="_blank" rel="noopener" class="phone-link" title="Open WhatsApp Chat">
+              ${formatPhone(s.customerPhone)}
+            </a>
+          </div>
+          ${s.customerName ? `<div class="customer-subname">${escapeHtml(s.customerName)}</div>` : ''}
+        </td>
+        <td>
+          <div class="table-email-cell font-mono">
+            ${s.accountLogin ? `
+              <button type="button" class="btn-copy-chip" title="Copy Account Email" onclick="navigator.clipboard.writeText('${escapeHtml(s.accountLogin)}'); showToast('Copied email: ${escapeHtml(s.accountLogin)}');">
+                📋
+              </button>
+              <span class="account-email-text" title="${escapeHtml(s.accountLogin)}">${escapeHtml(s.accountLogin)}</span>
+            ` : `<span class="text-muted">—</span>`}
+          </div>
+        </td>
+        <td>
+          <span class="font-mono font-bold text-gold" style="font-size:13px;">Rs. ${(Number(s.amount) || 0).toLocaleString()}</span>
+        </td>
+        <td>
+          <div class="expiry-cell">
+            <span class="font-mono font-bold ${expiryDateClass}">${formatDateDisplay(s.expiryDate)}</span>
+            <div class="mt-0.5">${expiryBadgeHtml}</div>
+          </div>
+        </td>
+        <td style="text-align: right;">
+          <div class="table-actions-cell">
+            ${isRemoved ? `
+              <button type="button" class="btn-chip btn-chip-undo" title="Customer is marked removed from device. Click to undo." onclick="toggleSurfsharkAccountRemoved('${s.id}', false)">
+                ✅ Removed <span class="undo-hint">(Undo)</span>
+              </button>
+            ` : `
+              <button type="button" class="btn-chip btn-chip-remove" title="Click after removing customer device from Surfshark account" onclick="toggleSurfsharkAccountRemoved('${s.id}', true)">
+                ❌ Mark Removed
+              </button>
+            `}
+            <button type="button" class="btn-action-icon" title="Edit Sale / Change Plan" onclick="openEditSale('${s.id}')">
+              ✏️
+            </button>
+            <button type="button" class="btn-action-icon btn-action-delete" title="Move to Recycle Bin" onclick="openDeleteSaleReasonModal('${s.id}')">
+              🗑️
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+window.renderSurfsharkExpiryTracker = renderSurfsharkExpiryTracker;
 
 // ==================== EXPENSE FORM CRUD ====================
 window.openExpenseModal = openExpenseModal;
