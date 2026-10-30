@@ -1845,6 +1845,8 @@ function renderApp() {
     renderStockAndSlots();
   } else if (view === 'remindersView') {
     renderReminders();
+  } else if (view === 'surfsharkView') {
+    renderSurfsharkExpiryTracker();
   } else if (view === 'adminView') {
     renderAdminCatalog();
   }
@@ -2002,6 +2004,16 @@ function renderKPIs() {
   document.getElementById('navExpenseCount').textContent = filteredExpenses.length;
   document.getElementById('navPendingCount').textContent = filteredPendingSales.length;
   document.getElementById('pendingTabTotal').textContent = filteredPendingTotal.toLocaleString('en-US');
+
+  const navSurfsharkEl = document.getElementById('navSurfsharkDueCount');
+  if (navSurfsharkEl) {
+    const surfsharkDue = (STATE.data.sales || []).filter(s =>
+      String(s.product || '').toLowerCase().includes('surfshark') &&
+      !s.accountRemoved &&
+      (calculateDaysRemaining(s.expiryDate) !== null && calculateDaysRemaining(s.expiryDate) <= 0)
+    ).length;
+    navSurfsharkEl.textContent = surfsharkDue;
+  }
 
   // Update specific date custom bar summary if active
   if (period === 'custom') {
@@ -3704,20 +3716,7 @@ function setupEventListeners() {
   });
   document.getElementById('drawerBtnSurfsharkExpiry')?.addEventListener('click', () => {
     closeSideDrawer();
-    switchView('adminView');
-    setTimeout(() => {
-      const el = document.getElementById('adminSurfsharkExpiryCard');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        el.style.transition = 'box-shadow 0.4s ease, border-color 0.4s ease';
-        el.style.borderColor = '#06b6d4';
-        el.style.boxShadow = '0 0 25px rgba(6, 182, 212, 0.45)';
-        setTimeout(() => {
-          el.style.borderColor = '';
-          el.style.boxShadow = '';
-        }, 1600);
-      }
-    }, 120);
+    switchView('surfsharkView');
   });
   document.getElementById('drawerBtnStaff')?.addEventListener('click', () => {
     closeSideDrawer();
@@ -4239,6 +4238,7 @@ function switchView(viewId) {
   else if (viewId === 'pendingView') renderPendingPayments();
   else if (viewId === 'stockView') renderStockAndSlots();
   else if (viewId === 'remindersView') renderReminders();
+  else if (viewId === 'surfsharkView') renderSurfsharkExpiryTracker();
   else if (viewId === 'adminView') renderAdminCatalog();
 
   window.scrollTo(0, 0);
