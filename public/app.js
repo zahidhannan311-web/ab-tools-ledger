@@ -5482,6 +5482,37 @@ function renderSurfsharkExpiryTracker() {
 }
 window.renderSurfsharkExpiryTracker = renderSurfsharkExpiryTracker;
 
+function toggleFullscreenMode() {
+  if (!document.fullscreenElement) {
+    const el = document.documentElement;
+    if (el.requestFullscreen) {
+      el.requestFullscreen().catch(err => console.warn('Fullscreen error:', err));
+    } else if (el.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen();
+    }
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+  }
+}
+window.toggleFullscreenMode = toggleFullscreenMode;
+
+document.addEventListener('fullscreenchange', () => {
+  const icon = document.getElementById('fullscreenIcon');
+  const text = document.getElementById('fullscreenText');
+  if (document.fullscreenElement) {
+    if (icon) icon.textContent = '✕';
+    if (text) text.textContent = 'Exit Fullscreen';
+  } else {
+    if (icon) icon.textContent = '⛶';
+    if (text) text.textContent = 'Full Screen';
+  }
+});
+
+
 // ==================== EXPENSE FORM CRUD ====================
 window.openExpenseModal = openExpenseModal;
 function openExpenseModal(preselectedTarget = 'admin') {

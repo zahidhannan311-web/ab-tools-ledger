@@ -689,9 +689,9 @@ body::before {
 }
 
 .header-content {
-  max-width: 1180px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 10px 18px;
+  padding: 10px 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -794,9 +794,9 @@ body::before {
 }
 
 .action-quick-bar {
-  max-width: 1180px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 0 18px 10px;
+  padding: 0 22px 10px;
   display: flex;
   gap: 8px;
   overflow-x: auto;
@@ -810,9 +810,9 @@ body::before {
   border-top: 1px solid rgba(255, 255, 255, 0.04);
 }
 .period-tabs {
-  max-width: 1180px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 6px 18px;
+  padding: 6px 22px;
   display: flex;
   gap: 6px;
   overflow-x: auto;
@@ -858,8 +858,9 @@ body::before {
 }
 
 .custom-date-container {
-  max-width: 1180px;
+  max-width: 100%;
   margin: 0 auto;
+  padding: 0 4px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1003,10 +1004,10 @@ body::before {
 
 /* ==================== MAIN CONTENT & KPI STATS ==================== */
 .app-body {
-  max-width: 1180px;
+  max-width: 100%;
   width: 100%;
   margin: 0 auto;
-  padding: 20px 18px;
+  padding: 18px 22px;
 }
 
 .stats-grid {
@@ -5170,6 +5171,13 @@ body::before {
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(10, 13, 18, 0.65);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.surfshark-table-container::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .surfshark-expiry-table {
@@ -5186,7 +5194,7 @@ body::before {
   z-index: 2;
 }
 .surfshark-expiry-table th {
-  padding: 10px 14px;
+  padding: 9px 12px;
   color: var(--text-muted);
   font-size: 11.5px;
   font-weight: 600;
@@ -5195,7 +5203,7 @@ body::before {
   white-space: nowrap;
 }
 .surfshark-expiry-table td {
-  padding: 11px 14px;
+  padding: 9px 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   vertical-align: middle;
 }

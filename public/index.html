@@ -22,7 +22,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=8.0">
+  <link rel="stylesheet" href="style.css?v=8.1">
 </head>
 <body>
 
@@ -733,6 +733,9 @@
             <p class="view-subtitle">Daily customer renewals &amp; device removal tracker — sorted by earliest expiry</p>
           </div>
           <div class="flex items-center gap-2">
+            <button type="button" class="btn btn-outline btn-sm" onclick="toggleFullscreenMode()" id="btnToggleFullscreen" title="Toggle Full Screen Mode">
+              <span id="fullscreenIcon">⛶</span> <span id="fullscreenText">Full Screen</span>
+            </button>
             <button type="button" class="btn btn-gold btn-sm" onclick="openSaleModalForSurfshark()">
               + Add Surfshark Sale
             </button>
@@ -840,8 +843,8 @@
                   <th>Customer Phone</th>
                   <th>Login Account / Email</th>
                   <th>Price</th>
-                  <th style="min-width: 170px;">Expiry Date &amp; Status</th>
-                  <th style="text-align: right; min-width: 150px;">Action / Removal</th>
+                  <th>Expiry Date &amp; Status</th>
+                  <th style="text-align: right;">Action / Removal</th>
                 </tr>
               </thead>
               <tbody id="surfsharkExpiryTableBody">
@@ -2250,6 +2253,6 @@
   <!-- Notification Toast -->
   <div id="toastNotification" class="toast"></div>
 
-  <script src="app.js?v=8.0"></script>
+  <script src="app.js?v=8.1"></script>
 </body>
 </html>
