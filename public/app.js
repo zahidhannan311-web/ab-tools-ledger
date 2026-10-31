@@ -934,7 +934,12 @@ async function performServerSync() {
 
         // Robust deep comparison: detect ANY addition, deletion, or status update (e.g. Paid)
         const salesChanged = JSON.stringify(mergedSales) !== JSON.stringify(STATE.data.sales || []);
+        const expChanged = JSON.stringify(mergedExpenses) !== JSON.stringify(STATE.data.expenses || []);
         let prodsChanged = false;
+
+        if (serverResult.kvLimitExceeded !== undefined) {
+          STATE.kvLimitExceeded = !!serverResult.kvLimitExceeded;
+        }
         
         // Exclude lastModified from settings comparison so periodic sync doesn't falsely report changes
         const currentSettingsCopy = { ...(STATE.data.settings || {}) };
@@ -1104,9 +1109,14 @@ function syncSettingsFormUI() {
   }
   if (cloudBadge) {
     const hasKv = !!((settings.kvUrl && settings.kvToken) || (localStorage.getItem('ab_tools_kv_url') && localStorage.getItem('ab_tools_kv_token')));
-    if (hasKv) {
+    if (STATE.kvLimitExceeded) {
+      cloudBadge.className = 'badge-rose font-bold';
+      cloudBadge.innerHTML = '⚠️ Daily Limit Reached (Free 10k)';
+      cloudBadge.setAttribute('title', 'Upstash Redis daily 10,000 commands limit reached. 24h me auto-reset hoga ya New Free Database banayein.');
+    } else if (hasKv) {
       cloudBadge.className = 'badge-green font-bold';
       cloudBadge.innerHTML = '🟢 Connected &amp; Auto-Syncing';
+      cloudBadge.setAttribute('title', 'Cloud Sync is active and healthy');
     } else {
       cloudBadge.className = 'badge-subtle';
       cloudBadge.innerHTML = '🟡 Local Mode (No Cloud)';
@@ -1122,19 +1132,17 @@ function syncSettingsFormUI() {
 
 // Background cross-device sync loop (Phone <-> Laptop)
 function startRealtimeSync() {
-  // Sync every 4 seconds in background when tab is active
+  // Sync every 8 seconds in background when tab is active (preserves Upstash 10k daily limit forever)
   setInterval(() => {
     if (STATE.unlocked && !document.hidden) {
       performServerSync();
-      syncDirectUpstashRedis();
     }
-  }, 4000);
+  }, 8000);
 
   // Sync immediately when phone tab/screen is brought to foreground
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && STATE.unlocked) {
       performServerSync();
-      syncDirectUpstashRedis();
     }
   });
 
@@ -1142,7 +1150,6 @@ function startRealtimeSync() {
   window.addEventListener('pageshow', () => {
     if (STATE.unlocked) {
       performServerSync();
-      syncDirectUpstashRedis();
     }
   });
 
@@ -6442,6 +6449,18 @@ async function handleTestCloudKv() {
     const directRes = await fetch(`${kvUrl}/get/ping`, {
       headers: { Authorization: `Bearer ${kvToken}` }
     });
+    const directData = await directRes.json().catch(() => null);
+    if (directData && directData.error) {
+      if (msgEl) {
+        msgEl.className = 'pin-feedback-msg text-rose';
+        if (directData.error.includes('limit') || directData.error.includes('Fixed plan')) {
+          msgEl.innerHTML = '⚠️ <strong>Upstash Daily Limit Reached!</strong> Free 10,000 commands/day limit poora ho gaya hai.<br><a href="https://console.upstash.com" target="_blank" rel="noopener" style="color:var(--gold-accent); text-decoration:underline;">console.upstash.com</a> se 1 click me <strong>New Free Database</strong> banayein aur uska REST URL/Token yahan enter karein.';
+        } else {
+          msgEl.textContent = 'Upstash Error: ' + directData.error;
+        }
+      }
+      return;
+    }
     if (directRes.ok) {
       if (msgEl) {
         msgEl.className = 'pin-feedback-msg text-green';
@@ -6467,7 +6486,7 @@ async function handleTestCloudKv() {
     } else {
       if (msgEl) {
         msgEl.className = 'pin-feedback-msg text-rose';
-        msgEl.textContent = result.error || 'Connection failed. Please check your Upstash credentials.';
+        msgEl.innerHTML = result.error || 'Connection failed. Please check your Upstash credentials.';
       }
     }
   } catch (err) {

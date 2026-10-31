@@ -55,15 +55,32 @@ function getCloudKvCredentials() {
   };
 }
 
-async function syncFromCloudKV() {
+let isKvLimitExceeded = false;
+let lastKvSyncTime = 0;
+const KV_SYNC_THROTTLE_MS = 6000;
+
+async function syncFromCloudKV(force = false) {
   const { url, token } = getCloudKvCredentials();
   if (!url || !token) return false;
+  const now = Date.now();
+  if (!force && memoryDb && (now - lastKvSyncTime < KV_SYNC_THROTTLE_MS)) {
+    return true;
+  }
+  lastKvSyncTime = now;
   try {
     const res = await fetch(`${url}/get/ab_tools_db`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (res.ok) {
       const data = await res.json();
+      if (data && data.error) {
+        if (data.error.includes('limit') || data.error.includes('Fixed plan')) {
+          isKvLimitExceeded = true;
+          console.warn('Upstash limit reached:', data.error);
+        }
+        return false;
+      }
+      isKvLimitExceeded = false;
       if (data && data.result) {
         let parsed = data.result;
         if (typeof parsed === 'string') {
@@ -147,6 +164,15 @@ async function syncToCloudKV(data) {
       },
       body: JSON.stringify(data)
     });
+    const resData = await res.json().catch(() => null);
+    if (resData && resData.error) {
+      if (resData.error.includes('limit') || resData.error.includes('Fixed plan')) {
+        isKvLimitExceeded = true;
+        console.warn('Upstash write blocked: Daily limit reached');
+      }
+      return false;
+    }
+    isKvLimitExceeded = false;
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
       console.warn('Cloud KV write warning:', res.status, txt);
@@ -158,15 +184,6 @@ async function syncToCloudKV(data) {
     return false;
   }
 }
-
-// Auto-sync Cloud KV for incoming API calls if configured
-app.use(async (req, res, next) => {
-  const { url, token } = getCloudKvCredentials();
-  if (url && token && req.path.startsWith('/api') && !req.path.startsWith('/api/cloud-kv/test')) {
-    await syncFromCloudKV();
-  }
-  next();
-});
 
 // Default initial catalog as specified in specification
 // Default initial catalog as specified in specification
@@ -539,7 +556,19 @@ app.post('/api/cloud-kv/test', async (req, res) => {
     const testRes = await fetch(`${cleanUrl}/get/ping`, {
       headers: { Authorization: `Bearer ${cleanToken}` }
     });
+    const data = await testRes.json().catch(() => null);
+    if (data && data.error) {
+      if (data.error.includes('limit') || data.error.includes('Fixed plan')) {
+        isKvLimitExceeded = true;
+        return res.status(400).json({
+          success: false,
+          error: '⚠️ Upstash Limit Reached! Free 10,000 commands/day limit poora ho gaya hai. Upstash Console (console.upstash.com) se 1 click me New Free Database banayein aur uska REST URL & Token yahan paste karein.'
+        });
+      }
+      return res.status(400).json({ success: false, error: 'Upstash Error: ' + data.error });
+    }
     if (testRes.ok) {
+      isKvLimitExceeded = false;
       return res.json({ success: true, message: 'Cloud KV Connected successfully! 🎉' });
     }
     const txt = await testRes.text().catch(() => '');
@@ -1465,6 +1494,7 @@ function mergeRecordLists(existing = [], incoming = [], deletedSet = new Set()) 
 // Universal Real-Time Sync endpoint (Cross-Device Instant Save without refresh)
 app.post('/api/sync', async (req, res) => {
   try {
+    await syncFromCloudKV();
     const {
       sales: incomingSales,
       expenses: incomingExpenses,
@@ -1637,7 +1667,8 @@ app.post('/api/sync', async (req, res) => {
       recycleBin: db.recycleBin || [],
       settings: db.settings,
       pin: db.pin,
-      pinLength: db.pin ? String(db.pin).length : 0
+      pinLength: db.pin ? String(db.pin).length : 0,
+      kvLimitExceeded: isKvLimitExceeded
     });
   } catch (err) {
     console.error('Realtime sync error:', err);
