@@ -8,8 +8,11 @@ const STATE = {
   pinSet: false,
   unlocked: false,
   targetPinLength: 4,
-  currentPeriod: 'today', // today, yesterday, week, month, all, custom
+  currentPeriod: 'today', // today, yesterday, week, month, all, custom, daterange, monthpick
   customSelectedDate: '',
+  dateRangeFrom: '',
+  dateRangeTo: '',
+  selectedMonth: '',   // format: 'YYYY-MM'
   currentView: 'salesView',
   selectedLoginProfile: null,
   loginProfiles: [],
@@ -240,6 +243,28 @@ window.setAppTheme = setAppTheme;
 
 // ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', async () => {
+  // Auto-clear stale KV credentials from localStorage if they point to old/suspended DB
+  // This ensures all devices automatically switch to the new Upstash database on next load
+  (function autoMigrateKvCredentials() {
+    const OLD_KV_HOST = 'desired-elephant-221971.upstash.io';
+    const storedUrl = localStorage.getItem('ab_tools_kv_url') || '';
+    if (storedUrl.includes(OLD_KV_HOST)) {
+      localStorage.removeItem('ab_tools_kv_url');
+      localStorage.removeItem('ab_tools_kv_token');
+      console.log('[Sync] Old suspended Upstash DB cleared from localStorage. Switching to new DB.');
+    }
+    // Also clear if settings in cache point to old DB
+    try {
+      const cache = JSON.parse(localStorage.getItem('ab_tools_cache') || '{}');
+      if (cache?.settings?.kvUrl?.includes(OLD_KV_HOST)) {
+        delete cache.settings.kvUrl;
+        delete cache.settings.kvToken;
+        localStorage.setItem('ab_tools_cache', JSON.stringify(cache));
+        console.log('[Sync] Old DB URL removed from cached settings.');
+      }
+    } catch (_) {}
+  })();
+
   initAppTheme();
   setupViewportKeyboardHandling();
   setupEventListeners();
@@ -864,7 +889,8 @@ let syncPendingAgain = false;
 function triggerAutoSaveSync(immediate = false) {
   saveLocalState();
   updateSyncBadge('syncing');
-  pushDirectUpstashRedis();
+  // NOTE: pushDirectUpstashRedis() removed — all writes go through server /api/sync only.
+  // This prevents race condition where client & server write conflicting states to Upstash simultaneously.
   if (autoSyncTimer) clearTimeout(autoSyncTimer);
   if (immediate) {
     performServerSync();
@@ -1310,8 +1336,8 @@ async function loadAppData() {
   }
 
   // 2. Instant Sync with Server (fetches fresh changes + auto-pushes local changes)
+  // Server already reads from Upstash (force=true) and merges everything — no need for a second direct pull.
   await performServerSync();
-  await syncDirectUpstashRedis();
 }
 
 function populateProductDropdowns() {
@@ -1751,6 +1777,78 @@ function shiftDateByDays(dateStr, offsetDays) {
   return `${resY}-${resM}-${resD}`;
 }
 
+// ==================== DATE RANGE & MONTH PICK HELPERS ====================
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function updateDateRangeMeta() {
+  const from = STATE.dateRangeFrom;
+  const to   = STATE.dateRangeTo;
+  const labelEl = document.getElementById('dateRangeLabel');
+  const statsEl = document.getElementById('dateRangeStatsSummary');
+  if (labelEl) {
+    if (from && to) {
+      labelEl.textContent = `${from} → ${to}`;
+    } else if (from) {
+      labelEl.textContent = `From ${from}`;
+    } else {
+      labelEl.textContent = 'Select a date range';
+    }
+  }
+  if (statsEl) {
+    const sales = (STATE.data.sales || []).filter(s => isDateInPeriod(s.date, 'daterange'));
+    const rev   = sales.reduce((a, s) => a + (Number(s.amount) || 0), 0);
+    statsEl.textContent = `${sales.length} sales · Rs. ${rev.toLocaleString()}`;
+  }
+}
+
+function updateMonthPickMeta() {
+  const m = STATE.selectedMonth; // 'YYYY-MM'
+  const labelEl = document.getElementById('monthPickLabel');
+  const statsEl = document.getElementById('monthPickStatsSummary');
+  if (labelEl && m) {
+    const [yr, mo] = m.split('-');
+    labelEl.textContent = `${MONTH_NAMES[parseInt(mo) - 1]} ${yr}`;
+  }
+  if (statsEl) {
+    const sales = (STATE.data.sales || []).filter(s => isDateInPeriod(s.date, 'monthpick'));
+    const rev   = sales.reduce((a, s) => a + (Number(s.amount) || 0), 0);
+    statsEl.textContent = `${sales.length} sales · Rs. ${rev.toLocaleString()}`;
+  }
+}
+
+function buildMonthQuickChips() {
+  const container = document.getElementById('monthQuickChips');
+  if (!container) return;
+
+  // Build list of months that have at least 1 sale
+  const monthSet = new Set();
+  (STATE.data.sales || []).forEach(s => {
+    if (s.date && s.date.length >= 7) monthSet.add(s.date.slice(0, 7));
+  });
+
+  // Sort descending (newest first), show up to 12
+  const months = Array.from(monthSet).sort((a, b) => b.localeCompare(a)).slice(0, 12);
+
+  container.innerHTML = months.map(m => {
+    const [yr, mo] = m.split('-');
+    const label = `${MONTH_NAMES[parseInt(mo) - 1].slice(0, 3)} ${yr}`;
+    const isActive = STATE.selectedMonth === m ? 'style="background:var(--gold-accent);color:#000;"' : '';
+    return `<button type="button" class="btn-date-chip month-quick-chip" data-month="${m}" ${isActive}>${label}</button>`;
+  }).join('');
+
+  // Chip click
+  container.querySelectorAll('.month-quick-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      STATE.selectedMonth = btn.getAttribute('data-month');
+      const mInput = document.getElementById('monthPickInput');
+      if (mInput) mInput.value = STATE.selectedMonth;
+      buildMonthQuickChips(); // re-highlight active chip
+      updateMonthPickMeta();
+      renderApp();
+    });
+  });
+}
+
 let lastCheckedLocalDate = getLocalTodayDateString();
 
 function startDailyDateWatcher() {
@@ -1819,6 +1917,23 @@ function isDateInPeriod(dateStr, period) {
   if (period === 'custom' || period === 'specific') {
     const target = STATE.customSelectedDate || todayStr;
     return dateStr === target;
+  }
+
+  // Date Range: is date se is date tak
+  if (period === 'daterange') {
+    const from = STATE.dateRangeFrom;
+    const to = STATE.dateRangeTo;
+    if (!from && !to) return true;
+    if (from && !to) return dateStr >= from;
+    if (!from && to) return dateStr <= to;
+    return dateStr >= from && dateStr <= to;
+  }
+
+  // Month Picker: specific month (YYYY-MM)
+  if (period === 'monthpick') {
+    const m = STATE.selectedMonth; // 'YYYY-MM'
+    if (!m) return true;
+    return dateStr.startsWith(m);
   }
 
   const itemDate = new Date(dateStr + 'T00:00:00');
@@ -2033,6 +2148,16 @@ function renderKPIs() {
       labelEl.textContent = formatDateWithDay(STATE.customSelectedDate || getLocalTodayDateString());
     }
   }
+
+  // Update Date Range bar summary if active
+  if (period === 'daterange') {
+    updateDateRangeMeta();
+  }
+
+  // Update Month Pick bar summary if active
+  if (period === 'monthpick') {
+    updateMonthPickMeta();
+  }
 }
 
 // ==================== RENDER SALES LIST ====================
@@ -2076,13 +2201,25 @@ function renderSales() {
       const prod = String(s.product || '').toLowerCase();
       const notes = String(s.notes || '').toLowerCase();
       const plan = String(s.planLabel || '').toLowerCase();
+      const dateStr = String(s.date || '').toLowerCase();
       return phone.includes(salesSearchVal) ||
              name.includes(salesSearchVal) ||
              login.includes(salesSearchVal) ||
              prod.includes(salesSearchVal) ||
              notes.includes(salesSearchVal) ||
-             plan.includes(salesSearchVal);
+             plan.includes(salesSearchVal) ||
+             dateStr.includes(salesSearchVal);
     });
+  }
+
+  // Purchase Date Filter (date picker)
+  const purchaseDateFilter = document.getElementById('salesFilterPurchaseDate')?.value || '';
+  const clearDateFilterBtn = document.getElementById('btnClearSalesDateFilter');
+  if (clearDateFilterBtn) {
+    clearDateFilterBtn.style.display = purchaseDateFilter ? 'block' : 'none';
+  }
+  if (purchaseDateFilter) {
+    list = list.filter(s => s.date === purchaseDateFilter);
   }
 
   if (productFilter !== 'ALL') {
@@ -2811,7 +2948,6 @@ async function handleSaveSlotCapacity(e) {
   showToast(`Slot capacity updated to ${newCapacity} members! ✓`);
 
   triggerAutoSaveSync(true);
-  await pushDirectUpstashRedis();
 }
 
 function handleRemoveCurrentStockAccount() {
@@ -2838,7 +2974,6 @@ function handleRemoveCurrentStockAccount() {
   renderStockAndSlots();
   showToast('Account removed from stock.');
   triggerAutoSaveSync(true);
-  pushDirectUpstashRedis();
 }
 
 function openAddStockAccountModal() {
@@ -2908,7 +3043,6 @@ async function handleSaveNewStockAccount(e) {
   showToast(`Account "${login}" added to stock with ${capacity} slots! 🎉`);
 
   triggerAutoSaveSync(true);
-  await pushDirectUpstashRedis();
 }
 
 function openNewSaleWithStock(product, login, type) {
@@ -3628,16 +3762,42 @@ function setupEventListeners() {
       const period = tab.getAttribute('data-period');
       STATE.currentPeriod = period;
 
-      const customBar = document.getElementById('customDateBar');
+      // Hide all period bars first
+      const customBar    = document.getElementById('customDateBar');
+      const dateRangeBar = document.getElementById('dateRangeBar');
+      const monthPickBar = document.getElementById('monthPickBar');
+      if (customBar)    customBar.style.display    = 'none';
+      if (dateRangeBar) dateRangeBar.style.display  = 'none';
+      if (monthPickBar) monthPickBar.style.display   = 'none';
+
       if (period === 'custom') {
-        if (!STATE.customSelectedDate) {
-          STATE.customSelectedDate = getLocalTodayDateString();
-        }
+        if (!STATE.customSelectedDate) STATE.customSelectedDate = getLocalTodayDateString();
         if (customBar) customBar.style.display = 'block';
         const dateInput = document.getElementById('periodCustomDateInput');
         if (dateInput) dateInput.value = STATE.customSelectedDate;
-      } else {
-        if (customBar) customBar.style.display = 'none';
+
+      } else if (period === 'daterange') {
+        if (dateRangeBar) dateRangeBar.style.display = 'block';
+        // Pre-fill with current month as default if empty
+        if (!STATE.dateRangeFrom) {
+          const today = getLocalTodayDateString();
+          const firstOfMonth = today.slice(0, 7) + '-01';
+          STATE.dateRangeFrom = firstOfMonth;
+          STATE.dateRangeTo   = today;
+        }
+        const fromEl = document.getElementById('dateRangeFrom');
+        const toEl   = document.getElementById('dateRangeTo');
+        if (fromEl) fromEl.value = STATE.dateRangeFrom;
+        if (toEl)   toEl.value   = STATE.dateRangeTo;
+        updateDateRangeMeta();
+
+      } else if (period === 'monthpick') {
+        if (monthPickBar) monthPickBar.style.display = 'block';
+        if (!STATE.selectedMonth) STATE.selectedMonth = getLocalTodayDateString().slice(0, 7);
+        const mInput = document.getElementById('monthPickInput');
+        if (mInput) mInput.value = STATE.selectedMonth;
+        buildMonthQuickChips();
+        updateMonthPickMeta();
       }
 
       renderApp();
@@ -3668,6 +3828,58 @@ function setupEventListeners() {
   document.getElementById('btnJumpTodayDate')?.addEventListener('click', () => {
     STATE.customSelectedDate = getLocalTodayDateString();
     if (customDateInput) customDateInput.value = STATE.customSelectedDate;
+    renderApp();
+  });
+
+  // ---- Date Range event listeners ----
+  document.getElementById('btnApplyDateRange')?.addEventListener('click', () => {
+    const from = document.getElementById('dateRangeFrom')?.value;
+    const to   = document.getElementById('dateRangeTo')?.value;
+    if (from) STATE.dateRangeFrom = from;
+    if (to)   STATE.dateRangeTo   = to;
+    updateDateRangeMeta();
+    renderApp();
+  });
+
+  document.getElementById('dateRangeFrom')?.addEventListener('change', (e) => {
+    STATE.dateRangeFrom = e.target.value;
+    updateDateRangeMeta();
+    renderApp();
+  });
+  document.getElementById('dateRangeTo')?.addEventListener('change', (e) => {
+    STATE.dateRangeTo = e.target.value;
+    updateDateRangeMeta();
+    renderApp();
+  });
+
+  document.getElementById('btnDateRangeThisMonth')?.addEventListener('click', () => {
+    const today = getLocalTodayDateString();
+    STATE.dateRangeFrom = today.slice(0, 7) + '-01';
+    STATE.dateRangeTo   = today;
+    const fromEl = document.getElementById('dateRangeFrom');
+    const toEl   = document.getElementById('dateRangeTo');
+    if (fromEl) fromEl.value = STATE.dateRangeFrom;
+    if (toEl)   toEl.value   = STATE.dateRangeTo;
+    updateDateRangeMeta();
+    renderApp();
+  });
+
+  document.getElementById('btnDateRangeLast30')?.addEventListener('click', () => {
+    const today = getLocalTodayDateString();
+    STATE.dateRangeTo   = today;
+    STATE.dateRangeFrom = shiftDateByDays(today, -29);
+    const fromEl = document.getElementById('dateRangeFrom');
+    const toEl   = document.getElementById('dateRangeTo');
+    if (fromEl) fromEl.value = STATE.dateRangeFrom;
+    if (toEl)   toEl.value   = STATE.dateRangeTo;
+    updateDateRangeMeta();
+    renderApp();
+  });
+
+  // ---- Month Picker event listeners ----
+  document.getElementById('monthPickInput')?.addEventListener('change', (e) => {
+    STATE.selectedMonth = e.target.value; // 'YYYY-MM'
+    updateMonthPickMeta();
     renderApp();
   });
 
@@ -3934,6 +4146,14 @@ function setupEventListeners() {
   document.getElementById('salesFilterStaff')?.addEventListener('change', renderSales);
   document.getElementById('salesFilterProduct')?.addEventListener('change', renderSales);
   document.getElementById('salesFilterStatus')?.addEventListener('change', renderSales);
+
+  // Purchase Date Filter event listeners
+  document.getElementById('salesFilterPurchaseDate')?.addEventListener('change', renderSales);
+  document.getElementById('btnClearSalesDateFilter')?.addEventListener('click', () => {
+    const dateInput = document.getElementById('salesFilterPurchaseDate');
+    if (dateInput) { dateInput.value = ''; }
+    renderSales();
+  });
   document.getElementById('expensesFilterTarget')?.addEventListener('change', renderExpenses);
 
   // Sale Modal Payment Proof File Input
@@ -6164,8 +6384,7 @@ async function handleProductSubmit(e) {
     console.warn('Product sync warning:', err);
   }
 
-  // Push to Cloud KV & schedule instant sync
-  await pushDirectUpstashRedis();
+  // Push to Cloud KV & schedule instant sync — single path through server only
   triggerAutoSaveSync(true);
 }
 
@@ -6497,8 +6716,8 @@ async function handleTestCloudKv() {
   }
 }
 
-const DEFAULT_CLIENT_KV_URL = 'https://desired-elephant-221971.upstash.io';
-const DEFAULT_CLIENT_KV_TOKEN = 'gQAAAAAAA2MTAAIgcDFkZTgzY2JmODU0YWE0YjI3OGFiODkyZjMyNzUxMzcyMw';
+const DEFAULT_CLIENT_KV_URL = 'https://flexible-tarpon-222320.upstash.io';
+const DEFAULT_CLIENT_KV_TOKEN = 'gQAAAAAAA2RwAAIgcDJmZDQ1YWU5M2YxNTg0ZDA4OWY3ODc3YjYyMjY2ODhiOQ';
 
 async function syncDirectUpstashRedis() {
   const url = STATE.data.settings?.kvUrl || localStorage.getItem('ab_tools_kv_url') || DEFAULT_CLIENT_KV_URL;

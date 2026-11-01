@@ -944,6 +944,18 @@ body::before {
   color: #000;
 }
 
+/* Month quick chips — active state */
+.month-quick-chip {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+.month-quick-chip:hover,
+.month-quick-chip.active {
+  background: var(--gold-accent) !important;
+  color: #000 !important;
+}
+
 .custom-date-meta {
   display: flex;
   align-items: center;
@@ -4788,6 +4800,41 @@ body::before {
 }
 .btn-clear-sales-search:hover {
   color: #fff;
+}
+
+/* Purchase Date Filter */
+.sales-date-filter-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 0 8px;
+  height: 32px;
+  transition: all 0.2s ease;
+}
+.sales-date-filter-wrap:focus-within {
+  border-color: var(--gold-border);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 2px var(--gold-dim);
+}
+.sales-date-filter-wrap .date-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.sales-date-filter-input {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.sales-date-filter-input::-webkit-calendar-picker-indicator {
+  filter: invert(0.6);
+  cursor: pointer;
 }
 .palette-footer {
   display: flex;

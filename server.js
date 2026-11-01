@@ -42,8 +42,8 @@ app.use('/api', (req, res, next) => {
 });
 
 // Cloud KV / Redis Persistent Storage Adapter (Upstash Redis / Vercel KV)
-const DEFAULT_KV_URL = 'https://desired-elephant-221971.upstash.io';
-const DEFAULT_KV_TOKEN = 'gQAAAAAAA2MTAAIgcDFkZTgzY2JmODU0YWE0YjI3OGFiODkyZjMyNzUxMzcyMw';
+const DEFAULT_KV_URL = 'https://flexible-tarpon-222320.upstash.io';
+const DEFAULT_KV_TOKEN = 'gQAAAAAAA2RwAAIgcDJmZDQ1YWU5M2YxNTg0ZDA4OWY3ODc3YjYyMjY2ODhiOQ';
 
 function getCloudKvCredentials() {
   const db = memoryDb || {};
@@ -57,7 +57,7 @@ function getCloudKvCredentials() {
 
 let isKvLimitExceeded = false;
 let lastKvSyncTime = 0;
-const KV_SYNC_THROTTLE_MS = 6000;
+const KV_SYNC_THROTTLE_MS = 2000; // Reduced from 6000ms → 2000ms for fresher cross-device reads
 
 async function syncFromCloudKV(force = false) {
   const { url, token } = getCloudKvCredentials();
@@ -1494,7 +1494,7 @@ function mergeRecordLists(existing = [], incoming = [], deletedSet = new Set()) 
 // Universal Real-Time Sync endpoint (Cross-Device Instant Save without refresh)
 app.post('/api/sync', async (req, res) => {
   try {
-    await syncFromCloudKV();
+    await syncFromCloudKV(true); // force=true: always read fresh from Upstash, bypass throttle
     const {
       sales: incomingSales,
       expenses: incomingExpenses,
